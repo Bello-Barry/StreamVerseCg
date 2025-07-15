@@ -29,25 +29,28 @@ export interface NotificationSettings {
 }
 
 class NotificationService {
-  private permission: NotificationPermission = 'default'
+  private permission: NotificationPermission = typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
   private settings: NotificationSettings
   private notifications: NotificationData[] = []
   private serviceWorkerRegistration: ServiceWorkerRegistration | null = null
 
   constructor() {
     this.settings = this.loadSettings()
-    this.initializePermission()
-    this.registerServiceWorker()
+    if (typeof window !== 'undefined') {
+      this.initializePermission()
+      this.registerServiceWorker()
+    }
   }
 
   private loadSettings(): NotificationSettings {
+    if (typeof window === 'undefined') return this.getDefaultSettings()
     try {
-      const stored = localStorage.getItem('streamverse_notification_settings')
+      const stored = localStorage.getItem("streamverse_notification_settings")
       if (stored) {
         return { ...this.getDefaultSettings(), ...JSON.parse(stored) }
       }
     } catch (error) {
-      console.warn('Failed to load notification settings:', error)
+      console.warn("Failed to load notification settings:", error)
     }
     return this.getDefaultSettings()
   }
@@ -65,36 +68,35 @@ class NotificationService {
   }
 
   private saveSettings(): void {
+    if (typeof window === 'undefined') return
     try {
-      localStorage.setItem('streamverse_notification_settings', JSON.stringify(this.settings))
+      localStorage.setItem("streamverse_notification_settings", JSON.stringify(this.settings))
     } catch (error) {
-      console.warn('Failed to save notification settings:', error)
+      console.warn("Failed to save notification settings:", error)
     }
   }
 
   private async initializePermission(): Promise<void> {
-    if ('Notification' in window) {
-      this.permission = Notification.permission
-      if (this.permission === 'default') {
-        // Don't request permission automatically, let user enable it
-      }
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    this.permission = Notification.permission
+    if (this.permission === 'default') {
+      // Don't request permission automatically, let user enable it
     }
   }
 
   private async registerServiceWorker(): Promise<void> {
-    if ('serviceWorker' in navigator) {
-      try {
-        this.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js')
-        console.log('Service Worker registered successfully')
-      } catch (error) {
-        console.warn('Service Worker registration failed:', error)
-      }
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
+    try {
+      this.serviceWorkerRegistration = await navigator.serviceWorker.register("/sw.js")
+      console.log("Service Worker registered successfully")
+    } catch (error) {
+      console.warn("Service Worker registration failed:", error)
     }
   }
 
   async requestPermission(): Promise<boolean> {
-    if (!('Notification' in window)) {
-      console.warn('This browser does not support notifications')
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      console.warn("This browser does not support notifications")
       return false
     }
 
@@ -124,7 +126,7 @@ class NotificationService {
   }
 
   async showNotification(data: Omit<NotificationData, 'id' | 'timestamp'>): Promise<void> {
-    if (!this.settings.enabled || this.permission !== 'granted') {
+    if (typeof window === 'undefined' || !this.settings.enabled || this.permission !== 'granted') {
       return
     }
 
@@ -146,8 +148,8 @@ class NotificationService {
     if (this.serviceWorkerRegistration) {
       await this.serviceWorkerRegistration.showNotification(notification.title, {
         body: notification.body,
-        icon: notification.icon || '/icons/icon-192x192.png',
-        badge: notification.badge || '/icons/icon-72x72.png',
+        icon: notification.icon || "/icons/icon-192x192.png",
+        badge: notification.badge || "/icons/icon-72x72.png",
         image: notification.image,
         tag: notification.tag,
         data: notification.data,
@@ -161,7 +163,7 @@ class NotificationService {
       // Fallback to regular notification
       const browserNotification = new Notification(notification.title, {
         body: notification.body,
-        icon: notification.icon || '/icons/icon-192x192.png',
+        icon: notification.icon || "/icons/icon-192x192.png",
         tag: notification.tag,
         data: notification.data,
         vibrate: this.settings.vibrate ? [200, 100, 200] : undefined,
@@ -192,25 +194,29 @@ class NotificationService {
   }
 
   private saveNotifications(): void {
+    if (typeof window === 'undefined') return
     try {
       // Keep only last 50 notifications
       const notificationsToStore = this.notifications.slice(-50)
-      localStorage.setItem('streamverse_notifications', JSON.stringify(notificationsToStore))
+      localStorage.setItem("streamverse_notifications", JSON.stringify(notificationsToStore))
     } catch (error) {
-      console.warn('Failed to save notifications:', error)
+      console.warn("Failed to save notifications:", error)
     }
   }
 
   getNotifications(): NotificationData[] {
+    if (typeof window === 'undefined') return []
     return [...this.notifications].reverse() // Most recent first
   }
 
   clearNotifications(): void {
+    if (typeof window === 'undefined') return
     this.notifications = []
-    localStorage.removeItem('streamverse_notifications')
+    localStorage.removeItem("streamverse_notifications")
   }
 
   markAsRead(notificationId: string): void {
+    if (typeof window === 'undefined') return
     const notification = this.notifications.find(n => n.id === notificationId)
     if (notification) {
       notification.data = { ...notification.data, read: true }
@@ -224,7 +230,7 @@ class NotificationService {
       type: 'channel_update',
       title: 'Nouvelle chaîne disponible',
       body: `${channelName} a été ajoutée à ${playlistName}`,
-      icon: '/icons/icon-192x192.png',
+      icon: "/icons/icon-192x192.png",
       tag: 'channel_update',
       data: { channelName, playlistName }
     })
@@ -235,7 +241,7 @@ class NotificationService {
       type: 'playlist_update',
       title: 'Playlist mise à jour',
       body: `${playlistName} contient maintenant ${channelCount} chaînes`,
-      icon: '/icons/icon-192x192.png',
+      icon: "/icons/icon-192x192.png",
       tag: 'playlist_update',
       data: { playlistName, channelCount }
     })
@@ -248,11 +254,11 @@ class NotificationService {
       type: 'channel_update',
       title: 'Chaîne favorite mise à jour',
       body: `${channelName} est maintenant disponible`,
-      icon: '/icons/icon-192x192.png',
+      icon: "/icons/icon-192x192.png",
       tag: 'favorite_update',
       data: { channelName },
       actions: [
-        { action: 'play', title: 'Regarder', icon: '/icons/play.png' },
+        { action: 'play', title: 'Regarder', icon: "/icons/play.png" },
         { action: 'dismiss', title: 'Ignorer' }
       ]
     })
@@ -263,7 +269,7 @@ class NotificationService {
       type: 'error',
       title: 'Erreur StreamVerse',
       body: message,
-      icon: '/icons/icon-192x192.png',
+      icon: "/icons/icon-192x192.png",
       tag: 'error',
       data: { details }
     })
@@ -274,7 +280,7 @@ class NotificationService {
       type: 'success',
       title: 'StreamVerse',
       body: message,
-      icon: '/icons/icon-192x192.png',
+      icon: "/icons/icon-192x192.png",
       tag: 'success',
       data: { details }
     })
@@ -282,6 +288,7 @@ class NotificationService {
 
   // Schedule notifications (for future features)
   scheduleNotification(data: Omit<NotificationData, 'id' | 'timestamp'>, delay: number): void {
+    if (typeof window === 'undefined') return
     setTimeout(() => {
       this.showNotification(data)
     }, delay)
@@ -289,7 +296,7 @@ class NotificationService {
 
   // Check if notifications are supported
   isSupported(): boolean {
-    return 'Notification' in window && 'serviceWorker' in navigator
+    return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator
   }
 
   // Get permission status
@@ -320,4 +327,3 @@ export function useNotifications() {
     getPermissionStatus: notificationService.getPermissionStatus.bind(notificationService)
   }
 }
-

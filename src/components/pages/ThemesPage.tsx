@@ -10,16 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useThemeManager, ThemeConfig, CustomThemeSettings } from '@/lib/themes'
-import { 
-  Palette, 
-  Type, 
-  Settings, 
-  Download, 
-  Upload, 
-  RotateCcw, 
-  Eye, 
-  Sun, 
-  Moon, 
+import {
+  Palette,
+  Type,
+  Settings,
+  Download,
+  Upload,
+  RotateCcw,
+  Eye,
+  Sun,
+  Moon,
   Sparkles,
   Layers,
   Zap,
@@ -32,6 +32,7 @@ export function ThemesPage() {
   const [availableThemes, setAvailableThemes] = useState<ThemeConfig[]>([])
   const [isDark, setIsDark] = useState(false)
   const [previewMode, setPreviewMode] = useState(false)
+  const [isClient, setIsClient] = useState(false)
 
   const {
     setTheme,
@@ -48,6 +49,7 @@ export function ThemesPage() {
   } = useThemeManager()
 
   useEffect(() => {
+    setIsClient(true)
     const loadThemeData = () => {
       setCurrentTheme(getCurrentTheme())
       setCustomSettings(getCustomSettings())
@@ -55,34 +57,41 @@ export function ThemesPage() {
       setIsDark(document.documentElement.classList.contains('dark'))
     }
 
-    loadThemeData()
-    const interval = setInterval(loadThemeData, 1000) // Update every second for live preview
-
-    return () => clearInterval(interval)
+    if (typeof window !== 'undefined') {
+      loadThemeData()
+      const interval = setInterval(loadThemeData, 1000) // Update every second for live preview
+      return () => clearInterval(interval)
+    }
   }, [getCurrentTheme, getCustomSettings, getAvailableThemes])
 
   const handleThemeChange = (themeId: string) => {
+    if (!isClient) return
     setTheme(themeId)
   }
 
   const handleDarkModeToggle = (dark: boolean) => {
+    if (!isClient) return
     setIsDark(dark)
     setDarkMode(dark)
   }
 
   const handleColorChange = (colorKey: string, value: string) => {
+    if (!isClient) return
     updateCustomColors({ [colorKey]: value })
   }
 
   const handleFontChange = (fontKey: string, value: string) => {
+    if (!isClient) return
     updateCustomFonts({ [fontKey]: value })
   }
 
   const handleSettingChange = (settingKey: string, value: any) => {
+    if (!isClient) return
     updateCustomSettings({ [settingKey]: value })
   }
 
   const handleExportTheme = () => {
+    if (!isClient) return
     const themeData = exportTheme()
     const blob = new Blob([themeData], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -96,6 +105,7 @@ export function ThemesPage() {
   }
 
   const handleImportTheme = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isClient) return
     const file = event.target.files?.[0]
     if (file) {
       const reader = new FileReader()
@@ -112,6 +122,7 @@ export function ThemesPage() {
   }
 
   const handleReset = () => {
+    if (!isClient) return
     if (confirm('Êtes-vous sûr de vouloir réinitialiser tous les paramètres de thème ?')) {
       resetToDefault()
     }
@@ -138,7 +149,7 @@ export function ThemesPage() {
     'Source Code Pro, Consolas, monospace'
   ]
 
-  if (!currentTheme || !customSettings) {
+  if (!isClient || !currentTheme || !customSettings) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -220,7 +231,7 @@ export function ThemesPage() {
             Thèmes Prédéfinis
           </CardTitle>
           <CardDescription>
-            Choisissez parmi nos thèmes prédéfinis
+            Choisissez parmi nos thèmes prédéfinies
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -549,4 +560,3 @@ export function ThemesPage() {
     </div>
   )
 }
-

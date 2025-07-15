@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Clock, Trash2, Calendar, TrendingUp, BarChart3, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,14 +29,21 @@ const HistoryPage: React.FC = () => {
   
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'duration' | 'name'>('recent');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Statistiques de visionnage
-  const watchStats = useMemo(() => getWatchStats(), [getWatchStats]);
-  const totalWatchTime = useMemo(() => getTotalWatchTime(), [getTotalWatchTime]);
-  const watchTimeByCategory = useMemo(() => getWatchTimeByCategory(), [getWatchTimeByCategory]);
+  const watchStats = useMemo(() => isClient ? getWatchStats() : {}, [getWatchStats, isClient]);
+  const totalWatchTime = useMemo(() => isClient ? getTotalWatchTime() : 0, [getTotalWatchTime, isClient]);
+  const watchTimeByCategory = useMemo(() => isClient ? getWatchTimeByCategory() : {}, [getWatchTimeByCategory, isClient]);
 
   // Historique filtré
   const filteredHistory = useMemo(() => {
+    if (!isClient) return [];
+
     let filtered = [...history];
     
     // Filtrer par période
@@ -70,10 +77,12 @@ const HistoryPage: React.FC = () => {
     }
     
     return filtered;
-  }, [history, timeFilter, sortBy]);
+  }, [history, timeFilter, sortBy, isClient]);
 
   // Chaînes uniques de l'historique filtré
   const uniqueChannels = useMemo(() => {
+    if (!isClient) return [];
+
     const channelMap = new Map();
     
     filteredHistory.forEach(entry => {
@@ -84,7 +93,7 @@ const HistoryPage: React.FC = () => {
     });
     
     return Array.from(channelMap.values()).map(entry => entry.channel);
-  }, [filteredHistory]);
+  }, [filteredHistory, isClient]);
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -97,6 +106,7 @@ const HistoryPage: React.FC = () => {
   };
 
   const formatDate = (date: Date) => {
+    if (!isClient) return '';
     const now = new Date();
     const diffTime = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -121,7 +131,7 @@ const HistoryPage: React.FC = () => {
   };
 
   const handleClearHistory = () => {
-    if (history.length === 0) return;
+    if (!isClient || history.length === 0) return;
     
     if (confirm(`Êtes-vous sûr de vouloir supprimer tout l'historique (${history.length} entrées) ?`)) {
       clearHistory();
@@ -130,6 +140,7 @@ const HistoryPage: React.FC = () => {
   };
 
   const handleExportHistory = () => {
+    if (!isClient) return;
     const historyData = exportHistory();
     const dataStr = JSON.stringify(historyData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -143,6 +154,17 @@ const HistoryPage: React.FC = () => {
     URL.revokeObjectURL(url);
     toast.success('Historique exporté avec succès');
   };
+
+  if (!isClient) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Chargement de l'historique...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -388,4 +410,3 @@ const HistoryPage: React.FC = () => {
 };
 
 export default HistoryPage;
-
