@@ -23,17 +23,15 @@ const CategoriesPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'count'>('count')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  // Filtrer et trier les catégories
   const filteredCategories = useMemo(() => {
     let filtered = categories
     
-    // Filtrer par recherche
     if (searchQuery.trim()) {
       filtered = filtered.filter(category =>
         category.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     }
     
-    // Trier
     return [...filtered].sort((a, b) => {
       const comparison = sortBy === 'name' 
         ? a.name.localeCompare(b.name)
@@ -43,7 +41,6 @@ const CategoriesPage: React.FC = () => {
     })
   }, [categories, searchQuery, sortBy, sortOrder])
 
-  // Chaînes de la catégorie sélectionnée
   const selectedCategoryChannels = useMemo(() => {
     if (!selectedCategory) return []
     return getChannelsByCategory(selectedCategory)
@@ -77,11 +74,9 @@ const CategoriesPage: React.FC = () => {
     )
   }
 
-  // Vue des chaînes d'une catégorie spécifique
   if (selectedCategory) {
     return (
       <div className="space-y-6">
-        {/* En-tête avec bouton retour */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button
@@ -103,7 +98,6 @@ const CategoriesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Grille des chaînes */}
         {selectedCategoryChannels.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {selectedCategoryChannels.map((channel) => (
@@ -126,10 +120,8 @@ const CategoriesPage: React.FC = () => {
     )
   }
 
-  // Vue principale des catégories
   return (
     <div className="space-y-6">
-      {/* Contrôles de filtrage et tri */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex-1 max-w-md">
           <Input
@@ -168,13 +160,11 @@ const CategoriesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Grille des catégories */}
       <CategoryGrid
         categories={filteredCategories}
         onCategorySelect={handleCategorySelect}
       />
 
-      {/* Message si aucune catégorie trouvée */}
       {filteredCategories.length === 0 && searchQuery && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">
