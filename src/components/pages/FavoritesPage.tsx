@@ -1,20 +1,21 @@
-'use client';
+'use client'
 
-import React, { useMemo, useState } from 'react';
-import { Heart, Trash2, Download, Upload, Grid3X3 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import ChannelCard from '@/components/ChannelCard';
-import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { useFavoritesStore } from '@/stores/useFavoritesStore';
-import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
-import { useAppStore } from '@/stores/useAppStore';
-import { toast } from 'sonner';
+import React, { useMemo, useState } from 'react'
+import { Heart, Trash2, Download, Upload, Grid3X3 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import ChannelCard from '@/components/ChannelCard'
+import { usePlaylistStore } from '@/stores/usePlaylistStore'
+import { useFavoritesStore } from '@/stores/useFavoritesStore'
+import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore'
+import { useAppStore } from '@/stores/useAppStore'
+import { toast } from 'sonner'
+import type { Channel } from '@/types'
 
 const FavoritesPage: React.FC = () => {
-  const { channels } = usePlaylistStore();
+  const { channels } = usePlaylistStore()
   const { 
     favorites, 
     toggleFavorite, 
@@ -24,101 +25,101 @@ const FavoritesPage: React.FC = () => {
     getFavoritesByCategory,
     exportFavorites,
     importFavorites
-  } = useFavoritesStore();
-  const { addToHistory } = useWatchHistoryStore();
-  const { setCurrentChannel } = useAppStore();
+  } = useFavoritesStore()
+  const { addToHistory } = useWatchHistoryStore()
+  const { setCurrentChannel } = useAppStore()
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   // Chaînes favorites
   const favoriteChannels = useMemo(() => {
-    return getFavoriteChannels(channels);
-  }, [channels, getFavoriteChannels]);
+    return getFavoriteChannels(channels)
+  }, [channels, getFavoriteChannels])
 
   // Favoris par catégorie
   const favoritesByCategory = useMemo(() => {
-    return getFavoritesByCategory(channels);
-  }, [channels, getFavoritesByCategory]);
+    return getFavoritesByCategory(channels)
+  }, [channels, getFavoritesByCategory])
 
   // Chaînes filtrées
   const filteredChannels = useMemo(() => {
-    let filtered = favoriteChannels;
+    let filtered = favoriteChannels
     
     // Filtrer par catégorie sélectionnée
     if (selectedCategory) {
-      filtered = favoritesByCategory[selectedCategory] || [];
+      filtered = favoritesByCategory[selectedCategory] || []
     }
     
     // Filtrer par recherche
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase()
       filtered = filtered.filter(channel =>
         channel.name.toLowerCase().includes(query) ||
         (channel.group || '').toLowerCase().includes(query)
-      );
+      )
     }
     
-    return filtered;
-  }, [favoriteChannels, favoritesByCategory, selectedCategory, searchQuery]);
+    return filtered
+  }, [favoriteChannels, favoritesByCategory, selectedCategory, searchQuery])
 
-  const handlePlayChannel = (channel: any) => {
-    setCurrentChannel(channel);
-    addToHistory(channel, 0);
-  };
+  const handlePlayChannel = (channel: Channel) => {
+    setCurrentChannel(channel)
+    addToHistory(channel, 0)
+  }
 
-  const handleToggleFavorite = (channel: any) => {
-    toggleFavorite(channel.id);
-    toast.success('Retiré des favoris');
-  };
+  const handleToggleFavorite = (channel: Channel) => {
+    toggleFavorite(channel.id)
+    toast.success(channel.name + ' retiré des favoris')
+  }
 
   const handleClearAllFavorites = () => {
-    if (favorites.length === 0) return;
+    if (favorites.length === 0) return
     
-    if (confirm(`Êtes-vous sûr de vouloir supprimer tous vos ${favorites.length} favoris ?`)) {
-      clearAllFavorites();
-      toast.success('Tous les favoris ont été supprimés');
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer tous vos ${favorites.length} favoris ?`)) {
+      clearAllFavorites()
+      toast.success('Tous les favoris ont été supprimés')
     }
-  };
+  }
 
   const handleExportFavorites = () => {
-    const favoriteIds = exportFavorites();
-    const dataStr = JSON.stringify(favoriteIds, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const favoriteIds = exportFavorites()
+    const dataStr = JSON.stringify(favoriteIds, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
     
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `streamverse-favoris-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `streamverse-favoris-${new Date().toISOString().split('T')[0]}.json`
+    link.click()
     
-    URL.revokeObjectURL(url);
-    toast.success('Favoris exportés avec succès');
-  };
+    URL.revokeObjectURL(url)
+    toast.success('Favoris exportés avec succès')
+  }
 
   const handleImportFavorites = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const file = event.target.files?.[0]
+    if (!file) return
     
-    const reader = new FileReader();
+    const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const favoriteIds = JSON.parse(e.target?.result as string);
+        const favoriteIds = JSON.parse(e.target?.result as string)
         if (Array.isArray(favoriteIds)) {
-          importFavorites(favoriteIds);
-          toast.success(`${favoriteIds.length} favoris importés avec succès`);
+          importFavorites(favoriteIds)
+          toast.success(`${favoriteIds.length} favoris importés avec succès`)
         } else {
-          toast.error('Format de fichier invalide');
+          toast.error('Format de fichier invalide')
         }
       } catch (error) {
-        toast.error('Erreur lors de l\'importation du fichier');
+        toast.error('Erreur lors de l&apos;importation du fichier')
       }
-    };
-    reader.readAsText(file);
+    }
+    reader.readAsText(file)
     
     // Reset input
-    event.target.value = '';
-  };
+    event.target.value = ''
+  }
 
   return (
     <div className="space-y-6">
@@ -130,7 +131,7 @@ const FavoritesPage: React.FC = () => {
             <span>Mes Favoris</span>
           </h1>
           <p className="text-muted-foreground">
-            {favoriteChannels.length} chaîne{favoriteChannels.length > 1 ? 's' : ''} favorite{favoriteChannels.length > 1 ? 's' : ''}
+            {favoriteChannels.length} chaîne{favoriteChannels.length !== 1 && 's'} favorite{favoriteChannels.length !== 1 && 's'}
           </p>
         </div>
         
@@ -200,7 +201,7 @@ const FavoritesPage: React.FC = () => {
                 Toutes ({favoriteChannels.length})
               </Button>
               
-              {Object.entries(favoritesByCategory).map(([category, channels]) => (
+              {Object.entries(favoritesByCategory).map(([category, categoryChannels]) => (
                 <Button
                   key={category}
                   variant={selectedCategory === category ? "default" : "outline"}
@@ -210,7 +211,7 @@ const FavoritesPage: React.FC = () => {
                 >
                   <span>{category}</span>
                   <Badge variant="secondary" className="ml-1">
-                    {channels.length}
+                    {categoryChannels.length}
                   </Badge>
                 </Button>
               ))}
@@ -230,10 +231,10 @@ const FavoritesPage: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {Object.entries(favoritesByCategory)
                     .sort(([,a], [,b]) => b.length - a.length)
-                    .map(([category, channels]) => (
+                    .map(([category, categoryChannels]) => (
                       <div key={category} className="text-center">
                         <div className="text-2xl font-bold text-primary">
-                          {channels.length}
+                          {categoryChannels.length}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {category}
@@ -263,15 +264,15 @@ const FavoritesPage: React.FC = () => {
             <div className="text-center py-12">
               <p className="text-muted-foreground">
                 {searchQuery 
-                  ? `Aucun favori trouvé pour "${searchQuery}"`
-                  : `Aucun favori dans la catégorie "${selectedCategory}"`
+                  ? `Aucun favori trouvé pour &quot;${searchQuery}&quot;`
+                  : `Aucun favori dans la catégorie &quot;${selectedCategory}&quot;`
                 }
               </p>
               <Button
                 variant="ghost"
                 onClick={() => {
-                  setSearchQuery('');
-                  setSelectedCategory(null);
+                  setSearchQuery('')
+                  setSelectedCategory(null)
                 }}
                 className="mt-2"
               >
@@ -289,13 +290,12 @@ const FavoritesPage: React.FC = () => {
             Ajoutez des chaînes à vos favoris en cliquant sur le cœur lors de la navigation.
           </p>
           <Button onClick={() => window.history.back()}>
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Button>
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default FavoritesPage;
-
+export default FavoritesPage

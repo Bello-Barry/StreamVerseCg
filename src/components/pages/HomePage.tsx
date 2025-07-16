@@ -1,22 +1,29 @@
-'use client';
+'use client'
 
-import React, { useMemo } from 'react';
-import { Tv, TrendingUp, Clock, Heart, Grid3X3, Play } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import ChannelCard from '@/components/ChannelCard';
-import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { useFavoritesStore } from '@/stores/useFavoritesStore';
-import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
-import { useAppStore } from '@/stores/useAppStore';
-import { ViewType } from '@/types';
+import React, { useMemo, useState, useEffect } from 'react'
+import { Tv, TrendingUp, Clock, Heart, Grid3X3, Play } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import ChannelCard from '@/components/ChannelCard'
+import { usePlaylistStore } from '@/stores/usePlaylistStore'
+import { useFavoritesStore } from '@/stores/useFavoritesStore'
+import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore'
+import { useAppStore } from '@/stores/useAppStore'
+import { ViewType } from '@/types'
+import type { Channel } from '@/types'
 
 const HomePage: React.FC = () => {
-  const { channels, categories, loading } = usePlaylistStore();
-  const { favorites, toggleFavorite, isFavorite } = useFavoritesStore();
-  const { getRecentChannels, getMostWatchedChannels, addToHistory } = useWatchHistoryStore();
-  const { setCurrentChannel, setCurrentView } = useAppStore();
+  const { channels, categories, loading } = usePlaylistStore()
+  const { favorites, toggleFavorite, isFavorite } = useFavoritesStore()
+  const { getRecentChannels, getMostWatchedChannels, addToHistory } = useWatchHistoryStore()
+  const { setCurrentChannel, setCurrentView } = useAppStore()
+  
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // Statistiques générales
   const stats = useMemo(() => ({
@@ -24,59 +31,65 @@ const HomePage: React.FC = () => {
     totalCategories: categories.length,
     totalFavorites: favorites.length,
     totalHistory: getRecentChannels().length
-  }), [channels.length, categories.length, favorites.length, getRecentChannels]);
+  }), [channels.length, categories.length, favorites.length, getRecentChannels])
 
   // Chaînes recommandées (mix de populaires et récentes)
   const recommendedChannels = useMemo(() => {
-    const recentChannels = getRecentChannels(6);
-    const mostWatched = getMostWatchedChannels(6);
+    if (!isClient) return []
+    
+    const recentChannels = getRecentChannels(6)
+    const mostWatched = getMostWatchedChannels(6)
     const randomChannels = channels
       .filter(channel => !recentChannels.includes(channel) && !mostWatched.includes(channel))
       .sort(() => Math.random() - 0.5)
-      .slice(0, 6);
+      .slice(0, 6)
     
-    return [...recentChannels, ...mostWatched, ...randomChannels].slice(0, 12);
-  }, [channels, getRecentChannels, getMostWatchedChannels]);
+    return [...recentChannels, ...mostWatched, ...randomChannels].slice(0, 12)
+  }, [channels, getRecentChannels, getMostWatchedChannels, isClient])
 
   // Chaînes tendances (catégories populaires)
   const trendingChannels = useMemo(() => {
+    if (!isClient) return []
+    
     const popularCategories = categories
       .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
+      .slice(0, 3)
     
     const trending = popularCategories.flatMap(category => 
       category.channels.slice(0, 4)
-    );
+    )
     
-    return trending.slice(0, 8);
-  }, [categories]);
+    return trending.slice(0, 8)
+  }, [categories, isClient])
 
   // Nouvelles découvertes (chaînes aléatoires)
   const discoveryChannels = useMemo(() => {
+    if (!isClient) return []
+    
     return channels
       .filter(channel => !favorites.includes(channel.id))
       .sort(() => Math.random() - 0.5)
-      .slice(0, 6);
-  }, [channels, favorites]);
+      .slice(0, 6)
+  }, [channels, favorites, isClient])
 
-  const handlePlayChannel = (channel: any) => {
-    setCurrentChannel(channel);
-    addToHistory(channel, 0); // Durée sera mise à jour par le lecteur
-  };
+  const handlePlayChannel = (channel: Channel) => {
+    setCurrentChannel(channel)
+    addToHistory(channel, 0)
+  }
 
-  const handleToggleFavorite = (channel: any) => {
-    toggleFavorite(channel.id);
-  };
+  const handleToggleFavorite = (channel: Channel) => {
+    toggleFavorite(channel.id)
+  }
 
-  if (loading) {
+  if (loading || !isClient) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Chargement des chaînes...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -251,8 +264,7 @@ const HomePage: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default HomePage;
-
+export default HomePage

@@ -1,16 +1,18 @@
-'use client';
+'use client'
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Clock, Trash2, Calendar, TrendingUp, BarChart3, Download } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import ChannelCard from '@/components/ChannelCard';
-import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
-import { useFavoritesStore } from '@/stores/useFavoritesStore';
-import { useAppStore } from '@/stores/useAppStore';
-import { toast } from 'sonner';
+import React, { useMemo, useState, useEffect } from 'react'
+import { Clock, Trash2, Calendar, TrendingUp, BarChart3, Download } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import ChannelCard from '@/components/ChannelCard'
+import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore'
+import { useFavoritesStore } from '@/stores/useFavoritesStore'
+import { useAppStore } from '@/stores/useAppStore'
+import { toast } from 'sonner'
+import type { Channel } from '@/types'
+import Image from 'next/image'
 
 const HistoryPage: React.FC = () => {
   const { 
@@ -23,147 +25,147 @@ const HistoryPage: React.FC = () => {
     getWatchTimeByCategory,
     getTotalWatchTime,
     exportHistory
-  } = useWatchHistoryStore();
-  const { toggleFavorite, isFavorite } = useFavoritesStore();
-  const { setCurrentChannel } = useAppStore();
+  } = useWatchHistoryStore()
+  const { toggleFavorite, isFavorite } = useFavoritesStore()
+  const { setCurrentChannel } = useAppStore()
   
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
-  const [sortBy, setSortBy] = useState<'recent' | 'duration' | 'name'>('recent');
-  const [isClient, setIsClient] = useState(false);
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'month'>('all')
+  const [sortBy, setSortBy] = useState<'recent' | 'duration' | 'name'>('recent')
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    setIsClient(true)
+  }, [])
 
   // Statistiques de visionnage
-  const watchStats = useMemo(() => isClient ? getWatchStats() : {}, [getWatchStats, isClient]);
-  const totalWatchTime = useMemo(() => isClient ? getTotalWatchTime() : 0, [getTotalWatchTime, isClient]);
-  const watchTimeByCategory = useMemo(() => isClient ? getWatchTimeByCategory() : {}, [getWatchTimeByCategory, isClient]);
+  const watchStats = useMemo(() => isClient ? getWatchStats() : {}, [getWatchStats, isClient])
+  const totalWatchTime = useMemo(() => isClient ? getTotalWatchTime() : 0, [getTotalWatchTime, isClient])
+  const watchTimeByCategory = useMemo(() => isClient ? getWatchTimeByCategory() : {}, [getWatchTimeByCategory, isClient])
 
   // Historique filtré
   const filteredHistory = useMemo(() => {
-    if (!isClient) return [];
+    if (!isClient) return []
 
-    let filtered = [...history];
+    let filtered = [...history]
     
     // Filtrer par période
-    const now = new Date();
+    const now = new Date()
     switch (timeFilter) {
       case 'today':
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        filtered = filtered.filter(entry => entry.timestamp >= today);
-        break;
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        filtered = filtered.filter(entry => entry.timestamp >= today)
+        break
       case 'week':
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        filtered = filtered.filter(entry => entry.timestamp >= weekAgo);
-        break;
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        filtered = filtered.filter(entry => entry.timestamp >= weekAgo)
+        break
       case 'month':
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        filtered = filtered.filter(entry => entry.timestamp >= monthAgo);
-        break;
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        filtered = filtered.filter(entry => entry.timestamp >= monthAgo)
+        break
     }
     
     // Trier
     switch (sortBy) {
       case 'recent':
-        filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        break;
+        filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        break
       case 'duration':
-        filtered.sort((a, b) => b.duration - a.duration);
-        break;
+        filtered.sort((a, b) => b.duration - a.duration)
+        break
       case 'name':
-        filtered.sort((a, b) => a.channel.name.localeCompare(b.channel.name));
-        break;
+        filtered.sort((a, b) => a.channel.name.localeCompare(b.channel.name))
+        break
     }
     
-    return filtered;
-  }, [history, timeFilter, sortBy, isClient]);
+    return filtered
+  }, [history, timeFilter, sortBy, isClient])
 
   // Chaînes uniques de l'historique filtré
   const uniqueChannels = useMemo(() => {
-    if (!isClient) return [];
+    if (!isClient) return []
 
-    const channelMap = new Map();
+    const channelMap = new Map()
     
     filteredHistory.forEach(entry => {
-      const existing = channelMap.get(entry.channel.id);
+      const existing = channelMap.get(entry.channel.id)
       if (!existing || entry.timestamp > existing.timestamp) {
-        channelMap.set(entry.channel.id, entry);
+        channelMap.set(entry.channel.id, entry)
       }
-    });
+    })
     
-    return Array.from(channelMap.values()).map(entry => entry.channel);
-  }, [filteredHistory, isClient]);
+    return Array.from(channelMap.values()).map(entry => entry.channel)
+  }, [filteredHistory, isClient])
 
   const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
     
     if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+      return `${hours}h ${minutes}m`
     }
-    return `${minutes}m`;
-  };
+    return `${minutes}m`
+  }
 
   const formatDate = (date: Date) => {
-    if (!isClient) return '';
-    const now = new Date();
-    const diffTime = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (!isClient) return ''
+    const now = new Date()
+    const diffTime = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
     
     if (diffDays === 0) {
-      return `Aujourd'hui à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+      return `Aujourd&apos;hui à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
     } else if (diffDays === 1) {
-      return `Hier à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+      return `Hier à ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
     } else if (diffDays < 7) {
-      return `Il y a ${diffDays} jours`;
+      return `Il y a ${diffDays} jours`
     } else {
-      return date.toLocaleDateString('fr-FR');
+      return date.toLocaleDateString('fr-FR')
     }
-  };
+  }
 
-  const handlePlayChannel = (channel: any) => {
-    setCurrentChannel(channel);
-  };
+  const handlePlayChannel = (channel: Channel) => {
+    setCurrentChannel(channel)
+  }
 
-  const handleToggleFavorite = (channel: any) => {
-    toggleFavorite(channel.id);
-  };
+  const handleToggleFavorite = (channel: Channel) => {
+    toggleFavorite(channel.id)
+  }
 
   const handleClearHistory = () => {
-    if (!isClient || history.length === 0) return;
+    if (!isClient || history.length === 0) return
     
-    if (confirm(`Êtes-vous sûr de vouloir supprimer tout l'historique (${history.length} entrées) ?`)) {
-      clearHistory();
-      toast.success('Historique supprimé');
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer tout l&apos;historique (${history.length} entrées) ?`)) {
+      clearHistory()
+      toast.success('Historique supprimé')
     }
-  };
+  }
 
   const handleExportHistory = () => {
-    if (!isClient) return;
-    const historyData = exportHistory();
-    const dataStr = JSON.stringify(historyData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    if (!isClient) return
+    const historyData = exportHistory()
+    const dataStr = JSON.stringify(historyData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
     
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `streamverse-historique-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `streamverse-historique-${new Date().toISOString().split('T')[0]}.json`
+    link.click()
     
-    URL.revokeObjectURL(url);
-    toast.success('Historique exporté avec succès');
-  };
+    URL.revokeObjectURL(url)
+    toast.success('Historique exporté avec succès')
+  }
 
   if (!isClient) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Chargement de l'historique...</p>
+          <p className="text-muted-foreground">Chargement de l&apos;historique...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -176,7 +178,7 @@ const HistoryPage: React.FC = () => {
             <span>Historique de visionnage</span>
           </h1>
           <p className="text-muted-foreground">
-            {history.length} session{history.length > 1 ? 's' : ''} de visionnage
+            {history.length} session{history.length !== 1 && 's'} de visionnage
           </p>
         </div>
         
@@ -259,7 +261,7 @@ const HistoryPage: React.FC = () => {
                         <div 
                           className="bg-primary h-2 rounded-full"
                           style={{ 
-                            width: `${(time / Math.max(...Object.values(watchTimeByCategory))) * 100}%` 
+                            width: `${(time / Math.max(1, ...Object.values(watchTimeByCategory))) * 100}%` 
                           }}
                         />
                       </div>
@@ -281,13 +283,13 @@ const HistoryPage: React.FC = () => {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <Select value={timeFilter} onValueChange={(value: any) => setTimeFilter(value)}>
+                <Select value={timeFilter} onValueChange={(value: 'all' | 'today' | 'week' | 'month') => setTimeFilter(value)}>
                   <SelectTrigger className="w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tout l'historique</SelectItem>
-                    <SelectItem value="today">Aujourd'hui</SelectItem>
+                    <SelectItem value="all">Tout l&apos;historique</SelectItem>
+                    <SelectItem value="today">Aujourd&apos;hui</SelectItem>
                     <SelectItem value="week">Cette semaine</SelectItem>
                     <SelectItem value="month">Ce mois</SelectItem>
                   </SelectContent>
@@ -296,7 +298,7 @@ const HistoryPage: React.FC = () => {
               
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-muted-foreground">Trier par:</span>
-                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <Select value={sortBy} onValueChange={(value: 'recent' | 'duration' | 'name') => setSortBy(value)}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
@@ -310,7 +312,7 @@ const HistoryPage: React.FC = () => {
             </div>
             
             <div className="text-sm text-muted-foreground">
-              {filteredHistory.length} entrée{filteredHistory.length > 1 ? 's' : ''} trouvée{filteredHistory.length > 1 ? 's' : ''}
+              {filteredHistory.length} entrée{filteredHistory.length !== 1 && 's'} trouvée{filteredHistory.length !== 1 && 's'}
             </div>
           </div>
 
@@ -325,9 +327,11 @@ const HistoryPage: React.FC = () => {
                         {/* Logo de la chaîne */}
                         <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                           {entry.channel.tvgLogo ? (
-                            <img
+                            <Image
                               src={entry.channel.tvgLogo}
                               alt={entry.channel.name}
+                              width={48}
+                              height={48}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -387,7 +391,7 @@ const HistoryPage: React.FC = () => {
                 onClick={() => setTimeFilter('all')}
                 className="mt-2"
               >
-                Voir tout l'historique
+                Voir tout l&apos;historique
               </Button>
             </div>
           )}
@@ -401,12 +405,12 @@ const HistoryPage: React.FC = () => {
             Votre historique de visionnage apparaîtra ici au fur et à mesure que vous regardez des chaînes.
           </p>
           <Button onClick={() => window.history.back()}>
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Button>
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default HistoryPage;
+export default HistoryPage
