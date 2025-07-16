@@ -1,86 +1,80 @@
-'use client';
+'use client'
 
-import React, { useState, useMemo } from 'react';
-import { ArrowLeft, Filter, SortAsc, SortDesc } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import CategoryGrid from '@/components/CategoryGrid';
-import ChannelCard from '@/components/ChannelCard';
-import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { useFavoritesStore } from '@/stores/useFavoritesStore';
-import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
-import { useAppStore } from '@/stores/useAppStore';
+import React, { useState, useMemo } from 'react'
+import { ArrowLeft, Filter, SortAsc, SortDesc } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import CategoryGrid from '@/components/CategoryGrid'
+import ChannelCard from '@/components/ChannelCard'
+import { usePlaylistStore } from '@/stores/usePlaylistStore'
+import { useFavoritesStore } from '@/stores/useFavoritesStore'
+import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore'
+import { useAppStore } from '@/stores/useAppStore'
+import type { Channel } from '@/types'
 
 const CategoriesPage: React.FC = () => {
-  const { categories, getChannelsByCategory, loading } = usePlaylistStore();
-  const { toggleFavorite, isFavorite } = useFavoritesStore();
-  const { addToHistory } = useWatchHistoryStore();
-  const { selectedCategory, setCurrentChannel, setSelectedCategory } = useAppStore();
+  const { categories, getChannelsByCategory, loading } = usePlaylistStore()
+  const { toggleFavorite, isFavorite } = useFavoritesStore()
+  const { addToHistory } = useWatchHistoryStore()
+  const { selectedCategory, setCurrentChannel, setSelectedCategory } = useAppStore()
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'count'>('count');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'name' | 'count'>('count')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Filtrer et trier les catégories
   const filteredCategories = useMemo(() => {
-    let filtered = categories;
+    let filtered = categories
     
     // Filtrer par recherche
     if (searchQuery.trim()) {
       filtered = filtered.filter(category =>
         category.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
     }
     
     // Trier
-    filtered = [...filtered].sort((a, b) => {
-      let comparison = 0;
+    return [...filtered].sort((a, b) => {
+      const comparison = sortBy === 'name' 
+        ? a.name.localeCompare(b.name)
+        : a.count - b.count
       
-      if (sortBy === 'name') {
-        comparison = a.name.localeCompare(b.name);
-      } else {
-        comparison = a.count - b.count;
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-    
-    return filtered;
-  }, [categories, searchQuery, sortBy, sortOrder]);
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [categories, searchQuery, sortBy, sortOrder])
 
   // Chaînes de la catégorie sélectionnée
   const selectedCategoryChannels = useMemo(() => {
-    if (!selectedCategory) return [];
-    return getChannelsByCategory(selectedCategory);
-  }, [selectedCategory, getChannelsByCategory]);
+    if (!selectedCategory) return []
+    return getChannelsByCategory(selectedCategory)
+  }, [selectedCategory, getChannelsByCategory])
 
   const handleCategorySelect = (categoryName: string) => {
-    setSelectedCategory(categoryName);
-  };
+    setSelectedCategory(categoryName)
+  }
 
   const handleBackToCategories = () => {
-    setSelectedCategory(null);
-  };
+    setSelectedCategory(null)
+  }
 
-  const handlePlayChannel = (channel: any) => {
-    setCurrentChannel(channel);
-    addToHistory(channel, 0);
-  };
+  const handlePlayChannel = (channel: Channel) => {
+    setCurrentChannel(channel)
+    addToHistory(channel, 0)
+  }
 
-  const handleToggleFavorite = (channel: any) => {
-    toggleFavorite(channel.id);
-  };
+  const handleToggleFavorite = (channel: Channel) => {
+    toggleFavorite(channel.id)
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Chargement des catégories...</p>
         </div>
       </div>
-    );
+    )
   }
 
   // Vue des chaînes d'une catégorie spécifique
@@ -129,7 +123,7 @@ const CategoriesPage: React.FC = () => {
           </div>
         )}
       </div>
-    );
+    )
   }
 
   // Vue principale des catégories
@@ -151,7 +145,7 @@ const CategoriesPage: React.FC = () => {
           
           <Select value={sortBy} onValueChange={(value: 'name' | 'count') => setSortBy(value)}>
             <SelectTrigger className="w-40">
-              <SelectValue />
+              <SelectValue placeholder="Trier par" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="count">Par nombre</SelectItem>
@@ -178,14 +172,13 @@ const CategoriesPage: React.FC = () => {
       <CategoryGrid
         categories={filteredCategories}
         onCategorySelect={handleCategorySelect}
-        selectedCategory={selectedCategory}
       />
 
       {/* Message si aucune catégorie trouvée */}
       {filteredCategories.length === 0 && searchQuery && (
         <div className="text-center py-12">
           <p className="text-muted-foreground">
-            Aucune catégorie trouvée pour "{searchQuery}".
+            Aucune catégorie trouvée pour &quot;{searchQuery}&quot;.
           </p>
           <Button
             variant="ghost"
@@ -197,8 +190,7 @@ const CategoriesPage: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default CategoriesPage;
-
+export default CategoriesPage

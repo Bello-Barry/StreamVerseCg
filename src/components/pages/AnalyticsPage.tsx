@@ -5,14 +5,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { useAnalytics, AnalyticsMetrics } from '@/lib/analytics'
-import { BarChart3, Users, Eye, Heart, Search, Clock, Smartphone, Monitor, Tablet, Download, Trash2 } from 'lucide-react'
+import { useAnalytics, type AnalyticsMetrics } from '@/lib/analytics'
+import { 
+  BarChart3, 
+  Users, 
+  Eye, 
+  Heart, 
+  Search, 
+  Clock, 
+  Smartphone, 
+  Monitor, 
+  Tablet, 
+  Download, 
+  Trash2 
+} from 'lucide-react'
 
 export function AnalyticsPage() {
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null)
+  const [isClient, setIsClient] = useState(false)
   const { getMetrics, exportData, clearData } = useAnalytics()
 
   useEffect(() => {
+    setIsClient(true)
     const loadMetrics = () => {
       setMetrics(getMetrics())
     }
@@ -25,7 +39,7 @@ export function AnalyticsPage() {
 
   const handleExportData = () => {
     const data = exportData()
-    const blob = new Blob([data], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -37,7 +51,7 @@ export function AnalyticsPage() {
   }
 
   const handleClearData = () => {
-    if (confirm('Êtes-vous sûr de vouloir effacer toutes les données d\'analytics ?')) {
+    if (window.confirm('Êtes-vous sûr de vouloir effacer toutes les données d&apos;analytics ?')) {
       clearData()
       setMetrics(getMetrics())
     }
@@ -61,7 +75,7 @@ export function AnalyticsPage() {
     }
   }
 
-  if (!metrics) {
+  if (!isClient || !metrics) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -77,10 +91,10 @@ export function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            Analytics & Métriques
+            Analytics &amp; Métriques
           </h1>
           <p className="text-muted-foreground mt-2">
-            Suivi d'usage et statistiques de l'application
+            Suivi d&apos;usage et statistiques de l&apos;application
           </p>
         </div>
         <div className="flex gap-2">
@@ -171,7 +185,7 @@ export function AnalyticsPage() {
                   <div className="text-right">
                     <div className="text-sm font-medium">{channel.views + channel.plays}</div>
                     <Progress 
-                      value={(channel.views + channel.plays) / Math.max(...metrics.topChannels.map(c => c.views + c.plays)) * 100} 
+                      value={(channel.views + channel.plays) / Math.max(1, ...metrics.topChannels.map(c => c.views + c.plays)) * 100} 
                       className="w-16 h-2 mt-1"
                     />
                   </div>
@@ -205,7 +219,7 @@ export function AnalyticsPage() {
                   <div className="text-right">
                     <div className="text-sm font-medium">{search.count}</div>
                     <Progress 
-                      value={search.count / Math.max(...metrics.topSearches.map(s => s.count)) * 100} 
+                      value={search.count / Math.max(1, ...metrics.topSearches.map(s => s.count)) * 100} 
                       className="w-16 h-2 mt-1"
                     />
                   </div>
@@ -233,7 +247,7 @@ export function AnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{views}</span>
                     <Progress 
-                      value={views / Math.max(...Object.values(metrics.pageViews)) * 100} 
+                      value={views / Math.max(1, ...Object.values(metrics.pageViews)) * 100} 
                       className="w-20 h-2"
                     />
                   </div>
@@ -246,9 +260,9 @@ export function AnalyticsPage() {
         {/* Device Types */}
         <Card>
           <CardHeader>
-            <CardTitle>Types d'Appareils</CardTitle>
+            <CardTitle>Types d&apos;Appareils</CardTitle>
             <CardDescription>
-              Répartition par type d'appareil
+              Répartition par type d&apos;appareil
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -264,7 +278,7 @@ export function AnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{count}</span>
                     <Progress 
-                      value={count / Math.max(...Object.values(metrics.deviceTypes)) * 100} 
+                      value={count / Math.max(1, ...Object.values(metrics.deviceTypes)) * 100} 
                       className="w-20 h-2"
                     />
                   </div>
@@ -280,7 +294,7 @@ export function AnalyticsPage() {
         <CardHeader>
           <CardTitle>Activité par Heure</CardTitle>
           <CardDescription>
-            Répartition de l'activité selon les tranches horaires
+            Répartition de l&apos;activité selon les tranches horaires
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -290,7 +304,7 @@ export function AnalyticsPage() {
                 <div className="text-2xl font-bold">{count}</div>
                 <div className="text-sm text-muted-foreground">{range}h</div>
                 <Progress 
-                  value={count / Math.max(...Object.values(metrics.timeRanges)) * 100} 
+                  value={count / Math.max(1, ...Object.values(metrics.timeRanges)) * 100} 
                   className="mt-2"
                 />
               </div>
@@ -301,4 +315,3 @@ export function AnalyticsPage() {
     </div>
   )
 }
-
