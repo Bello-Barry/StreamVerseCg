@@ -1,0 +1,17 @@
+📁 fichiers_modifies/
+├── 📄 package.json                    # Dépendances TailwindCSS corrigées (v4 → v3)
+├── 📄 tailwind.config.js             # Configuration TailwindCSS v3 standard
+├── 📄 postcss.config.js              # Plugin PostCSS corrigé
+├── 📄 globals.css                     # Styles CSS corrigés (oklch → hsl)
+├── 📄 NotificationsPage.tsx           # Composant avec protection hydratation SSR/CSR
+├── 📄 appliquer_corrections.sh        # Script automatique d'installation
+├── 📄 INSTRUCTIONS.md                 # Instructions détaillées d'application
+├── 📄 README.md                       # Documentation complète des modifications
+└── 📄 structure_fichiers.txt          # Ce fichier (structure du dossier)
+
+🎯 DESTINATION DES FICHIERS DANS VOTRE PROJET :
+• package.json → /package.json
+• tailwind.config.js → /tailwind.config.js  
+• postcss.config.js → /postcss.config.js
+• globals.css → /src/app/globals.css
+• NotificationsPage.tsx → /src/components/pages/NotificationsPage.tsx
