@@ -3,13 +3,21 @@
 import { createContext, useContext, useEffect, ReactNode } from 'react'
 import { useNotifications } from '@/lib/notifications'
 
+// Définition des types pour les détails d'erreur
+interface ErrorDetails {
+  message: string;
+  code?: number;
+  stack?: string;
+  [key: string]: unknown;
+}
+
 interface NotificationContextType {
   requestPermission: () => Promise<boolean>
   notifyChannelUpdate: (channelName: string, playlistName: string) => Promise<void>
   notifyPlaylistUpdate: (playlistName: string, channelCount: number) => Promise<void>
   notifyFavoriteChannelUpdate: (channelName: string) => Promise<void>
-  notifyError: (message: string, details?: any) => Promise<void>
-  notifySuccess: (message: string, details?: any) => Promise<void>
+  notifyError: (message: string, details?: ErrorDetails) => Promise<void>
+  notifySuccess: (message: string, details?: Record<string, unknown>) => Promise<void>
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
@@ -42,4 +50,3 @@ export function useNotificationContext() {
   }
   return context
 }
-

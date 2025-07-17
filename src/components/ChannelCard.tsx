@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Play, Heart, MoreVertical, Tv, Globe, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   };
 
   const getCountryFlag = (country: string) => {
-    // Mapping simple pour quelques pays
     const flags = {
       'France': '🇫🇷',
       'United States': '🇺🇸',
@@ -73,12 +73,16 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         {/* Image/Logo de la chaîne */}
         <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden rounded-t-lg">
           {channel.tvgLogo && !imageError ? (
-            <img
-              src={channel.tvgLogo}
-              alt={channel.name}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-              onError={() => setImageError(true)}
-            />
+            <div className="w-full h-full relative">
+              <Image
+                src={channel.tvgLogo}
+                alt={channel.name}
+                fill
+                className="object-cover transition-transform duration-300 group-hover:scale-110"
+                onError={() => setImageError(true)}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Tv className="h-12 w-12 text-primary/60" />
@@ -206,4 +210,3 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
 };
 
 export default ChannelCard;
-

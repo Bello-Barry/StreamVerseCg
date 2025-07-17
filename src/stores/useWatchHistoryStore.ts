@@ -172,7 +172,7 @@ export const useWatchHistoryStore = create<WatchHistoryStore>()(
         // Calculer la série
         const sortedDays = Object.keys(dayGroups).sort().reverse();
         let streak = 0;
-        let currentDate = new Date();
+        const currentDate = new Date(); // Corrigé : déclaré en const
         
         for (const day of sortedDays) {
           const dayDate = new Date(day);
@@ -221,4 +221,3 @@ export const useWatchHistoryStore = create<WatchHistoryStore>()(
     }
   )
 );
-
