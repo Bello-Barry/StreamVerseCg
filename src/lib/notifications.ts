@@ -6,7 +6,7 @@ export interface NotificationData {
   badge?: string
   image?: string
   tag?: string
-  data?: any
+  data?: Record<string, unknown> // Remplacement de 'any' par un type plus sûr
   actions?: NotificationAction[]
   timestamp: number
   type: 'info' | 'success' | 'warning' | 'error' | 'channel_update' | 'playlist_update'
@@ -26,6 +26,14 @@ export interface NotificationSettings {
   systemNotifications: boolean
   sound: boolean
   vibrate: boolean
+}
+
+// Type pour les détails d'erreur
+interface ErrorDetails {
+  message?: string;
+  code?: number;
+  stack?: string;
+  [key: string]: unknown;
 }
 
 class NotificationService {
@@ -219,7 +227,10 @@ class NotificationService {
     if (typeof window === 'undefined') return
     const notification = this.notifications.find(n => n.id === notificationId)
     if (notification) {
-      notification.data = { ...notification.data, read: true }
+      notification.data = { 
+        ...(notification.data as Record<string, unknown> || {}), 
+        read: true 
+      }
       this.saveNotifications()
     }
   }
@@ -264,7 +275,7 @@ class NotificationService {
     })
   }
 
-  async notifyError(message: string, details?: any): Promise<void> {
+  async notifyError(message: string, details?: ErrorDetails): Promise<void> {
     await this.showNotification({
       type: 'error',
       title: 'Erreur StreamVerse',
@@ -275,7 +286,7 @@ class NotificationService {
     })
   }
 
-  async notifySuccess(message: string, details?: any): Promise<void> {
+  async notifySuccess(message: string, details?: Record<string, unknown>): Promise<void> {
     await this.showNotification({
       type: 'success',
       title: 'StreamVerse',

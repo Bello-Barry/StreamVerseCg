@@ -3,7 +3,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import Image from 'next/image'; // Optimisation: Remplacer <img> par <Image>
+import Image from 'next/image';
 import Hls from 'hls.js';
 import {
   Play,
@@ -16,7 +16,6 @@ import {
   Heart,
   Share2,
 } from 'lucide-react';
-// Correction: Imports inutilisés (SkipBack, SkipForward, Settings) ont été retirés
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,12 +26,10 @@ import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
 import { ViewType } from '@/types';
 import { toast } from 'sonner';
 
-// Correction: Typage pour les données d'erreur HLS.js
 interface HlsErrorData {
   type: string;
   details: string;
   fatal: boolean;
-  // ... autres propriétés si nécessaire
 }
 
 const PlayerPage: React.FC = () => {
@@ -40,11 +37,11 @@ const PlayerPage: React.FC = () => {
   const { toggleFavorite, isFavorite } = useFavoritesStore();
   const { addToHistory } = useWatchHistoryStore();
 
-  const playerContainerRef = useRef<HTMLDivElement>(null); // Optimisation: Pour le mode plein écran
+  const playerContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<Hls | null>(null); // Correction: Typage de la référence HLS
+  const hlsRef = useRef<Hls | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const watchStartTimeRef = useRef<number>(Date.now()); // Optimisation: Utiliser useRef pour une valeur stable
+  const watchStartTimeRef = useRef<number>(Date.now());
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(userPreferences.volume);
@@ -88,7 +85,6 @@ const PlayerPage: React.FC = () => {
             }
           });
 
-          // Correction: Typage de l'événement d'erreur
           hls.on(Hls.Events.ERROR, (_event: string, data: HlsErrorData) => {
             console.error('HLS Error:', data);
             if (data.fatal) {
@@ -120,7 +116,7 @@ const PlayerPage: React.FC = () => {
     };
   }, [currentChannel, userPreferences.autoplay]);
 
-  // Gestionnaires d'événements vidéo et de nettoyage
+  // Gestionnaires d'événements vidéo
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -143,7 +139,7 @@ const PlayerPage: React.FC = () => {
     };
   }, []);
 
-  // Optimisation: Gestion robuste du plein écran
+  // Gestion du plein écran
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -175,13 +171,15 @@ const PlayerPage: React.FC = () => {
     };
   }, [isPlaying, showControls, hideControls]);
 
-  // Enregistrer dans l'historique à la fermeture du composant
+  // Enregistrer dans l'historique à la fermeture
   useEffect(() => {
-    watchStartTimeRef.current = Date.now();
+    const startTime = Date.now();
+    watchStartTimeRef.current = startTime;
+
     return () => {
       if (currentChannel) {
-        const watchDuration = Math.floor((Date.now() - watchStartTimeRef.current) / 1000);
-        if (watchDuration > 5) { // Au moins 5 secondes
+        const watchDuration = Math.floor((Date.now() - startTime) / 1000);
+        if (watchDuration > 5) {
           addToHistory(currentChannel, watchDuration);
         }
       }
@@ -228,7 +226,6 @@ const PlayerPage: React.FC = () => {
 
   const handleToggleFavorite = useCallback(() => {
     if (!currentChannel) return;
-    // Correction: Logique du toast corrigée pour refléter l'action immédiate
     const currentlyFavorite = isFavorite(currentChannel.id);
     toggleFavorite(currentChannel.id);
     toast.success(currentlyFavorite ? 'Retiré des favoris' : 'Ajouté aux favoris');
@@ -250,7 +247,7 @@ const PlayerPage: React.FC = () => {
       <div className="flex flex-col items-center justify-center h-full text-center py-12">
         <p className="text-muted-foreground">Aucune chaîne sélectionnée.</p>
         <Button onClick={() => setCurrentView(ViewType.HOME)} className="mt-4">
-          Retour à l'accueil
+          Retour à l&apos;accueil
         </Button>
       </div>
     );
@@ -269,7 +266,7 @@ const PlayerPage: React.FC = () => {
           className="w-full h-full"
           poster={currentChannel.tvgLogo}
           onClick={handlePlayPause}
-          playsInline // Amélioration pour mobile
+          playsInline
         />
 
         {(isLoading || error) && (
@@ -351,7 +348,6 @@ const PlayerPage: React.FC = () => {
               </div>
             </div>
             {currentChannel.tvgLogo && (
-              // Correction: Utilisation du composant Image de Next.js
               <div className="relative w-16 h-16 flex-shrink-0">
                 <Image
                   src={currentChannel.tvgLogo}
