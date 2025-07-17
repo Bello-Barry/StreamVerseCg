@@ -1,0 +1,236 @@
+// Types pour l'application StreamVerse
+
+export interface Channel {
+  id: string;
+  name: string;
+  url: string;
+  tvgId?: string;
+  tvgName?: string;
+  tvgLogo?: string;
+  group?: string;
+  playlistSource: string;
+  language?: string;
+  country?: string;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  url?: string;
+  content?: string;
+  type: 'url' | 'file' | 'xtream';
+  status: 'active' | 'inactive' | 'error';
+  lastUpdate?: Date;
+  channelCount?: number;
+  description?: string;
+  isRemovable?: boolean;
+  xtreamConfig?: {
+    server: string;
+    username: string;
+    password: string;
+  };
+}
+
+export interface Category {
+  name: string;
+  channels: Channel[];
+  count: number;
+  icon?: string;
+}
+
+export interface WatchEntry {
+  id: string;
+  channel: Channel;
+  timestamp: Date;
+  duration: number;
+  completed: boolean;
+}
+
+export interface WatchStats {
+  totalWatchTime: number;
+  favoriteCategories: string[];
+  mostWatchedChannels: Channel[];
+  watchingStreak: number;
+}
+
+export interface UserPreferences {
+  theme: 'light' | 'dark' | 'system';
+  language: string;
+  autoplay: boolean;
+  quality: 'auto' | 'high' | 'medium' | 'low';
+  volume: number;
+}
+
+export interface SearchFilters {
+  category?: string;
+  language?: string;
+  country?: string;
+  quality?: string;
+}
+
+export interface RecommendationEngine {
+  getRecommendations: (userId?: string) => Channel[];
+  updateUserPreferences: (channel: Channel, rating: number) => void;
+  getTrendingChannels: () => Channel[];
+}
+
+export interface PlaylistManagerState {
+  playlists: Playlist[];
+  channels: Channel[];
+  categories: Category[];
+  loading: boolean;
+  error: string | null;
+}
+
+export interface FavoritesState {
+  favorites: string[];
+  toggleFavorite: (channelId: string) => void;
+  addFavorite: (channelId: string) => void;
+  removeFavorite: (channelId: string) => void;
+  isFavorite: (channelId: string) => boolean;
+}
+
+export interface WatchHistoryState {
+  history: WatchEntry[];
+  addToHistory: (channel: Channel, duration: number) => void;
+  clearHistory: () => void;
+  getWatchStats: () => WatchStats;
+}
+
+export interface AppState {
+  currentView: 'home' | 'categories' | 'favorites' | 'history' | 'search' | 'player';
+  currentChannel: Channel | null;
+  searchQuery: string;
+  selectedCategory: string | null;
+  isPlaying: boolean;
+  userPreferences: UserPreferences;
+}
+
+// Types pour les formulaires
+export interface PlaylistFormData {
+  name: string;
+  url?: string;
+  type: 'url' | 'file' | 'xtream';
+  description?: string;
+  xtreamServer?: string;
+  xtreamUsername?: string;
+  xtreamPassword?: string;
+}
+
+export interface SearchFormData {
+  query: string;
+  filters: SearchFilters;
+}
+
+// Types pour les événements
+export interface PlayerEvent {
+  type: 'play' | 'pause' | 'stop' | 'error' | 'ended';
+  channel: Channel;
+  timestamp: Date;
+  data?: any;
+}
+
+export interface PlaylistEvent {
+  type: 'added' | 'updated' | 'removed' | 'error';
+  playlist: Playlist;
+  timestamp: Date;
+  error?: string;
+}
+
+// Types pour l'API
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface M3UParseResult {
+  channels: Channel[];
+  errors: string[];
+  warnings: string[];
+}
+
+// Types pour les hooks
+export interface UseM3UParserReturn {
+  channels: Channel[];
+  loading: boolean;
+  error: string | null;
+  parseM3U: (content: string, source: string) => Promise<M3UParseResult>;
+  reload: () => void;
+}
+
+export interface UsePlayerReturn {
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  volume: number;
+  play: (channel: Channel) => void;
+  pause: () => void;
+  stop: () => void;
+  seek: (time: number) => void;
+  setVolume: (volume: number) => void;
+}
+
+// Types pour les composants
+export interface ChannelCardProps {
+  channel: Channel;
+  onPlay: (channel: Channel) => void;
+  onToggleFavorite: (channel: Channel) => void;
+  isFavorite: boolean;
+  showCategory?: boolean;
+}
+
+export interface CategoryGridProps {
+  categories: Category[];
+  onCategorySelect: (category: string) => void;
+  selectedCategory?: string;
+}
+
+export interface HeaderProps {
+  onSearch: (query: string) => void;
+  searchQuery: string;
+  currentView: string;
+  onViewChange: (view: string) => void;
+}
+
+export interface PlayerProps {
+  channel: Channel | null;
+  onClose: () => void;
+  autoplay?: boolean;
+}
+
+// Enums
+export enum ViewType {
+  HOME = 'home',
+  CATEGORIES = 'categories',
+  FAVORITES = 'favorites',
+  HISTORY = 'history',
+  SEARCH = 'search',
+  PLAYER = 'player',
+  PLAYLISTS = 'playlists',
+  ANALYTICS = 'analytics',
+  NOTIFICATIONS = 'notifications',
+  THEMES = 'themes'
+}
+
+export enum PlaylistStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  ERROR = 'error',
+  LOADING = 'loading'
+}
+
+export enum Theme {
+  LIGHT = 'light',
+  DARK = 'dark',
+  SYSTEM = 'system'
+}
+
+export enum Quality {
+  AUTO = 'auto',
+  HIGH = 'high',
+  MEDIUM = 'medium',
+  LOW = 'low'
+}
+
