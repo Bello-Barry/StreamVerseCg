@@ -330,23 +330,33 @@ class ThemeManager {
   private isDark: boolean = false
 
   constructor() {
-    this.customSettings = this.loadCustomSettings()
-    this.currentTheme = this.getThemeById(this.customSettings.selectedTheme) || defaultThemes[0]
-    this.isDark = this.getSystemTheme() === 'dark'
-    this.applyTheme()
-    this.setupSystemThemeListener()
+    if (typeof window !== 'undefined') {
+      this.customSettings = this.loadCustomSettings();
+      this.currentTheme = this.getThemeById(this.customSettings.selectedTheme) || defaultThemes[0];
+      this.isDark = this.getSystemTheme() === 'dark';
+      this.applyTheme();
+      this.setupSystemThemeListener();
+    } else {
+      // Default values for SSR
+      this.customSettings = { selectedTheme: 'streamverse-default' };
+      this.currentTheme = defaultThemes[0];
+      this.isDark = false; // Default to light mode on server
+    }
   }
 
   private loadCustomSettings(): CustomThemeSettings {
+    if (typeof window === 'undefined') {
+      return { selectedTheme: 'streamverse-default' };
+    }
     try {
-      const stored = localStorage.getItem('streamverse_theme_settings')
+      const stored = localStorage.getItem('streamverse_theme_settings');
       if (stored) {
-        return { selectedTheme: 'streamverse-default', ...JSON.parse(stored) }
+        return { selectedTheme: 'streamverse-default', ...JSON.parse(stored) };
       }
     } catch (error) {
-      console.warn('Failed to load theme settings:', error)
+      console.warn('Failed to load theme settings:', error);
     }
-    return { selectedTheme: 'streamverse-default' }
+    return { selectedTheme: 'streamverse-default' };
   }
 
   private saveCustomSettings(): void {
@@ -524,4 +534,3 @@ export function useThemeManager() {
     importTheme: themeManager.importTheme.bind(themeManager)
   }
 }
-

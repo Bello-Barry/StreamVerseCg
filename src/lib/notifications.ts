@@ -43,16 +43,16 @@ class NotificationService {
   }
 
   private loadSettings(): NotificationSettings {
-    if (typeof window === 'undefined') return this.getDefaultSettings()
+    if (typeof window === 'undefined') return this.getDefaultSettings();
     try {
-      const stored = localStorage.getItem("streamverse_notification_settings")
+      const stored = localStorage.getItem("streamverse_notification_settings");
       if (stored) {
-        return { ...this.getDefaultSettings(), ...JSON.parse(stored) }
+        return { ...this.getDefaultSettings(), ...JSON.parse(stored) };
       }
     } catch (error) {
-      console.warn("Failed to load notification settings:", error)
+      console.warn("Failed to load notification settings:", error);
     }
-    return this.getDefaultSettings()
+    return this.getDefaultSettings();
   }
 
   private getDefaultSettings(): NotificationSettings {
