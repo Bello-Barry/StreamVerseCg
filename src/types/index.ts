@@ -123,12 +123,16 @@ export interface SearchFormData {
 }
 
 // Types pour les événements
+
+
 export interface PlayerEvent {
   type: 'play' | 'pause' | 'stop' | 'error' | 'ended';
   channel: Channel;
   timestamp: Date;
-  data?: any;
+  data?: unknown;
 }
+
+
 
 export interface PlaylistEvent {
   type: 'added' | 'updated' | 'removed' | 'error';

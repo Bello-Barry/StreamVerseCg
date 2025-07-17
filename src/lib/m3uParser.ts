@@ -101,7 +101,7 @@ function parseExtinfLine(line: string, sourceName: string): Partial<Channel> | n
       return null;
     }
     
-    const [, duration, attributes, title] = match;
+    const [, _duration, attributes, title] = match;
     
     const channel: Partial<Channel> = {
       name: title.trim(),
@@ -193,7 +193,7 @@ function isValidStreamUrl(url: string): boolean {
     
     return true;
     
-  } catch (error) {
+  } catch  {
     return false;
   }
 }

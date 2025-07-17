@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Playlist, Channel, Category, PlaylistManagerState, M3UParseResult } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
-import { parseXtreamContent, XtreamParser } from '@/lib/xtreamParser';
+//import { parseXtreamContent, XtreamParser } from '@/lib/xtreamParser';
+import { parseXtreamContent } from '@/lib/xtreamParser';
 
 interface PlaylistStore extends PlaylistManagerState {
   // Actions pour les playlists
