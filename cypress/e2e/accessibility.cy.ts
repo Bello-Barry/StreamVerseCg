@@ -4,8 +4,7 @@ describe('Accessibility Tests', () => {
   })
 
   it('has proper heading hierarchy', () => {
-    cy.get('h1').should('exist')
-    cy.get('h1').should('contain', 'StreamVerse')
+    cy.get('h1').should('exist').and('contain', 'StreamVerse')
   })
 
   it('has proper alt text for images', () => {
@@ -21,12 +20,14 @@ describe('Accessibility Tests', () => {
     cy.contains('Playlists').click()
     cy.get('[data-testid="add-playlist-button"]').click()
     cy.get('input').each(($input) => {
-      cy.wrap($input).should('have.attr', 'placeholder').or('have.attr', 'aria-label')
+      const hasPlaceholder = $input.attr('placeholder')
+      const hasAriaLabel = $input.attr('aria-label')
+
+      expect(!!hasPlaceholder || !!hasAriaLabel).to.be.true
     })
   })
 
   it('supports keyboard navigation', () => {
-    // Test focus + enter manually (no .tab())
     cy.get('[data-testid="menu-button"]').focus().type('{enter}')
     cy.get('[data-testid="sidebar"]').should('be.visible')
   })
@@ -40,7 +41,6 @@ describe('Accessibility Tests', () => {
   })
 
   it('has sufficient color contrast', () => {
-    // Basic visibility check (cypress-axe can be added later)
     cy.get('body').should('be.visible')
     cy.get('[data-testid="header"]').should('be.visible')
     cy.contains('StreamVerse').should('be.visible')
@@ -65,6 +65,6 @@ describe('Accessibility Tests', () => {
     cy.get('[data-testid="add-playlist-button"]').click()
     cy.get('[data-testid="add-playlist-submit"]').click()
 
-    cy.get('[role="alert"]').should('exist').or('contain.text', 'requis')
+    cy.get('[role="alert"]').should('exist')
   })
 })
