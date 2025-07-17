@@ -1,12 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle
+} from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import {
+  BarChart3, Users, Eye, Heart, Search, Clock, Smartphone, Monitor, Tablet, Download, Trash2
+} from 'lucide-react'
 import { useAnalytics, AnalyticsMetrics } from '@/lib/analytics'
-import { BarChart3, Users, Eye, Heart, Search, Clock, Smartphone, Monitor, Tablet, Download, Trash2 } from 'lucide-react'
 
 export function AnalyticsPage() {
   const [metrics, setMetrics] = useState<AnalyticsMetrics | null>(null)
@@ -18,7 +22,7 @@ export function AnalyticsPage() {
     }
 
     loadMetrics()
-    const interval = setInterval(loadMetrics, 5000) // Update every 5 seconds
+    const interval = setInterval(loadMetrics, 5000)
 
     return () => clearInterval(interval)
   }, [getMetrics])
@@ -37,27 +41,27 @@ export function AnalyticsPage() {
   }
 
   const handleClearData = () => {
-    if (confirm('Êtes-vous sûr de vouloir effacer toutes les données d\'analytics ?')) {
+    if (confirm('Êtes-vous sûr de vouloir effacer toutes les données d\u2019analytics ?')) {
       clearData()
       setMetrics(getMetrics())
     }
   }
 
-  const formatDuration = (ms: number) => {
+  const formatDuration = (ms: number): string => {
     const minutes = Math.floor(ms / 60000)
     const hours = Math.floor(minutes / 60)
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m`
-    }
-    return `${minutes}m`
+    return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`
   }
 
-  const getDeviceIcon = (device: string) => {
+  const getDeviceIcon = (device: string): JSX.Element => {
     switch (device) {
-      case 'mobile': return <Smartphone className="h-4 w-4" />
-      case 'tablet': return <Tablet className="h-4 w-4" />
-      case 'desktop': return <Monitor className="h-4 w-4" />
-      default: return <Monitor className="h-4 w-4" />
+      case 'mobile':
+        return <Smartphone className="h-4 w-4" />
+      case 'tablet':
+        return <Tablet className="h-4 w-4" />
+      case 'desktop':
+      default:
+        return <Monitor className="h-4 w-4" />
     }
   }
 
@@ -66,11 +70,17 @@ export function AnalyticsPage() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <BarChart3 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Chargement des analytics...</p>
+          <p className="text-muted-foreground">Chargement des analytics…</p>
         </div>
       </div>
     )
   }
+
+  const maxViewsPlays = Math.max(...metrics.topChannels.map(c => c.views + c.plays)) || 1
+  const maxSearchCount = Math.max(...metrics.topSearches.map(s => s.count)) || 1
+  const maxPageViews = Math.max(...Object.values(metrics.pageViews)) || 1
+  const maxDeviceCount = Math.max(...Object.values(metrics.deviceTypes)) || 1
+  const maxTimeRange = Math.max(...Object.values(metrics.timeRanges)) || 1
 
   return (
     <div className="space-y-6">
@@ -80,7 +90,7 @@ export function AnalyticsPage() {
             Analytics & Métriques
           </h1>
           <p className="text-muted-foreground mt-2">
-            Suivi d'usage et statistiques de l'application
+            Suivi d&rsquo;usage et statistiques de l&rsquo;application
           </p>
         </div>
         <div className="flex gap-2">
@@ -95,7 +105,7 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Overview Cards */}
+      {/* Cartes globales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -106,7 +116,6 @@ export function AnalyticsPage() {
             <div className="text-2xl font-bold">{metrics.totalEvents.toLocaleString()}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Utilisateurs Uniques</CardTitle>
@@ -116,7 +125,6 @@ export function AnalyticsPage() {
             <div className="text-2xl font-bold">{metrics.uniqueUsers.toLocaleString()}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Durée Session</CardTitle>
@@ -126,7 +134,6 @@ export function AnalyticsPage() {
             <div className="text-2xl font-bold">{formatDuration(metrics.sessionDuration)}</div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Favoris Ajoutés</CardTitle>
@@ -171,7 +178,7 @@ export function AnalyticsPage() {
                   <div className="text-right">
                     <div className="text-sm font-medium">{channel.views + channel.plays}</div>
                     <Progress 
-                      value={(channel.views + channel.plays) / Math.max(...metrics.topChannels.map(c => c.views + c.plays)) * 100} 
+                      value={(channel.views + channel.plays) / maxViewsPlays * 100} 
                       className="w-16 h-2 mt-1"
                     />
                   </div>
@@ -205,7 +212,7 @@ export function AnalyticsPage() {
                   <div className="text-right">
                     <div className="text-sm font-medium">{search.count}</div>
                     <Progress 
-                      value={search.count / Math.max(...metrics.topSearches.map(s => s.count)) * 100} 
+                      value={search.count / maxSearchCount * 100} 
                       className="w-16 h-2 mt-1"
                     />
                   </div>
@@ -226,14 +233,14 @@ export function AnalyticsPage() {
           <CardContent>
             <div className="space-y-3">
               {Object.entries(metrics.pageViews)
-                .sort(([,a], [,b]) => b - a)
+                .sort(([, a], [, b]) => b - a)
                 .map(([page, views]) => (
                 <div key={page} className="flex items-center justify-between">
                   <span className="font-medium text-sm capitalize">{page}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{views}</span>
                     <Progress 
-                      value={views / Math.max(...Object.values(metrics.pageViews)) * 100} 
+                      value={views / maxPageViews * 100} 
                       className="w-20 h-2"
                     />
                   </div>
@@ -246,15 +253,15 @@ export function AnalyticsPage() {
         {/* Device Types */}
         <Card>
           <CardHeader>
-            <CardTitle>Types d'Appareils</CardTitle>
+            <CardTitle>Types d&rsquo;Appareils</CardTitle>
             <CardDescription>
-              Répartition par type d'appareil
+              Répartition par type d&rsquo;appareil
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {Object.entries(metrics.deviceTypes)
-                .sort(([,a], [,b]) => b - a)
+                .sort(([, a], [, b]) => b - a)
                 .map(([device, count]) => (
                 <div key={device} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -264,7 +271,7 @@ export function AnalyticsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm">{count}</span>
                     <Progress 
-                      value={count / Math.max(...Object.values(metrics.deviceTypes)) * 100} 
+                      value={count / maxDeviceCount * 100} 
                       className="w-20 h-2"
                     />
                   </div>
@@ -280,7 +287,7 @@ export function AnalyticsPage() {
         <CardHeader>
           <CardTitle>Activité par Heure</CardTitle>
           <CardDescription>
-            Répartition de l'activité selon les tranches horaires
+            Répartition de l&rsquo;activité selon les tranches horaires
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -290,7 +297,7 @@ export function AnalyticsPage() {
                 <div className="text-2xl font-bold">{count}</div>
                 <div className="text-sm text-muted-foreground">{range}h</div>
                 <Progress 
-                  value={count / Math.max(...Object.values(metrics.timeRanges)) * 100} 
+                  value={count / maxTimeRange * 100} 
                   className="mt-2"
                 />
               </div>
