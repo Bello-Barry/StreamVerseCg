@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useThemeManager } from '@/lib/themes';
+import { useThemeManager } from '@/stores/useThemeStore';
 import {
   Palette,
   Type,
