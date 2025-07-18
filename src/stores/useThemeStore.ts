@@ -31,6 +31,7 @@ export interface ThemeState {
   theme: ThemeDefinition;
   isDark: boolean;
   customSettings: ThemeDefinition;
+  availableThemes: ThemeDefinition[]; // ✅ AJOUTÉ
   setTheme: (themeId: string) => void;
   setDarkMode: (isDark: boolean) => void;
   updateCustomColors: (colors: Partial<ThemeColors>) => void;
@@ -43,7 +44,7 @@ export interface ThemeState {
   importTheme: (themeData: string) => boolean;
 }
 
-// Valeur par défaut
+// ✅ Exemple de plusieurs thèmes disponibles
 const defaultTheme: ThemeDefinition = {
   id: 'default',
   name: 'Thème par défaut',
@@ -65,16 +66,31 @@ const defaultTheme: ThemeDefinition = {
   gradients: false,
 };
 
+const darkTheme: ThemeDefinition = {
+  ...defaultTheme,
+  id: 'dark',
+  name: 'Thème sombre',
+  mode: 'dark',
+  colors: {
+    primary: '#8b5cf6',
+    background: '#111827',
+    text: '#ffffff',
+    accent: '#f43f5e',
+    muted: '#9ca3af',
+  },
+};
+
 export const useThemeManager = create<ThemeState>()(
   persist(
     (set, get) => ({
       theme: defaultTheme,
       isDark: false,
       customSettings: defaultTheme,
+      availableThemes: [defaultTheme, darkTheme], // ✅ AJOUTÉ
 
       setTheme: (themeId: string) => {
-        // Ici tu pourrais charger un thème existant par ID (depuis un tableau de thèmes si besoin)
-        const newTheme = defaultTheme;
+        const found = get().availableThemes.find((t) => t.id === themeId);
+        const newTheme = found ?? defaultTheme;
         set({ theme: newTheme, customSettings: newTheme });
       },
 
