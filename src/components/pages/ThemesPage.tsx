@@ -38,6 +38,8 @@ import type { CustomThemeSettings } from '@/types';
 
 type SettingValue = string | boolean | number;
 
+type ThemeColorKey = 'border' | 'background' | 'primary' | 'secondary' | 'accent' | 'card';
+
 export function ThemesPage() {
   const [isClient, setIsClient] = useState(false);
 
@@ -147,17 +149,14 @@ export function ThemesPage() {
     }
   }, [resetToDefault]);
 
-  const colorInputs = useMemo(
-    () => [
-      { key: 'primary', label: 'Couleur Primaire', description: "Couleur principale de l'interface" },
-      { key: 'secondary', label: 'Couleur Secondaire', description: 'Couleur pour les éléments secondaires' },
-      { key: 'accent', label: "Couleur d'Accent", description: 'Couleur pour les éléments mis en valeur' },
-      { key: 'background', label: 'Arrière-plan', description: 'Couleur de fond principale' },
-      { key: 'card', label: 'Cartes', description: 'Couleur de fond des cartes' },
-      { key: 'border', label: 'Bordures', description: 'Couleur des bordures' },
-    ],
-    []
-  );
+  const colorInputs: { key: ThemeColorKey; label: string; description: string }[] = [
+  { key: 'primary', label: 'Couleur Primaire', description: "Couleur principale de l'interface" },
+  { key: 'secondary', label: 'Couleur Secondaire', description: 'Couleur pour les éléments secondaires' },
+  { key: 'accent', label: "Couleur d'Accent", description: 'Couleur pour les éléments mis en valeur' },
+  { key: 'background', label: 'Arrière-plan', description: 'Couleur de fond principale' },
+  { key: 'card', label: 'Cartes', description: 'Couleur de fond des cartes' },
+  { key: 'border', label: 'Bordures', description: 'Couleur des bordures' },
+];
 
   const fontOptions = useMemo(
     () => [
