@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ThemeColors, ThemeFonts, ThemeDefinition } from '@/types/themes';
+import { ThemeDefinition, ThemeColors, ThemeFonts } from '@/types';
 
 interface ThemeState {
-  theme: ThemeDefinition; // ✅ propriété manquante
+  theme: ThemeDefinition; // ✅ Propriété nécessaire
   isDark: boolean;
   customSettings: {
     colors: ThemeColors;
@@ -21,49 +21,35 @@ interface ThemeState {
   importTheme: (themeData: string) => boolean;
 }
 
+const defaultTheme: ThemeDefinition = {
+  id: 'custom',
+  name: 'Thème personnalisé',
+  colors: {
+    primary: '#0ea5e9',
+    secondary: '#9333ea',
+    background: '#ffffff',
+    text: '#000000',
+    card: '#f9fafb',
+  },
+  fonts: {
+    heading: 'Inter',
+    body: 'Inter',
+    mono: 'JetBrains Mono',
+  },
+  glassmorphism: false,
+  gradients: false,
+  borderRadius: 8,
+};
+
 export const useThemeManager = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: {
-        id: 'custom',
-        name: 'Thème personnalisé',
-        colors: {
-          primary: '#0ea5e9',
-          secondary: '#9333ea',
-          background: '#ffffff',
-          text: '#000000',
-          card: '#f9fafb',
-        },
-        fonts: {
-          heading: 'Inter',
-          body: 'Inter',
-          mono: 'JetBrains Mono',
-        },
-        glassmorphism: false,
-        gradients: false,
-        borderRadius: 8,
-      },
+      theme: defaultTheme,
       isDark: false,
-      customSettings: {
-        colors: {
-          primary: '#0ea5e9',
-          secondary: '#9333ea',
-          background: '#ffffff',
-          text: '#000000',
-          card: '#f9fafb',
-        },
-        fonts: {
-          heading: 'Inter',
-          body: 'Inter',
-          mono: 'JetBrains Mono',
-        },
-        glassmorphism: false,
-        gradients: false,
-        borderRadius: 8,
-      },
+      customSettings: { ...defaultTheme },
       setTheme: (themeId) => {
-        // tu peux charger des thèmes prédéfinis ici si tu veux
-        console.log('Changement de thème vers', themeId);
+        // Ici tu peux ajouter une logique pour charger un thème prédéfini
+        set({ theme: defaultTheme }); // pour l'instant on force le thème custom
       },
       setDarkMode: (isDark) => set({ isDark }),
       updateCustomColors: (colors) =>
@@ -94,7 +80,12 @@ export const useThemeManager = create<ThemeState>()(
         try {
           const parsed = JSON.parse(themeData);
           if (typeof parsed === 'object') {
-            set({ customSettings: parsed });
+            set({
+              customSettings: {
+                ...get().customSettings,
+                ...parsed,
+              },
+            });
             return true;
           }
           return false;
@@ -104,7 +95,7 @@ export const useThemeManager = create<ThemeState>()(
       },
     }),
     {
-      name: 'theme-settings',
+      name: 'theme-manager-store',
     }
   )
 );

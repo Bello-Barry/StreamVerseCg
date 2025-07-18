@@ -32,6 +32,30 @@ export enum Quality {
   LOW = 'low'
 }
 
+export interface ThemeColors {
+  primary: string;
+  secondary: string;
+  background: string;
+  text: string;
+  card: string;
+}
+
+export interface ThemeFonts {
+  heading: string;
+  body: string;
+  mono: string;
+}
+
+export interface ThemeDefinition {
+  id: string;
+  name: string;
+  colors: ThemeColors;
+  fonts: ThemeFonts;
+  glassmorphism: boolean;
+  gradients: boolean;
+  borderRadius: number;
+}
+
 export type CustomThemeSettings = {
   colors: {
     primary?: string;
