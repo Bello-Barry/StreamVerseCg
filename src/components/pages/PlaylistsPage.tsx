@@ -73,6 +73,7 @@ const PlaylistsPage: React.FC = () => {
           username: data.xtreamUsername || '',
           password: data.xtreamPassword || '',
         } : undefined,
+        status: editingPlaylist?.status ?? 'inactive',
       };
 
       if (editingPlaylist) {
