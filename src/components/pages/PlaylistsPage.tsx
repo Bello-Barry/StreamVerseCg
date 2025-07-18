@@ -311,7 +311,7 @@ const PlaylistsPage: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    
     </div>
   );
 };
