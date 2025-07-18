@@ -18,7 +18,7 @@ import { AnalyticsProvider } from '@/components/AnalyticsProvider';
 import { NotificationProvider } from '@/components/NotificationProvider';
 import { useAppStore } from '@/stores/useAppStore';
 import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { ViewType } from '@/types';
+import type { AppState, ViewType, Channel } from '@/types';
 
 export default function StreamVersePage() {
   const { 

@@ -20,6 +20,7 @@ import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { ViewType, Channel } from '@/types';
 
+
 const HomePage: React.FC = () => {
   const { channels, categories, loading } = usePlaylistStore();
   const { favorites, toggleFavorite, isFavorite } = useFavoritesStore();
