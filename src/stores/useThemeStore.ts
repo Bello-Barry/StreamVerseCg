@@ -1,99 +1,127 @@
-// src/store/useThemeStore.ts
-import { create } from "zustand"
+import { create } from 'zustand';
 
 export interface ThemeColors {
-  primary: string
-  secondary: string
-  background: string
-  text: string
+  background: string;
+  text: string;
+  primary: string;
+  secondary: string;
 }
 
 export interface ThemeFonts {
-  body: string
-  heading: string
-}
-
-export interface ThemeLayout {
-  borderRadius: number
-  spacing: number
+  body: string;
+  heading: string;
 }
 
 export interface ThemeEffects {
-  shadows: boolean
-  animations: boolean
+  borderRadius: string;
+  boxShadow: string;
+}
+
+export interface ThemeLayout {
+  spacing: number;
+  maxWidth: number;
+}
+
+export interface ThemeSettings {
+  colors: ThemeColors;
+  fonts: ThemeFonts;
+  effects: ThemeEffects;
+  layout: ThemeLayout;
 }
 
 export interface ThemeDefinition {
-  id: string
-  name: string
-  isDark: boolean
-  colors: ThemeColors
-  fonts: ThemeFonts
-  layout: ThemeLayout
-  effects: ThemeEffects
+  id: string;
+  name: string;
+  settings: ThemeSettings;
 }
+
+// Exemples de thèmes
+const defaultTheme: ThemeDefinition = {
+  id: 'default',
+  name: 'Thème par défaut',
+  settings: {
+    colors: {
+      background: '#ffffff',
+      text: '#000000',
+      primary: '#2563eb',
+      secondary: '#7c3aed',
+    },
+    fonts: {
+      body: 'Inter, sans-serif',
+      heading: 'Poppins, sans-serif',
+    },
+    effects: {
+      borderRadius: '0.5rem',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    },
+    layout: {
+      spacing: 16,
+      maxWidth: 1200,
+    },
+  },
+};
+
+const darkTheme: ThemeDefinition = {
+  id: 'dark',
+  name: 'Thème sombre',
+  settings: {
+    colors: {
+      background: '#0f172a',
+      text: '#f8fafc',
+      primary: '#3b82f6',
+      secondary: '#8b5cf6',
+    },
+    fonts: {
+      body: 'Inter, sans-serif',
+      heading: 'Poppins, sans-serif',
+    },
+    effects: {
+      borderRadius: '0.5rem',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)',
+    },
+    layout: {
+      spacing: 16,
+      maxWidth: 1200,
+    },
+  },
+};
+
+const defaultThemes: ThemeDefinition[] = [defaultTheme, darkTheme];
 
 export interface ThemeState {
-  theme: ThemeDefinition
-  customSettings: ThemeDefinition
-  availableThemes: ThemeDefinition[]
-  setTheme: (themeId: string) => void
-  setDarkMode: (isDark: boolean) => void
-  updateCustomColors: (colors: Partial<ThemeColors>) => void
-  updateCustomFonts: (fonts: Partial<ThemeFonts>) => void
-  updateCustomLayout: (layout: Partial<ThemeLayout>) => void
-  updateCustomEffects: (effects: Partial<ThemeEffects>) => void
-  updateCustomSettings: (settings: Partial<ThemeDefinition>) => void
-  resetToDefault: () => void
-  exportTheme: () => string
-  importTheme: (themeData: string) => boolean
-}
+  theme: ThemeDefinition;
+  customSettings: ThemeSettings;
+  availableThemes: ThemeDefinition[];
+  isDark: boolean;
 
-const defaultTheme: ThemeDefinition = {
-  id: "default",
-  name: "Default",
-  isDark: false,
-  colors: {
-    primary: "#4f46e5",
-    secondary: "#9333ea",
-    background: "#ffffff",
-    text: "#000000",
-  },
-  fonts: {
-    body: "Arial, sans-serif",
-    heading: "Georgia, serif",
-  },
-  layout: {
-    borderRadius: 8,
-    spacing: 16,
-  },
-  effects: {
-    shadows: true,
-    animations: true,
-  },
+  setTheme: (themeId: string) => void;
+  setDarkMode: (isDark: boolean) => void;
+  updateCustomColors: (colors: Partial<ThemeColors>) => void;
+  updateCustomFonts: (fonts: Partial<ThemeFonts>) => void;
+  updateCustomSettings: (settings: Partial<ThemeSettings>) => void;
+  resetToDefault: () => void;
+  exportTheme: () => string;
+  importTheme: (themeData: string) => boolean;
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: defaultTheme,
-  customSettings: defaultTheme,
-  availableThemes: [defaultTheme],
+  customSettings: defaultTheme.settings,
+  availableThemes: [...defaultThemes],
+  isDark: false,
 
   setTheme: (themeId) => {
-    const theme = get().availableThemes.find((t) => t.id === themeId)
-    if (theme) set({ theme, customSettings: theme })
+    const selected = get().availableThemes.find((t) => t.id === themeId);
+    if (selected) {
+      set({
+        theme: selected,
+        customSettings: selected.settings,
+      });
+    }
   },
 
   setDarkMode: (isDark) => {
-    set((state) => ({
-      theme: {
-        ...state.theme,
-        isDark,
-      },
-      customSettings: {
-        ...state.customSettings,
-        isDark,
-      },
-    }))
+    set({ isDark });
   },
 
   updateCustomColors: (colors) => {
@@ -105,7 +133,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
           ...colors,
         },
       },
-    }))
+    }));
   },
 
   updateCustomFonts: (fonts) => {
@@ -117,31 +145,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
           ...fonts,
         },
       },
-    }))
-  },
-
-  updateCustomLayout: (layout) => {
-    set((state) => ({
-      customSettings: {
-        ...state.customSettings,
-        layout: {
-          ...state.customSettings.layout,
-          ...layout,
-        },
-      },
-    }))
-  },
-
-  updateCustomEffects: (effects) => {
-    set((state) => ({
-      customSettings: {
-        ...state.customSettings,
-        effects: {
-          ...state.customSettings.effects,
-          ...effects,
-        },
-      },
-    }))
+    }));
   },
 
   updateCustomSettings: (settings) => {
@@ -150,28 +154,32 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         ...state.customSettings,
         ...settings,
       },
-    }))
+    }));
   },
 
   resetToDefault: () => {
     set({
       theme: defaultTheme,
-      customSettings: defaultTheme,
-    })
+      customSettings: defaultTheme.settings,
+      isDark: false,
+    });
   },
 
   exportTheme: () => {
-    return JSON.stringify(get().customSettings)
-  },
-
-  importTheme: (themeData: string) => {
     try {
-      const importedTheme = JSON.parse(themeData) as ThemeDefinition
-      set({ theme: importedTheme, customSettings: importedTheme })
-      return true
-    } catch (error) {
-      console.error("Erreur d'import de thème :", error)
-      return false
+      return JSON.stringify(get().customSettings);
+    } catch {
+      return '';
     }
   },
-}))
+
+  importTheme: (data) => {
+    try {
+      const parsed = JSON.parse(data) as ThemeSettings;
+      set({ customSettings: parsed });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+}));
