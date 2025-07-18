@@ -16,21 +16,24 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { PlaylistFormData, Playlist ,PlaylistStatus } from '@/types';
+import { PlaylistFormData, Playlist, PlaylistStatus } from '@/types';
 import { toast } from 'sonner';
 
 const playlistSchema = z.object({
-  name: z.string().min(1, 'Le nom est requis.').max(100, 'Le nom ne doit pas dépasser 100 caractères.'),
+  name: z.string().min(1, 'Le nom est requis.').max(100),
   type: z.enum(['url', 'file', 'xtream']),
   url: z.string().optional(),
-  description: z.string().max(500, 'La description ne doit pas dépasser 500 caractères.').optional(),
+  description: z.string().max(500).optional(),
   xtreamServer: z.string().optional(),
   xtreamUsername: z.string().optional(),
   xtreamPassword: z.string().optional(),
-}).refine(data => data.type !== 'url' || (data.url && z.string().url('URL invalide.').safeParse(data.url).success), {
-  message: 'Une URL valide est requise pour le type URL.',
-  path: ['url'],
-});
+}).refine(
+  (data) => data.type !== 'url' || (data.url && z.string().url().safeParse(data.url).success),
+  {
+    message: 'Une URL valide est requise pour le type URL.',
+    path: ['url'],
+  }
+);
 
 const PlaylistsPage: React.FC = () => {
   const {
@@ -65,15 +68,23 @@ const PlaylistsPage: React.FC = () => {
 
   const handleSubmit = useCallback(async (data: PlaylistFormData) => {
     try {
-      const playlistData = {
-        ...data,
+      const playlistData: Omit<Playlist, 'id'> = {
+        name: data.name,
+        type: data.type,
+        url: data.url,
+        description: data.description,
         content: data.type === 'file' ? fileContent : undefined,
-        xtreamConfig: data.type === 'xtream' ? {
-          server: data.xtreamServer || '',
-          username: data.xtreamUsername || '',
-          password: data.xtreamPassword || '',
-        } : undefined,
-        status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE, 
+        xtreamConfig: data.type === 'xtream'
+          ? {
+              server: data.xtreamServer || '',
+              username: data.xtreamUsername || '',
+              password: data.xtreamPassword || '',
+            }
+          : undefined,
+        status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE,
+        channelCount: 0,
+        lastUpdate: null,
+        isRemovable: true,
       };
 
       if (editingPlaylist) {
@@ -83,6 +94,7 @@ const PlaylistsPage: React.FC = () => {
         await addPlaylist(playlistData);
         toast.success(`La playlist "${data.name}" a été ajoutée.`);
       }
+
       resetFormAndState();
     } catch (error) {
       console.error(error);
@@ -135,9 +147,7 @@ const PlaylistsPage: React.FC = () => {
   }, [form]);
 
   useEffect(() => {
-    if (!isDialogOpen) {
-      resetFormAndState();
-    }
+    if (!isDialogOpen) resetFormAndState();
   }, [isDialogOpen, resetFormAndState]);
 
   const getStatusInfo = (status: string) => {
@@ -151,7 +161,7 @@ const PlaylistsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+ <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Gestion des Playlists</h1>
           <p className="text-muted-foreground mt-1">
@@ -301,6 +311,7 @@ const PlaylistsPage: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
     </div>
   );
 };
