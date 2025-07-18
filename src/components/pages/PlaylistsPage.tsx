@@ -83,7 +83,7 @@ const PlaylistsPage: React.FC = () => {
           : undefined,
         status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE,
         channelCount: 0,
-        lastUpdate: null,
+        
         isRemovable: true,
       };
 
