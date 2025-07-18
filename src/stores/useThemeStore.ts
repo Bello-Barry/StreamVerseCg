@@ -35,6 +35,7 @@ export interface ThemeDefinition {
 
 export interface ThemeState {
   theme: ThemeDefinition
+  customSettings: ThemeDefinition
   availableThemes: ThemeDefinition[]
   setTheme: (themeId: string) => void
   setDarkMode: (isDark: boolean) => void
@@ -74,11 +75,12 @@ const defaultTheme: ThemeDefinition = {
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: defaultTheme,
+  customSettings: defaultTheme,
   availableThemes: [defaultTheme],
 
   setTheme: (themeId) => {
     const theme = get().availableThemes.find((t) => t.id === themeId)
-    if (theme) set({ theme })
+    if (theme) set({ theme, customSettings: theme })
   },
 
   setDarkMode: (isDark) => {
@@ -87,15 +89,19 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         ...state.theme,
         isDark,
       },
+      customSettings: {
+        ...state.customSettings,
+        isDark,
+      },
     }))
   },
 
   updateCustomColors: (colors) => {
     set((state) => ({
-      theme: {
-        ...state.theme,
+      customSettings: {
+        ...state.customSettings,
         colors: {
-          ...state.theme.colors,
+          ...state.customSettings.colors,
           ...colors,
         },
       },
@@ -104,10 +110,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   updateCustomFonts: (fonts) => {
     set((state) => ({
-      theme: {
-        ...state.theme,
+      customSettings: {
+        ...state.customSettings,
         fonts: {
-          ...state.theme.fonts,
+          ...state.customSettings.fonts,
           ...fonts,
         },
       },
@@ -116,10 +122,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   updateCustomLayout: (layout) => {
     set((state) => ({
-      theme: {
-        ...state.theme,
+      customSettings: {
+        ...state.customSettings,
         layout: {
-          ...state.theme.layout,
+          ...state.customSettings.layout,
           ...layout,
         },
       },
@@ -128,10 +134,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   updateCustomEffects: (effects) => {
     set((state) => ({
-      theme: {
-        ...state.theme,
+      customSettings: {
+        ...state.customSettings,
         effects: {
-          ...state.theme.effects,
+          ...state.customSettings.effects,
           ...effects,
         },
       },
@@ -140,25 +146,28 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   updateCustomSettings: (settings) => {
     set((state) => ({
-      theme: {
-        ...state.theme,
+      customSettings: {
+        ...state.customSettings,
         ...settings,
       },
     }))
   },
 
   resetToDefault: () => {
-    set({ theme: defaultTheme })
+    set({
+      theme: defaultTheme,
+      customSettings: defaultTheme,
+    })
   },
 
   exportTheme: () => {
-    return JSON.stringify(get().theme)
+    return JSON.stringify(get().customSettings)
   },
 
   importTheme: (themeData: string) => {
     try {
       const importedTheme = JSON.parse(themeData) as ThemeDefinition
-      set({ theme: importedTheme })
+      set({ theme: importedTheme, customSettings: importedTheme })
       return true
     } catch (error) {
       console.error("Erreur d'import de thème :", error)
