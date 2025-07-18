@@ -32,6 +32,25 @@ export enum Quality {
   LOW = 'low'
 }
 
+export type CustomThemeSettings = {
+  colors: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    background?: string;
+    card?: string;
+    border?: string;
+  };
+  fonts: {
+    heading: string;
+    body: string;
+    mono: string;
+  };
+  glassmorphism: boolean;
+  gradients: boolean;
+  borderRadius: number;
+};
+
 // Types généraux
 export interface Channel {
   id: string;

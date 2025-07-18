@@ -1,5 +1,3 @@
-// src/components/pages/ThemesPage.tsx
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -22,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useThemeManager, ThemeConfig, CustomThemeSettings } from '@/lib/themes';
+import { useThemeManager } from '@/lib/themes';
 import {
   Palette,
   Type,
@@ -34,9 +32,9 @@ import {
   Sun,
   Moon,
   Sparkles,
-  Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { CustomThemeSettings } from '@/types';
 
 type SettingValue = string | boolean | number;
 
@@ -62,8 +60,15 @@ export function ThemesPage() {
     setIsClient(true);
   }, []);
 
-  const handleThemeChange = useCallback((themeId: string) => setTheme(themeId), [setTheme]);
-  const handleDarkModeToggle = useCallback((dark: boolean) => setDarkMode(dark), [setDarkMode]);
+  const handleThemeChange = useCallback(
+    (themeId: string) => setTheme(themeId),
+    [setTheme]
+  );
+
+  const handleDarkModeToggle = useCallback(
+    (dark: boolean) => setDarkMode(dark),
+    [setDarkMode]
+  );
 
   const handleColorChange = useCallback(
     (colorKey: keyof CustomThemeSettings['colors'], value: string) => {
@@ -108,7 +113,8 @@ export function ThemesPage() {
         reader.onload = (e) => {
           const content = e.target?.result as string;
           try {
-            if (importTheme(content)) {
+            const success = importTheme(content);
+            if (success) {
               toast.success('Thème importé et appliqué avec succès !');
             } else {
               toast.error("Erreur lors de l'importation du thème", {
@@ -117,7 +123,10 @@ export function ThemesPage() {
             }
           } catch (error) {
             toast.error("Erreur critique à l'importation", {
-              description: error instanceof Error ? error.message : 'Une erreur inconnue est survenue.',
+              description:
+                error instanceof Error
+                  ? error.message
+                  : 'Une erreur inconnue est survenue.',
             });
           }
         };
@@ -128,7 +137,11 @@ export function ThemesPage() {
   );
 
   const handleReset = useCallback(() => {
-    if (window.confirm("Êtes-vous sûr de vouloir réinitialiser tous les paramètres de thème ? Cette action est irréversible.")) {
+    if (
+      window.confirm(
+        "Êtes-vous sûr de vouloir réinitialiser tous les paramètres de thème ? Cette action est irréversible."
+      )
+    ) {
       resetToDefault();
       toast.success('Thème réinitialisé aux valeurs par défaut.');
     }
@@ -148,9 +161,14 @@ export function ThemesPage() {
 
   const fontOptions = useMemo(
     () => [
-      'Inter, system-ui, sans-serif', 'Poppins, system-ui, sans-serif', 'Roboto, system-ui, sans-serif',
-      'Open Sans, system-ui, sans-serif', 'Montserrat, system-ui, sans-serif', 'JetBrains Mono, monospace',
-      'Fira Code, monospace', 'Source Code Pro, monospace',
+      'Inter, system-ui, sans-serif',
+      'Poppins, system-ui, sans-serif',
+      'Roboto, system-ui, sans-serif',
+      'Open Sans, system-ui, sans-serif',
+      'Montserrat, system-ui, sans-serif',
+      'JetBrains Mono, monospace',
+      'Fira Code, monospace',
+      'Source Code Pro, monospace',
     ],
     []
   );
@@ -168,6 +186,7 @@ export function ThemesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Barre de contrôle */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
@@ -193,216 +212,152 @@ export function ThemesPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {isDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            Mode d&apos;Affichage
-          </CardTitle>
-          <CardDescription>Basculer entre le mode clair et sombre.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Clair</span>
-            <Switch checked={isDark} onCheckedChange={handleDarkModeToggle} aria-label="Basculer le mode sombre" />
-            <span className="text-sm text-muted-foreground">Sombre</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5" />Thèmes Prédéfinis</CardTitle>
-          <CardDescription>Choisissez parmi nos thèmes prédéfinis pour commencer.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {availableThemes.map((theme) => (
-              <div
-                key={theme.id}
-                role="button"
-                tabIndex={0}
-                className={`rounded-lg border-2 p-4 cursor-pointer transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring ${
-                  currentTheme.id === theme.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                }`}
-                onClick={() => handleThemeChange(theme.id)}
-                onKeyDown={(e) => e.key === 'Enter' && handleThemeChange(theme.id)}
-              >
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-semibold">{theme.name}</h3>
-                  {currentTheme.id === theme.id && <Badge variant="default">Actuel</Badge>}
-                </div>
-                <p className="mb-3 text-sm text-muted-foreground">{theme.description}</p>
-                <div className="mb-2 flex gap-1">
-                  <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: `hsl(${theme.colors[isDark ? 'dark' : 'light'].primary})` }} />
-                  <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: `hsl(${theme.colors[isDark ? 'dark' : 'light'].secondary})` }} />
-                  <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: `hsl(${theme.colors[isDark ? 'dark' : 'light'].accent})` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="colors" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="colors"><Palette className="mr-2 h-4 w-4" />Couleurs</TabsTrigger>
-          <TabsTrigger value="fonts"><Type className="mr-2 h-4 w-4" />Polices</TabsTrigger>
-          <TabsTrigger value="effects"><Sparkles className="mr-2 h-4 w-4" />Effets</TabsTrigger>
-          <TabsTrigger value="layout"><Settings className="mr-2 h-4 w-4" />Mise en page</TabsTrigger>
+<Tabs defaultValue="colors" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="colors">
+            <Palette className="mr-2 h-4 w-4" /> Couleurs
+          </TabsTrigger>
+          <TabsTrigger value="fonts">
+            <Type className="mr-2 h-4 w-4" /> Polices
+          </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="mr-2 h-4 w-4" /> Paramètres
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="colors" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personnalisation des Couleurs</CardTitle>
-              <CardDescription>Modifiez les couleurs pour créer votre thème unique. Les changements sont appliqués en temps réel.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {colorInputs.map(({ key, label, description }) => (
-                  <div key={key} className="space-y-2">
-                    <label htmlFor={`color-input-${key}`} className="text-sm font-medium">{label}</label>
-                    <p className="text-xs text-muted-foreground">{description}</p>
-                    <Input
-                      id={`color-input-${key}`}
-                      placeholder="ex: 262.1 83.3% 57.8%"
-                      value={customSettings.colors[key as keyof typeof customSettings.colors] || ''}
-                      onChange={(e) => handleColorChange(key as keyof typeof customSettings.colors, e.target.value)}
-                      className="flex-1"
-                    />
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fonts" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personnalisation des Polices</CardTitle>
-              <CardDescription>Choisissez les polices pour les titres, le corps du texte et le code.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(['heading', 'body', 'mono'] as const).map((fontType) => (
-                <div key={fontType}>
-                  <label htmlFor={`font-select-${fontType}`} className="mb-2 block text-sm font-medium">
-                    Police {fontType === 'heading' ? 'des Titres' : fontType === 'body' ? 'du Corps' : 'Monospace'}
-                  </label>
-                  <Select
-                    value={customSettings.fonts[fontType]}
-                    onValueChange={(value) => handleFontChange(fontType, value)}
-                  >
-                    <SelectTrigger id={`font-select-${fontType}`}>
-                      <SelectValue placeholder="Choisir une police" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {fontOptions.map((font) => (
-                        <SelectItem key={font} value={font}>
-                          <span style={{ fontFamily: font }}>{font.split(',')[0]}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="effects" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Effets Visuels</CardTitle>
-              <CardDescription>Configurez les effets visuels et les animations.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label htmlFor="glassmorphism-switch" className="font-medium">Glassmorphisme</label>
-                  <p className="text-sm text-muted-foreground">Activer les effets de verre et de transparence.</p>
-                </div>
-                <Switch
-                  id="glassmorphism-switch"
-                  checked={customSettings.glassmorphism}
-                  onCheckedChange={(value) => handleSettingChange('glassmorphism', value)}
+        <TabsContent value="colors" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {colorInputs.map(({ key, label, description }) => (
+            <Card key={key}>
+              <CardHeader>
+                <CardTitle>{label}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Input
+                  type="color"
+                  value={customSettings.colors[key as keyof typeof customSettings.colors] || '#ffffff'}
+                  onChange={(e) => handleColorChange(key as keyof typeof customSettings.colors, e.target.value)}
+                  className="h-10 w-16 p-0"
                 />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <label htmlFor="gradients-switch" className="font-medium">Dégradés</label>
-                  <p className="text-sm text-muted-foreground">Utiliser des dégradés de couleurs.</p>
-                </div>
-                <Switch
-                  id="gradients-switch"
-                  checked={customSettings.gradients}
-                  onCheckedChange={(value) => handleSettingChange('gradients', value)}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
 
-        <TabsContent value="layout" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mise en Page</CardTitle>
-              <CardDescription>Configurez l&apos;apparence générale de l&apos;interface.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label htmlFor="border-radius-select" className="mb-2 block text-sm font-medium">Rayon des Bordures</label>
+        <TabsContent value="fonts" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {(['heading', 'body', 'mono'] as const).map((fontKey) => (
+            <Card key={fontKey}>
+              <CardHeader>
+                <CardTitle>
+                  {fontKey === 'heading' ? 'Police des Titres' : fontKey === 'body' ? 'Police du Corps' : 'Police Mono'}
+                </CardTitle>
+                <CardDescription>Sélectionnez une police pour {fontKey}</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Select
-                  value={String(customSettings.borderRadius)}
-                  onValueChange={(value) => handleSettingChange('borderRadius', Number(value))}
+                  value={customSettings.fonts[fontKey]}
+                  onValueChange={(value) => handleFontChange(fontKey, value)}
                 >
-                  <SelectTrigger id="border-radius-select">
-                    <SelectValue />
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choisir une police" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">Aucun</SelectItem>
-                    <SelectItem value="0.3">Petit</SelectItem>
-                    <SelectItem value="0.5">Moyen</SelectItem>
-                    <SelectItem value="0.75">Grand</SelectItem>
-                    <SelectItem value="1">Très grand</SelectItem>
+                    {fontOptions.map((font) => (
+                      <SelectItem key={font} value={font}>
+                        <span style={{ fontFamily: font }}>{font}</span>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+              </CardContent>
+            </Card>
+          ))}
+        </TabsContent>
+
+        <TabsContent value="settings" className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Mode Sombre</CardTitle>
+              <CardDescription>Activez ou désactivez le thème sombre</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Sun className="h-5 w-5" />
+                <Switch checked={isDark} onCheckedChange={handleDarkModeToggle} />
+                <Moon className="h-5 w-5" />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Effet Glassmorphism</CardTitle>
+              <CardDescription>Ajoute un effet de flou et de transparence</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Switch
+                checked={customSettings.glassmorphism}
+                onCheckedChange={(v) => handleSettingChange('glassmorphism', v)}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Gradients</CardTitle>
+              <CardDescription>Utilise des dégradés dans le thème</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Switch
+                checked={customSettings.gradients}
+                onCheckedChange={(v) => handleSettingChange('gradients', v)}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Arrondi</CardTitle>
+              <CardDescription>Rayon d’arrondi global pour les éléments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Input
+                type="number"
+                min={0}
+                max={30}
+                step={1}
+                value={customSettings.borderRadius}
+                onChange={(e) => handleSettingChange('borderRadius', Number(e.target.value))}
+              />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5" />Aperçu en Temps Réel</CardTitle>
-          <CardDescription>Les modifications sont appliquées automatiquement à l&apos;ensemble de l&apos;application.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-lg border bg-card p-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-                  <Sparkles className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="font-semibold">Exemple de Carte</h3>
-                  <p className="text-sm text-muted-foreground">Ceci est un aperçu de votre thème.</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm">Principal</Button>
-                <Button variant="secondary" size="sm">Secondaire</Button>
-                <Button variant="outline" size="sm">Contour</Button>
-              </div>
-              <div className="rounded bg-muted p-3">
-                <p className="text-sm">Zone de contenu avec un arrière-plan différent.</p>
-              </div>
-            </div>
+      {/* Aperçu */}
+      <div className="rounded-2xl border bg-card p-6 shadow">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold">Aperçu</h2>
+          <Badge variant="outline" className="flex items-center gap-2 text-xs">
+            <Eye className="h-4 w-4" />
+            {currentTheme.name} {isDark && '(sombre)'}
+          </Badge>
+        </div>
+        <div className="space-y-4">
+          <p className="text-muted-foreground">
+            Voici un aperçu de votre thème personnalisé. Les couleurs, polices et paramètres s’appliquent globalement
+            dans l’application.
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <Button>
+              <Sparkles className="mr-2 h-4 w-4" /> Bouton
+            </Button>
+            <Input placeholder="Champ de texte" />
+            <Badge>Badge</Badge>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
     </div>
   );
 }
