@@ -158,6 +158,14 @@ const PlaylistsPage: React.FC = () => {
       default: return { Icon: AlertCircle, text: 'Inconnu', variant: 'outline', color: 'text-gray-500' };
     }
   };
+  
+  // ✅ Mapping des variantes personnalisées vers celles autorisées par <Badge>
+  const variantMap: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+    success: 'default',
+    info: 'secondary',
+    warning: 'destructive',
+  }
+  
 
   return (
     <div className="space-y-6">
@@ -259,7 +267,12 @@ const PlaylistsPage: React.FC = () => {
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="flex-1 pr-2">{playlist.name}</CardTitle>
-                    <Badge variant={status.variant} className="flex-shrink-0"><status.Icon className={`mr-1 h-3 w-3 ${status.color}`} />{status.text}</Badge>
+ <Badge variant={variantMap[status.variant] ?? 'default'}
+                    className="flex-shrink-0"
+                  >
+                    <status.Icon className={`mr-1 h-3 w-3 ${status.color}`} />
+                    {status.text}
+                  </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
