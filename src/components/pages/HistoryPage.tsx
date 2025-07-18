@@ -6,12 +6,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
 import { useAppStore } from '@/stores/useAppStore';
-import { ViewType } from '@/types';
+import { ViewType, Channel } from '@/types';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { toast } from 'react-toastify';
 import Image from 'next/image';
 
-interface Channel {
+interface PartialChannel {
   id: string;
   name: string;
   tvgLogo?: string;
@@ -69,8 +69,14 @@ const HistoryPage: React.FC = () => {
       });
   }, [history, timeFilter, sortBy, isClient]);
 
-  const handlePlayChannel = (channel: Channel) => {
-    setCurrentChannel(channel);
+  const handlePlayChannel = (channel: PartialChannel) => {
+    const fullChannel: Channel = {
+      ...channel,
+      url: '', // 🛠️ à adapter si tu as une URL
+      playlistSource: '', // 🛠️ à adapter selon la source
+    };
+
+    setCurrentChannel(fullChannel);
   };
 
   const handleClearHistory = () => {
