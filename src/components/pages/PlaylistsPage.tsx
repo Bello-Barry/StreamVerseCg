@@ -16,7 +16,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { PlaylistFormData, Playlist } from '@/types';
+import { PlaylistFormData, Playlist ,PlaylistStatus } from '@/types';
 import { toast } from 'sonner';
 
 const playlistSchema = z.object({
@@ -73,7 +73,7 @@ const PlaylistsPage: React.FC = () => {
           username: data.xtreamUsername || '',
           password: data.xtreamPassword || '',
         } : undefined,
-        status: editingPlaylist?.status ?? 'inactive',
+        status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE, 
       };
 
       if (editingPlaylist) {
