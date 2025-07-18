@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useThemeManager } from '@/stores/useThemeStore';
+import { useThemeStore } from '@/stores/useThemeStore';
 import {
   Palette,
   Type,
@@ -54,7 +54,7 @@ export function ThemesPage() {
     resetToDefault,
     exportTheme,
     importTheme,
-  } = useThemeManager();
+  } = useThemeStore();
 
   useEffect(() => {
     setIsClient(true);
