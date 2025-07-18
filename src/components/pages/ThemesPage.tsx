@@ -235,7 +235,7 @@ export function ThemesPage() {
                 <Input
                   type="color"
                   value={customSettings.colors[key as keyof typeof customSettings.colors] || '#ffffff'}
-                  onChange={(e) => handleColorChange(key as keyof typeof customSettings.colors, e.target.value)}
+                  onChange={(e) => handleColorChange(key, e.target.value)}
                   className="h-10 w-16 p-0"
                 />
               </CardContent>
