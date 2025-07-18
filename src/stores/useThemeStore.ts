@@ -1,164 +1,168 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { Theme as ThemeEnum } from '@/types';
+// src/store/useThemeStore.ts
+import { create } from "zustand"
 
 export interface ThemeColors {
-  primary: string;
-  background: string;
-  text: string;
-  accent: string;
-  muted: string;
+  primary: string
+  secondary: string
+  background: string
+  text: string
 }
 
 export interface ThemeFonts {
-  heading: string;
-  body: string;
-  monospace: string;
+  body: string
+  heading: string
+}
+
+export interface ThemeLayout {
+  borderRadius: number
+  spacing: number
+}
+
+export interface ThemeEffects {
+  shadows: boolean
+  animations: boolean
 }
 
 export interface ThemeDefinition {
-  id: string;
-  name: string;
-  mode: 'light' | 'dark';
-  colors: ThemeColors;
-  fonts: ThemeFonts;
-  borderRadius: number;
-  glassmorphism: boolean;
-  gradients: boolean;
+  id: string
+  name: string
+  isDark: boolean
+  colors: ThemeColors
+  fonts: ThemeFonts
+  layout: ThemeLayout
+  effects: ThemeEffects
 }
 
 export interface ThemeState {
-  theme: ThemeDefinition;
-  isDark: boolean;
-  customSettings: ThemeDefinition;
-  availableThemes: ThemeDefinition[]; // ✅ AJOUTÉ
-  setTheme: (themeId: string) => void;
-  setDarkMode: (isDark: boolean) => void;
-  updateCustomColors: (colors: Partial<ThemeColors>) => void;
-  updateCustomFonts: (fonts: Partial<ThemeFonts>) => void;
-  updateSetting: <K extends keyof ThemeDefinition>(
-    key: K,
-    value: ThemeDefinition[K]
-  ) => void;
-  exportTheme: () => string;
-  importTheme: (themeData: string) => boolean;
+  theme: ThemeDefinition
+  availableThemes: ThemeDefinition[]
+  setTheme: (themeId: string) => void
+  setDarkMode: (isDark: boolean) => void
+  updateCustomColors: (colors: Partial<ThemeColors>) => void
+  updateCustomFonts: (fonts: Partial<ThemeFonts>) => void
+  updateCustomLayout: (layout: Partial<ThemeLayout>) => void
+  updateCustomEffects: (effects: Partial<ThemeEffects>) => void
+  updateCustomSettings: (settings: Partial<ThemeDefinition>) => void
+  resetToDefault: () => void
+  exportTheme: () => string
+  importTheme: (themeData: string) => boolean
 }
 
-// ✅ Exemple de plusieurs thèmes disponibles
 const defaultTheme: ThemeDefinition = {
-  id: 'default',
-  name: 'Thème par défaut',
-  mode: 'light',
+  id: "default",
+  name: "Default",
+  isDark: false,
   colors: {
-    primary: '#3b82f6',
-    background: '#ffffff',
-    text: '#000000',
-    accent: '#f97316',
-    muted: '#6b7280',
+    primary: "#4f46e5",
+    secondary: "#9333ea",
+    background: "#ffffff",
+    text: "#000000",
   },
   fonts: {
-    heading: 'Inter, sans-serif',
-    body: 'Inter, sans-serif',
-    monospace: 'Fira Code, monospace',
+    body: "Arial, sans-serif",
+    heading: "Georgia, serif",
   },
-  borderRadius: 8,
-  glassmorphism: false,
-  gradients: false,
-};
-
-const darkTheme: ThemeDefinition = {
-  ...defaultTheme,
-  id: 'dark',
-  name: 'Thème sombre',
-  mode: 'dark',
-  colors: {
-    primary: '#8b5cf6',
-    background: '#111827',
-    text: '#ffffff',
-    accent: '#f43f5e',
-    muted: '#9ca3af',
+  layout: {
+    borderRadius: 8,
+    spacing: 16,
   },
-};
+  effects: {
+    shadows: true,
+    animations: true,
+  },
+}
 
-export const useThemeManager = create<ThemeState>()(
-  persist(
-    (set, get) => ({
-      theme: defaultTheme,
-      isDark: false,
-      customSettings: defaultTheme,
-      availableThemes: [defaultTheme, darkTheme], // ✅ AJOUTÉ
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  theme: defaultTheme,
+  availableThemes: [defaultTheme],
 
-      setTheme: (themeId: string) => {
-        const found = get().availableThemes.find((t) => t.id === themeId);
-        const newTheme = found ?? defaultTheme;
-        set({ theme: newTheme, customSettings: newTheme });
+  setTheme: (themeId) => {
+    const theme = get().availableThemes.find((t) => t.id === themeId)
+    if (theme) set({ theme })
+  },
+
+  setDarkMode: (isDark) => {
+    set((state) => ({
+      theme: {
+        ...state.theme,
+        isDark,
       },
+    }))
+  },
 
-      setDarkMode: (isDark: boolean) => {
-        set((state) => ({
-          isDark,
-          customSettings: {
-            ...state.customSettings,
-            mode: isDark ? 'dark' : 'light',
-          },
-        }));
+  updateCustomColors: (colors) => {
+    set((state) => ({
+      theme: {
+        ...state.theme,
+        colors: {
+          ...state.theme.colors,
+          ...colors,
+        },
       },
+    }))
+  },
 
-      updateCustomColors: (colors: Partial<ThemeColors>) => {
-        set((state) => ({
-          customSettings: {
-            ...state.customSettings,
-            colors: {
-              ...state.customSettings.colors,
-              ...colors,
-            },
-          },
-        }));
+  updateCustomFonts: (fonts) => {
+    set((state) => ({
+      theme: {
+        ...state.theme,
+        fonts: {
+          ...state.theme.fonts,
+          ...fonts,
+        },
       },
+    }))
+  },
 
-      updateCustomFonts: (fonts: Partial<ThemeFonts>) => {
-        set((state) => ({
-          customSettings: {
-            ...state.customSettings,
-            fonts: {
-              ...state.customSettings.fonts,
-              ...fonts,
-            },
-          },
-        }));
+  updateCustomLayout: (layout) => {
+    set((state) => ({
+      theme: {
+        ...state.theme,
+        layout: {
+          ...state.theme.layout,
+          ...layout,
+        },
       },
+    }))
+  },
 
-      updateSetting: (key, value) => {
-        set((state) => ({
-          customSettings: {
-            ...state.customSettings,
-            [key]: value,
-          },
-        }));
+  updateCustomEffects: (effects) => {
+    set((state) => ({
+      theme: {
+        ...state.theme,
+        effects: {
+          ...state.theme.effects,
+          ...effects,
+        },
       },
+    }))
+  },
 
-      exportTheme: () => {
-        const themeToExport = get().customSettings;
-        return JSON.stringify(themeToExport, null, 2);
+  updateCustomSettings: (settings) => {
+    set((state) => ({
+      theme: {
+        ...state.theme,
+        ...settings,
       },
+    }))
+  },
 
-      importTheme: (themeData: string) => {
-        try {
-          const imported = JSON.parse(themeData) as ThemeDefinition;
-          set({
-            theme: imported,
-            customSettings: imported,
-            isDark: imported.mode === 'dark',
-          });
-          return true;
-        } catch (error) {
-          console.error('Erreur import theme :', error);
-          return false;
-        }
-      },
-    }),
-    {
-      name: 'theme-storage',
+  resetToDefault: () => {
+    set({ theme: defaultTheme })
+  },
+
+  exportTheme: () => {
+    return JSON.stringify(get().theme)
+  },
+
+  importTheme: (themeData: string) => {
+    try {
+      const importedTheme = JSON.parse(themeData) as ThemeDefinition
+      set({ theme: importedTheme })
+      return true
+    } catch (error) {
+      console.error("Erreur d'import de thème :", error)
+      return false
     }
-  )
-);
+  },
+}))
