@@ -58,6 +58,10 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
     return flags[country as keyof typeof flags] || '🌍';
   };
 
+  const isValidImageUrl = (url: string | undefined) => {
+    return !!url && url.startsWith('http');
+  };
+
   return (
     <Card 
       className={cn(
@@ -72,23 +76,24 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
       <CardContent className="p-0">
         {/* Image/Logo de la chaîne */}
         <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden rounded-t-lg">
-          {channel.tvgLogo && !imageError ? (
-            <div className="w-full h-full relative">
-              <Image
-                src={channel.tvgLogo}
-                alt={channel.name}
-                fill
-                className="object-cover transition-transform duration-300 group-hover:scale-110"
-                onError={() => setImageError(true)}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
-            </div>
+          {isValidImageUrl(channel.tvgLogo) && !imageError ? (
+            <Image
+              src={channel.tvgLogo}
+              alt={channel.name}
+              fill
+              onError={() => {
+                console.warn(`Erreur chargement logo: ${channel.tvgLogo}`);
+                setImageError(true);
+              }}
+              className="object-cover transition-transform duration-300 group-hover:scale-110"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Tv className="h-12 w-12 text-primary/60" />
             </div>
           )}
-          
+
           {/* Overlay avec boutons */}
           <div className={cn(
             "absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity duration-300",
@@ -169,9 +174,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </DropdownMenu>
           </div>
 
-          {/* Métadonnées */}
           <div className="space-y-2">
-            {/* Catégorie */}
             {showCategory && channel.group && (
               <Badge 
                 variant="secondary" 
@@ -181,7 +184,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
               </Badge>
             )}
 
-            {/* Informations supplémentaires */}
             <div className="flex items-center space-x-3 text-sm text-muted-foreground">
               {channel.country && (
                 <div className="flex items-center space-x-1">
@@ -189,7 +191,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
                   <span>{channel.country}</span>
                 </div>
               )}
-              
               {channel.language && (
                 <div className="flex items-center space-x-1">
                   <Globe className="h-3 w-3" />
@@ -198,7 +199,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
               )}
             </div>
 
-            {/* Source de la playlist */}
             <div className="text-xs text-muted-foreground truncate">
               Source: {channel.playlistSource}
             </div>

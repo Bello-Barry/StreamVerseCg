@@ -80,62 +80,75 @@ export const usePlaylistStore = create<PlaylistStore>()(
         await get().refreshPlaylist(newPlaylist.id);
       },
 
-      updatePlaylist: (id, updates) => set((state) => ({
-        playlists: state.playlists.map(playlist =>
-          playlist.id === id
-            ? { ...playlist, ...updates, lastUpdate: new Date() }
-            : playlist
-        )
-      })),
+      updatePlaylist: (id, updates) =>
+        set((state) => ({
+          playlists: state.playlists.map((playlist) =>
+            playlist.id === id
+              ? { ...playlist, ...updates, lastUpdate: new Date() }
+              : playlist
+          )
+        })),
 
       removePlaylist: (id) => {
         const { playlists } = get();
-        const playlist = playlists.find(p => p.id === id);
-
+        const playlist = playlists.find((p) => p.id === id);
         if (playlist && playlist.isRemovable === false) {
           console.warn(`Impossible de supprimer la playlist "${playlist.name}" car elle est protégée.`);
           return;
         }
 
         set((state) => ({
-          playlists: state.playlists.filter(playlist => playlist.id !== id),
-          channels: state.channels.filter(channel => channel.playlistSource !== id)
+          playlists: state.playlists.filter((playlist) => playlist.id !== id),
+          channels: state.channels.filter((channel) => channel.playlistSource !== id)
         }));
       },
 
-      togglePlaylistStatus: (id) => set((state) => ({
-        playlists: state.playlists.map(playlist =>
-          playlist.id === id
-            ? {
-                ...playlist,
-                status: playlist.status === PlaylistStatus.ACTIVE
-                  ? PlaylistStatus.INACTIVE
-                  : PlaylistStatus.ACTIVE,
-                lastUpdate: new Date()
-              }
-            : playlist
-        )
-      })),
+      togglePlaylistStatus: (id) =>
+        set((state) => ({
+          playlists: state.playlists.map((playlist) =>
+            playlist.id === id
+              ? {
+                  ...playlist,
+                  status:
+                    playlist.status === PlaylistStatus.ACTIVE
+                      ? PlaylistStatus.INACTIVE
+                      : PlaylistStatus.ACTIVE,
+                  lastUpdate: new Date()
+                }
+              : playlist
+          )
+        })),
 
       refreshPlaylists: async () => {
         const { playlists } = get();
         set({ loading: true, error: null });
 
         try {
-          const activePlaylists = playlists.filter(p => p.status === PlaylistStatus.ACTIVE);
+          const activePlaylists = playlists.filter(
+            (p) => p.status === PlaylistStatus.ACTIVE
+          );
           const allChannels: Channel[] = [];
 
           for (const playlist of activePlaylists) {
             try {
               let parseResult: M3UParseResult;
 
-              if (playlist.type === 'xtream' && playlist.xtreamConfig) {
-                parseResult = await parseXtreamContent(playlist.xtreamConfig, playlist.id);
+              if (
+                playlist.type === 'xtream' &&
+                playlist.xtreamConfig?.server &&
+                playlist.xtreamConfig?.username &&
+                playlist.xtreamConfig?.password
+              ) {
+                parseResult = await parseXtreamContent(
+                  playlist.xtreamConfig,
+                  playlist.id
+                );
               } else if (playlist.type === 'url' && playlist.url) {
                 const response = await fetch(playlist.url);
-                if (!response.ok) {
-                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                if (!response.ok)
+                  throw new Error(
+                    `HTTP ${response.status}: ${response.statusText}`
+                  );
                 const content = await response.text();
                 parseResult = parseM3UContent(content, playlist.id);
               } else if (playlist.content) {
@@ -165,10 +178,10 @@ export const usePlaylistStore = create<PlaylistStore>()(
             categories: get().getCategories(),
             loading: false
           });
-
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : 'Erreur inconnue',
+            error:
+              error instanceof Error ? error.message : 'Erreur inconnue',
             loading: false
           });
         }
@@ -176,7 +189,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
       refreshPlaylist: async (id) => {
         const { playlists } = get();
-        const playlist = playlists.find(p => p.id === id);
+        const playlist = playlists.find((p) => p.id === id);
 
         if (!playlist || playlist.status !== PlaylistStatus.ACTIVE) return;
 
@@ -185,13 +198,22 @@ export const usePlaylistStore = create<PlaylistStore>()(
         try {
           let parseResult: M3UParseResult;
 
-          if (playlist.type === 'xtream' && playlist.xtreamConfig) {
-            parseResult = await parseXtreamContent(playlist.xtreamConfig, playlist.id);
+          if (
+            playlist.type === 'xtream' &&
+            playlist.xtreamConfig?.server &&
+            playlist.xtreamConfig?.username &&
+            playlist.xtreamConfig?.password
+          ) {
+            parseResult = await parseXtreamContent(
+              playlist.xtreamConfig,
+              playlist.id
+            );
           } else if (playlist.type === 'url' && playlist.url) {
             const response = await fetch(playlist.url);
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
+            if (!response.ok)
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+              );
             const content = await response.text();
             parseResult = parseM3UContent(content, playlist.id);
           } else if (playlist.content) {
@@ -203,7 +225,9 @@ export const usePlaylistStore = create<PlaylistStore>()(
           if (parseResult.channels.length > 0) {
             set((state) => ({
               channels: [
-                ...state.channels.filter(c => c.playlistSource !== id),
+                ...state.channels.filter(
+                  (c) => c.playlistSource !== playlist.id
+                ),
                 ...parseResult.channels
               ],
               loading: false
@@ -225,21 +249,22 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
       getChannelsByCategory: (category) => {
         const { channels } = get();
-        return channels.filter(channel =>
-          (channel.group || 'Undefined') === category
+        return channels.filter(
+          (channel) => (channel.group || 'Undefined') === category
         );
       },
 
       searchChannels: (query) => {
         const { channels } = get();
         if (!query.trim()) return channels;
-
         const searchTerm = query.toLowerCase();
-        return channels.filter(channel =>
-          channel.name.toLowerCase().includes(searchTerm) ||
-          (channel.group || '').toLowerCase().includes(searchTerm) ||
-          (channel.country || '').toLowerCase().includes(searchTerm) ||
-          (channel.language || '').toLowerCase().includes(searchTerm)
+
+        return channels.filter(
+          (channel) =>
+            channel.name.toLowerCase().includes(searchTerm) ||
+            (channel.group || '').toLowerCase().includes(searchTerm) ||
+            (channel.country || '').toLowerCase().includes(searchTerm) ||
+            (channel.language || '').toLowerCase().includes(searchTerm)
         );
       },
 
@@ -247,25 +272,25 @@ export const usePlaylistStore = create<PlaylistStore>()(
         const { channels } = get();
         const categoryMap = new Map<string, Channel[]>();
 
-        channels.forEach(channel => {
+        channels.forEach((channel) => {
           const category = channel.group || 'Undefined';
-          if (!categoryMap.has(category)) {
-            categoryMap.set(category, []);
-          }
+          if (!categoryMap.has(category)) categoryMap.set(category, []);
           categoryMap.get(category)!.push(channel);
         });
 
-        return Array.from(categoryMap.entries()).map(([name, channels]) => ({
-          name,
-          channels,
-          count: channels.length
-        })).sort((a, b) => b.count - a.count);
+        return Array.from(categoryMap.entries())
+          .map(([name, channels]) => ({
+            name,
+            channels,
+            count: channels.length
+          }))
+          .sort((a, b) => b.count - a.count);
       },
 
       getCategoryCount: (category) => {
         const { channels } = get();
-        return channels.filter(channel =>
-          (channel.group || 'Undefined') === category
+        return channels.filter(
+          (channel) => (channel.group || 'Undefined') === category
         ).length;
       },
 
@@ -273,10 +298,11 @@ export const usePlaylistStore = create<PlaylistStore>()(
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
 
-      resetStore: () => set({
-        ...initialState,
-        playlists: defaultPlaylists
-      })
+      resetStore: () =>
+        set({
+          ...initialState,
+          playlists: defaultPlaylists
+        })
     }),
     {
       name: 'streamverse-playlist-store',
