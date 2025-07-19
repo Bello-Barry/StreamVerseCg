@@ -6,7 +6,7 @@ export interface NotificationData {
   badge?: string
   image?: string
   tag?: string
-  data?: Record<string, unknown> // Remplacement de 'any' par un type plus sûr
+  data?: Record<string, unknown>
   actions?: NotificationAction[]
   timestamp: number
   type: 'info' | 'success' | 'warning' | 'error' | 'channel_update' | 'playlist_update'
@@ -28,7 +28,6 @@ export interface NotificationSettings {
   vibrate: boolean
 }
 
-// Type pour les détails d'erreur
 interface ErrorDetails {
   message?: string;
   code?: number;
@@ -88,7 +87,7 @@ class NotificationService {
     if (typeof window === 'undefined' || !('Notification' in window)) return
     this.permission = Notification.permission
     if (this.permission === 'default') {
-      // Don't request permission automatically, let user enable it
+      // Ne pas demander automatiquement
     }
   }
 
@@ -108,13 +107,11 @@ class NotificationService {
       return false
     }
 
-    if (this.permission === 'granted') {
-      return true
-    }
+    if (this.permission === 'granted') return true
 
     const permission = await Notification.requestPermission()
     this.permission = permission
-    
+
     if (permission === 'granted') {
       this.settings.enabled = true
       this.saveSettings()
@@ -134,9 +131,7 @@ class NotificationService {
   }
 
   async showNotification(data: Omit<NotificationData, 'id' | 'timestamp'>): Promise<void> {
-    if (typeof window === 'undefined' || !this.settings.enabled || this.permission !== 'granted') {
-      return
-    }
+    if (typeof window === 'undefined' || !this.settings.enabled || this.permission !== 'granted') return
 
     const notification: NotificationData = {
       ...data,
@@ -144,31 +139,28 @@ class NotificationService {
       timestamp: Date.now()
     }
 
-    // Check if this type of notification is enabled
-    if (!this.isNotificationTypeEnabled(notification.type)) {
-      return
-    }
+    if (!this.isNotificationTypeEnabled(notification.type)) return
 
     this.notifications.push(notification)
     this.saveNotifications()
 
-    // Show browser notification
+    const baseOptions = {
+      body: notification.body,
+      icon: notification.icon || "/icons/icon-192x192.png",
+      badge: notification.badge || "/icons/icon-72x72.png",
+      ...(notification.image ? { image: notification.image } : {}), // ✅ corrigé ici
+      tag: notification.tag,
+      data: notification.data,
+      actions: notification.actions,
+      vibrate: this.settings.vibrate ? [200, 100, 200] : undefined,
+      silent: !this.settings.sound,
+      requireInteraction: notification.type === 'error',
+      timestamp: notification.timestamp
+    }
+
     if (this.serviceWorkerRegistration) {
-      await this.serviceWorkerRegistration.showNotification(notification.title, {
-        body: notification.body,
-        icon: notification.icon || "/icons/icon-192x192.png",
-        badge: notification.badge || "/icons/icon-72x72.png",
-        image: notification.image,
-        tag: notification.tag,
-        data: notification.data,
-        actions: notification.actions,
-        vibrate: this.settings.vibrate ? [200, 100, 200] : undefined,
-        silent: !this.settings.sound,
-        requireInteraction: notification.type === 'error',
-        timestamp: notification.timestamp
-      })
+      await this.serviceWorkerRegistration.showNotification(notification.title, baseOptions)
     } else {
-      // Fallback to regular notification
       const browserNotification = new Notification(notification.title, {
         body: notification.body,
         icon: notification.icon || "/icons/icon-192x192.png",
@@ -178,7 +170,6 @@ class NotificationService {
         silent: !this.settings.sound
       })
 
-      // Auto-close after 5 seconds for non-error notifications
       if (notification.type !== 'error') {
         setTimeout(() => browserNotification.close(), 5000)
       }
@@ -187,24 +178,19 @@ class NotificationService {
 
   private isNotificationTypeEnabled(type: NotificationData['type']): boolean {
     switch (type) {
-      case 'channel_update':
-        return this.settings.channelUpdates
-      case 'playlist_update':
-        return this.settings.playlistUpdates
+      case 'channel_update': return this.settings.channelUpdates
+      case 'playlist_update': return this.settings.playlistUpdates
       case 'info':
       case 'success':
       case 'warning':
-      case 'error':
-        return this.settings.systemNotifications
-      default:
-        return true
+      case 'error': return this.settings.systemNotifications
+      default: return true
     }
   }
 
   private saveNotifications(): void {
     if (typeof window === 'undefined') return
     try {
-      // Keep only last 50 notifications
       const notificationsToStore = this.notifications.slice(-50)
       localStorage.setItem("streamverse_notifications", JSON.stringify(notificationsToStore))
     } catch (error) {
@@ -214,7 +200,7 @@ class NotificationService {
 
   getNotifications(): NotificationData[] {
     if (typeof window === 'undefined') return []
-    return [...this.notifications].reverse() // Most recent first
+    return [...this.notifications].reverse()
   }
 
   clearNotifications(): void {
@@ -227,15 +213,14 @@ class NotificationService {
     if (typeof window === 'undefined') return
     const notification = this.notifications.find(n => n.id === notificationId)
     if (notification) {
-      notification.data = { 
-        ...(notification.data as Record<string, unknown> || {}), 
-        read: true 
+      notification.data = {
+        ...(notification.data as Record<string, unknown> || {}),
+        read: true
       }
       this.saveNotifications()
     }
   }
 
-  // Predefined notification methods
   async notifyChannelUpdate(channelName: string, playlistName: string): Promise<void> {
     await this.showNotification({
       type: 'channel_update',
@@ -297,7 +282,6 @@ class NotificationService {
     })
   }
 
-  // Schedule notifications (for future features)
   scheduleNotification(data: Omit<NotificationData, 'id' | 'timestamp'>, delay: number): void {
     if (typeof window === 'undefined') return
     setTimeout(() => {
@@ -305,21 +289,17 @@ class NotificationService {
     }, delay)
   }
 
-  // Check if notifications are supported
   isSupported(): boolean {
     return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator
   }
 
-  // Get permission status
   getPermissionStatus(): NotificationPermission {
     return this.permission
   }
 }
 
-// Create singleton instance
 export const notificationService = new NotificationService()
 
-// React hook for notifications
 export function useNotifications() {
   return {
     requestPermission: notificationService.requestPermission.bind(notificationService),
