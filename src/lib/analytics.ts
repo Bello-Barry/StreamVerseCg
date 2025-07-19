@@ -1,6 +1,15 @@
 export interface AnalyticsEvent {
   id: string
-  type: 'channel_view' | 'channel_play' | 'search' | 'favorite_add' | 'favorite_remove' | 'playlist_add' | 'playlist_remove' | 'page_view'
+  type:
+    | 'channel_view'
+    | 'channel_play'
+    | 'search'
+    | 'favorite_add'
+    | 'favorite_remove'
+    | 'playlist_add'
+    | 'playlist_remove'
+    | 'page_view'
+    | 'session_end' // ✅ Ajouté ici
   data: Record<string, any>
   timestamp: number
   sessionId: string
