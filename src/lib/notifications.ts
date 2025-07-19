@@ -36,7 +36,9 @@ interface ErrorDetails {
 }
 
 class NotificationService {
-  private permission: NotificationPermission = typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  private permission: NotificationPermission =
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+
   private settings: NotificationSettings
   private notifications: NotificationData[] = []
   private serviceWorkerRegistration: ServiceWorkerRegistration | null = null
@@ -50,16 +52,16 @@ class NotificationService {
   }
 
   private loadSettings(): NotificationSettings {
-    if (typeof window === 'undefined') return this.getDefaultSettings();
+    if (typeof window === 'undefined') return this.getDefaultSettings()
     try {
-      const stored = localStorage.getItem("streamverse_notification_settings");
+      const stored = localStorage.getItem('streamverse_notification_settings')
       if (stored) {
-        return { ...this.getDefaultSettings(), ...JSON.parse(stored) };
+        return { ...this.getDefaultSettings(), ...JSON.parse(stored) }
       }
     } catch (error) {
-      console.warn("Failed to load notification settings:", error);
+      console.warn('Failed to load notification settings:', error)
     }
-    return this.getDefaultSettings();
+    return this.getDefaultSettings()
   }
 
   private getDefaultSettings(): NotificationSettings {
@@ -77,37 +79,36 @@ class NotificationService {
   private saveSettings(): void {
     if (typeof window === 'undefined') return
     try {
-      localStorage.setItem("streamverse_notification_settings", JSON.stringify(this.settings))
+      localStorage.setItem('streamverse_notification_settings', JSON.stringify(this.settings))
     } catch (error) {
-      console.warn("Failed to save notification settings:", error)
+      console.warn('Failed to save notification settings:', error)
     }
   }
 
   private async initializePermission(): Promise<void> {
     if (typeof window === 'undefined' || !('Notification' in window)) return
     this.permission = Notification.permission
-    if (this.permission === 'default') {
-      // Ne pas demander automatiquement
-    }
   }
 
   private async registerServiceWorker(): Promise<void> {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
     try {
-      this.serviceWorkerRegistration = await navigator.serviceWorker.register("/sw.js")
-      console.log("Service Worker registered successfully")
+      this.serviceWorkerRegistration = await navigator.serviceWorker.register('/sw.js')
+      console.log('Service Worker registered successfully')
     } catch (error) {
-      console.warn("Service Worker registration failed:", error)
+      console.warn('Service Worker registration failed:', error)
     }
   }
 
   async requestPermission(): Promise<boolean> {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      console.warn("This browser does not support notifications")
+      console.warn('This browser does not support notifications')
       return false
     }
 
-    if (this.permission === 'granted') return true
+    if (this.permission === 'granted') {
+      return true
+    }
 
     const permission = await Notification.requestPermission()
     this.permission = permission
@@ -131,7 +132,9 @@ class NotificationService {
   }
 
   async showNotification(data: Omit<NotificationData, 'id' | 'timestamp'>): Promise<void> {
-    if (typeof window === 'undefined' || !this.settings.enabled || this.permission !== 'granted') return
+    if (typeof window === 'undefined' || !this.settings.enabled || this.permission !== 'granted') {
+      return
+    }
 
     const notification: NotificationData = {
       ...data,
@@ -139,36 +142,43 @@ class NotificationService {
       timestamp: Date.now()
     }
 
-    if (!this.isNotificationTypeEnabled(notification.type)) return
+    if (!this.isNotificationTypeEnabled(notification.type)) {
+      return
+    }
 
     this.notifications.push(notification)
     this.saveNotifications()
 
-    const baseOptions = {
+    const options: NotificationOptions = {
       body: notification.body,
-      icon: notification.icon || "/icons/icon-192x192.png",
-      badge: notification.badge || "/icons/icon-72x72.png",
-      ...(notification.image ? { image: notification.image } : {}), // ✅ corrigé ici
+      icon: notification.icon || '/icons/icon-192x192.png',
+      badge: notification.badge || '/icons/icon-72x72.png',
       tag: notification.tag,
       data: notification.data,
       actions: notification.actions,
-      vibrate: this.settings.vibrate ? [200, 100, 200] : undefined,
       silent: !this.settings.sound,
-      requireInteraction: notification.type === 'error',
       timestamp: notification.timestamp
     }
 
+    // Only set `image` if it exists (it's not supported everywhere)
+    if ('image' in Notification.prototype && notification.image) {
+      // @ts-expect-error image is not yet in the standard lib
+      options.image = notification.image
+    }
+
     if (this.serviceWorkerRegistration) {
-      await this.serviceWorkerRegistration.showNotification(notification.title, baseOptions)
+      await this.serviceWorkerRegistration.showNotification(notification.title, options)
     } else {
-      const browserNotification = new Notification(notification.title, {
+      const browserOptions: NotificationOptions = {
         body: notification.body,
-        icon: notification.icon || "/icons/icon-192x192.png",
+        icon: notification.icon || '/icons/icon-192x192.png',
         tag: notification.tag,
         data: notification.data,
-        vibrate: this.settings.vibrate ? [200, 100, 200] : undefined,
         silent: !this.settings.sound
-      })
+        // Note: vibrate and image not included here to prevent TypeScript errors
+      }
+
+      const browserNotification = new Notification(notification.title, browserOptions)
 
       if (notification.type !== 'error') {
         setTimeout(() => browserNotification.close(), 5000)
@@ -178,13 +188,17 @@ class NotificationService {
 
   private isNotificationTypeEnabled(type: NotificationData['type']): boolean {
     switch (type) {
-      case 'channel_update': return this.settings.channelUpdates
-      case 'playlist_update': return this.settings.playlistUpdates
+      case 'channel_update':
+        return this.settings.channelUpdates
+      case 'playlist_update':
+        return this.settings.playlistUpdates
       case 'info':
       case 'success':
       case 'warning':
-      case 'error': return this.settings.systemNotifications
-      default: return true
+      case 'error':
+        return this.settings.systemNotifications
+      default:
+        return true
     }
   }
 
@@ -192,9 +206,9 @@ class NotificationService {
     if (typeof window === 'undefined') return
     try {
       const notificationsToStore = this.notifications.slice(-50)
-      localStorage.setItem("streamverse_notifications", JSON.stringify(notificationsToStore))
+      localStorage.setItem('streamverse_notifications', JSON.stringify(notificationsToStore))
     } catch (error) {
-      console.warn("Failed to save notifications:", error)
+      console.warn('Failed to save notifications:', error)
     }
   }
 
@@ -206,7 +220,7 @@ class NotificationService {
   clearNotifications(): void {
     if (typeof window === 'undefined') return
     this.notifications = []
-    localStorage.removeItem("streamverse_notifications")
+    localStorage.removeItem('streamverse_notifications')
   }
 
   markAsRead(notificationId: string): void {
@@ -214,7 +228,7 @@ class NotificationService {
     const notification = this.notifications.find(n => n.id === notificationId)
     if (notification) {
       notification.data = {
-        ...(notification.data as Record<string, unknown> || {}),
+        ...(notification.data || {}),
         read: true
       }
       this.saveNotifications()
@@ -226,7 +240,7 @@ class NotificationService {
       type: 'channel_update',
       title: 'Nouvelle chaîne disponible',
       body: `${channelName} a été ajoutée à ${playlistName}`,
-      icon: "/icons/icon-192x192.png",
+      icon: '/icons/icon-192x192.png',
       tag: 'channel_update',
       data: { channelName, playlistName }
     })
@@ -237,7 +251,7 @@ class NotificationService {
       type: 'playlist_update',
       title: 'Playlist mise à jour',
       body: `${playlistName} contient maintenant ${channelCount} chaînes`,
-      icon: "/icons/icon-192x192.png",
+      icon: '/icons/icon-192x192.png',
       tag: 'playlist_update',
       data: { playlistName, channelCount }
     })
@@ -250,11 +264,11 @@ class NotificationService {
       type: 'channel_update',
       title: 'Chaîne favorite mise à jour',
       body: `${channelName} est maintenant disponible`,
-      icon: "/icons/icon-192x192.png",
+      icon: '/icons/icon-192x192.png',
       tag: 'favorite_update',
       data: { channelName },
       actions: [
-        { action: 'play', title: 'Regarder', icon: "/icons/play.png" },
+        { action: 'play', title: 'Regarder', icon: '/icons/play.png' },
         { action: 'dismiss', title: 'Ignorer' }
       ]
     })
@@ -265,7 +279,7 @@ class NotificationService {
       type: 'error',
       title: 'Erreur StreamVerse',
       body: message,
-      icon: "/icons/icon-192x192.png",
+      icon: '/icons/icon-192x192.png',
       tag: 'error',
       data: { details }
     })
@@ -276,7 +290,7 @@ class NotificationService {
       type: 'success',
       title: 'StreamVerse',
       body: message,
-      icon: "/icons/icon-192x192.png",
+      icon: '/icons/icon-192x192.png',
       tag: 'success',
       data: { details }
     })
