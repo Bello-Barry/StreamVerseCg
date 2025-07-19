@@ -156,6 +156,7 @@ class NotificationService {
       tag: notification.tag,
       data: notification.data,
       silent: !this.settings.sound,
+      // @ts-ignore – actions is not in official NotificationOptions yet
       timestamp: notification.timestamp
     }
 
