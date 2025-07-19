@@ -29,10 +29,10 @@ export interface NotificationSettings {
 }
 
 interface ErrorDetails {
-  message?: string;
-  code?: number;
-  stack?: string;
-  [key: string]: unknown;
+  message?: string
+  code?: number
+  stack?: string
+  [key: string]: unknown
 }
 
 class NotificationService {
@@ -155,13 +155,10 @@ class NotificationService {
       badge: notification.badge || '/icons/icon-72x72.png',
       tag: notification.tag,
       data: notification.data,
-      // @ts-ignore – actions n’est pas encore supporté dans NotificationOptions
-browserOptions.actions = notification.actions,
       silent: !this.settings.sound,
       timestamp: notification.timestamp
     }
 
-    // Only set `image` if it exists (it's not supported everywhere)
     if ('image' in Notification.prototype && notification.image) {
       // @ts-expect-error image is not yet in the standard lib
       options.image = notification.image
@@ -176,8 +173,10 @@ browserOptions.actions = notification.actions,
         tag: notification.tag,
         data: notification.data,
         silent: !this.settings.sound
-        // Note: vibrate and image not included here to prevent TypeScript errors
       }
+
+      // @ts-ignore – actions is not in official NotificationOptions yet
+      browserOptions.actions = notification.actions
 
       const browserNotification = new Notification(notification.title, browserOptions)
 
