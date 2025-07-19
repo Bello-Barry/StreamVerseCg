@@ -5,12 +5,15 @@ export interface ThemeColors {
   text: string;
   primary: string;
   secondary: string;
+  border?: string;
+  card?: string;
+  accent?: string;
 }
 
 export interface ThemeFonts {
   body: string;
   heading: string;
-  mono: string; // ✅ ajouté ici
+  mono: string;
 }
 
 export interface ThemeEffects {
@@ -28,6 +31,11 @@ export interface ThemeSettings {
   fonts: ThemeFonts;
   effects: ThemeEffects;
   layout: ThemeLayout;
+
+  // ✅ Ajoutés manuellement pour coller à ton usage dans ThemesPage.tsx :
+  glassmorphism: boolean;
+  gradients: boolean;
+  borderRadius: number;
 }
 
 export interface ThemeDefinition {
@@ -36,7 +44,6 @@ export interface ThemeDefinition {
   settings: ThemeSettings;
 }
 
-// Exemples de thèmes
 const defaultTheme: ThemeDefinition = {
   id: 'default',
   name: 'Thème par défaut',
@@ -46,11 +53,14 @@ const defaultTheme: ThemeDefinition = {
       text: '#000000',
       primary: '#2563eb',
       secondary: '#7c3aed',
+      border: '#e2e8f0',
+      card: '#f8fafc',
+      accent: '#4f46e5',
     },
     fonts: {
       body: 'Inter, sans-serif',
       heading: 'Poppins, sans-serif',
-      mono: 'Fira Code, monospace', // ✅ ajouté ici
+      mono: 'Fira Code, monospace',
     },
     effects: {
       borderRadius: '0.5rem',
@@ -60,6 +70,9 @@ const defaultTheme: ThemeDefinition = {
       spacing: 16,
       maxWidth: 1200,
     },
+    glassmorphism: false,
+    gradients: false,
+    borderRadius: 8,
   },
 };
 
@@ -72,11 +85,14 @@ const darkTheme: ThemeDefinition = {
       text: '#f8fafc',
       primary: '#3b82f6',
       secondary: '#8b5cf6',
+      border: '#1e293b',
+      card: '#1e293b',
+      accent: '#6366f1',
     },
     fonts: {
       body: 'Inter, sans-serif',
       heading: 'Poppins, sans-serif',
-      mono: 'Fira Code, monospace', // ✅ ajouté ici aussi
+      mono: 'Fira Code, monospace',
     },
     effects: {
       borderRadius: '0.5rem',
@@ -86,6 +102,9 @@ const darkTheme: ThemeDefinition = {
       spacing: 16,
       maxWidth: 1200,
     },
+    glassmorphism: true,
+    gradients: true,
+    borderRadius: 10,
   },
 };
 
