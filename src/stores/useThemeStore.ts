@@ -10,6 +10,7 @@ export interface ThemeColors {
 export interface ThemeFonts {
   body: string;
   heading: string;
+  mono: string; // ✅ ajouté ici
 }
 
 export interface ThemeEffects {
@@ -49,6 +50,7 @@ const defaultTheme: ThemeDefinition = {
     fonts: {
       body: 'Inter, sans-serif',
       heading: 'Poppins, sans-serif',
+      mono: 'Fira Code, monospace', // ✅ ajouté ici
     },
     effects: {
       borderRadius: '0.5rem',
@@ -74,6 +76,7 @@ const darkTheme: ThemeDefinition = {
     fonts: {
       body: 'Inter, sans-serif',
       heading: 'Poppins, sans-serif',
+      mono: 'Fira Code, monospace', // ✅ ajouté ici aussi
     },
     effects: {
       borderRadius: '0.5rem',
