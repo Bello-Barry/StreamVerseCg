@@ -77,17 +77,17 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         {/* Image/Logo de la chaîne */}
         <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden rounded-t-lg">
           {isValidImageUrl(channel.tvgLogo) && !imageError ? (
-            <Image
-              src={channel.tvgLogo}
-              alt={channel.name}
-              fill
-              onError={() => {
-                console.warn(`Erreur chargement logo: ${channel.tvgLogo}`);
-                setImageError(true);
-              }}
-              className="object-cover transition-transform duration-300 group-hover:scale-110"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
+           <Image
+  src={channel.tvgLogo ?? '/placeholder.svg'}
+  alt={channel.name}
+  fill
+  onError={() => {
+    console.warn(`Erreur chargement logo: ${channel.tvgLogo}`);
+    setImageError(true);
+  }}
+  className="object-cover transition-transform duration-300 group-hover:scale-110"
+  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+/>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Tv className="h-12 w-12 text-primary/60" />
