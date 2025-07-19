@@ -155,7 +155,8 @@ class NotificationService {
       badge: notification.badge || '/icons/icon-72x72.png',
       tag: notification.tag,
       data: notification.data,
-      actions: notification.actions,
+      // @ts-ignore – actions n’est pas encore supporté dans NotificationOptions
+browserOptions.actions = notification.actions,
       silent: !this.settings.sound,
       timestamp: notification.timestamp
     }
