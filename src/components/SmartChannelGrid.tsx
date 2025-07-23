@@ -229,7 +229,7 @@ const scoreB = (b.name?.length ?? 0) % 10
 
   // Gestion de la sélection de chaîne
   const handleChannelSelect = useCallback((channel: Channel) => {
-    updateWatchHistory(channel.id, channel.category)
+    updateWatchHistory(channel.id, channel.category ?? 'inconnue')
     onChannelSelect(channel)
   }, [updateWatchHistory, onChannelSelect])
 
