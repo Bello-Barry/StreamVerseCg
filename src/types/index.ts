@@ -246,15 +246,19 @@ export interface UsePlayerReturn {
 }
 
 // Composants UI
-interface ChannelCardProps {
+// ... (autres exports)
+
+export interface ChannelCardProps {
   channel: Channel;
   onPlay: (channel: Channel) => void;
   onToggleFavorite: (channel: Channel) => void;
   isFavorite: boolean;
   showCategory?: boolean;
-  showReliabilityIndicator?: boolean; // Ajoutez cette ligne
+  showReliabilityIndicator?: boolean;
   compact?: boolean;
 }
+
+
 
 export interface CategoryGridProps {
   categories: Category[];
