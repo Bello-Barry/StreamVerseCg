@@ -87,6 +87,7 @@ export interface Channel {
   playlistSource: string;
   language?: string;
   country?: string;
+  category?: string; // ← celui-là manque ailleurs
 }
 
 export interface Playlist {

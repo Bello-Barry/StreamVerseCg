@@ -22,7 +22,9 @@ import { ViewType, Channel } from '@/types';
 
 // Import des nouveaux composants
 import { SmartChannelGrid } from '@/components/SmartChannelGrid';
-import { getSmartRecommendations } from '@/lib/smartChannelRecommendation';
+import { useRecommendationStore } from '@/stores/useRecommendationStore'
+
+
 
 interface HomePageProps {
   onChannelSelect?: (channel: Channel) => void;
@@ -46,6 +48,14 @@ const HomePage: React.FC<HomePageProps> = ({ onChannelSelect, onPlaybackError })
     }),
     [channels.length, categories.length, favorites.length, getRecentChannels]
   );
+  const recommendations = useRecommendationStore(state => state.recommendations)
+const setRecommendations = useRecommendationStore(state => state.setRecommendations)
+
+useEffect(() => {
+  setRecommendations(allChannels, {
+    preferredCategories: ['Sports', 'News']
+  })
+}, [allChannels])
 
   // Recommandations intelligentes utilisant le nouveau service
   const recommendedChannels = useMemo(async () => {
