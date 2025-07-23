@@ -477,12 +477,14 @@ const scoreB = (b.name?.length ?? 0) % 10
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {popularChannels.map((channel) => (
                     <div key={channel.id} className="relative">
-                      <ChannelCard
-                        channel={channel}
-                        onClick={() => handleChannelSelect(channel)}
-                        showReliabilityIndicator={true}
-                        compact={viewMode === 'list'}
-                      />
+<ChannelCard
+  channel={channel}
+  onPlay={() => handleChannelSelect(channel)}
+  onToggleFavorite={() => useFavoritesStore.getState().toggleFavorite(channel.id)}
+  isFavorite={useFavoritesStore.getState().favorites.includes(channel.id)}
+  showReliabilityIndicator={true}
+  compact={viewMode === 'list'}
+/>
                       <Badge className="absolute top-2 left-2" variant="default">
                         <TrendingUp className="h-3 w-3 mr-1" />
                         Populaire
@@ -519,12 +521,14 @@ const scoreB = (b.name?.length ?? 0) % 10
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {channelsWithDetails.map((channel) => (
                       <div key={channel.id} className="relative">
-                        <ChannelCard
-                          channel={channel}
-                          onClick={() => handleChannelSelect(channel)}
-                          showReliabilityIndicator={true}
-                          compact={viewMode === 'list'}
-                        />
+                       <ChannelCard
+  channel={channel}
+  onPlay={() => handleChannelSelect(channel)}
+  onToggleFavorite={() => useFavoritesStore.getState().toggleFavorite(channel.id)}
+  isFavorite={useFavoritesStore.getState().favorites.includes(channel.id)}
+  showReliabilityIndicator={true}
+  compact={viewMode === 'list'}
+/>
                         <Badge className="absolute top-2 left-2" variant="default">
                           <Zap className="h-3 w-3 mr-1" />
                           Fiable
