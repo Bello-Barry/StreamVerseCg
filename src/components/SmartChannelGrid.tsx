@@ -125,7 +125,7 @@ export function SmartChannelGrid({
 
       switch (sortBy) {
         case 'name':
-          return a.name.localeCompare(b.name)
+          return (a.name ?? '').localeCompare(b.name ?? '')
         
         case 'reliability':
           const reliabilityA = statusA?.reliability || 0
@@ -151,8 +151,8 @@ export function SmartChannelGrid({
         
         case 'popular':
           // Tri par popularité (simulé par un score basé sur le nom)
-          const scoreA = a.name.length % 10
-          const scoreB = b.name.length % 10
+          const scoreA = (a.name?.length ?? 0) % 10
+const scoreB = (b.name?.length ?? 0) % 10
           return scoreB - scoreA
         
         default:
