@@ -1,39 +1,23 @@
-import { create } from 'zustand'
-import { smartRecommendation } from '@/lib/smartChannelRecommendation'
-import type { Channel } from '@/types'
-import type { SmartRecommendationOptions } from '@/lib/smartChannelRecommendation'
+import { create } from 'zustand';
+import { Channel } from '@/types';
+import { SmartChannelRecommendation } from '@/lib/smartChannelRecommendation';
 
-interface RecommendationStore {
-  recommendations: Channel[]
-  popularChannels: Channel[]
-  preferredCategories: { category: string; score: number }[]
-  setRecommendations: (channels: Channel[], options?: SmartRecommendationOptions) => void
-  updateWatchHistory: (channelId: string, category: string) => void
-  refreshPopularChannels: (channels: Channel[]) => void
-  refreshPreferredCategories: () => void
+interface RecommendationPreferences {
+  preferredCategories?: string[];
+  recentChannels?: Channel[];
+  mostWatchedChannels?: Channel[];
 }
 
-export const useRecommendationStore = create<RecommendationStore>((set) => ({
+interface RecommendationState {
+  recommendations: Channel[];
+  setRecommendations: (channels: Channel[], preferences: RecommendationPreferences) => void;
+}
+
+export const useRecommendationStore = create<RecommendationState>((set) => ({
   recommendations: [],
-  popularChannels: [],
-  preferredCategories: [],
-
-  setRecommendations: (channels, options) => {
-    const recommendations = smartRecommendation.getSmartRecommendations(channels, options)
-    set({ recommendations })
+  setRecommendations: (channels, preferences) => {
+    const recommender = new SmartChannelRecommendation(channels);
+    const result = recommender.recommend(preferences);
+    set({ recommendations: result });
   },
-
-  updateWatchHistory: (channelId, category) => {
-    smartRecommendation.updateWatchHistory(channelId, category)
-  },
-
-  refreshPopularChannels: (channels) => {
-    const popularChannels = smartRecommendation.getPopularChannels(channels)
-    set({ popularChannels })
-  },
-
-  refreshPreferredCategories: () => {
-    const preferredCategories = smartRecommendation.getPreferredCategories()
-    set({ preferredCategories })
-  }
-}))
+}));

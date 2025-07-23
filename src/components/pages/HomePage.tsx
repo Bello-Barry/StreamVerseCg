@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   Tv,
   TrendingUp,
@@ -20,11 +20,8 @@ import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { ViewType, Channel } from '@/types';
 
-// Import des nouveaux composants
 import { SmartChannelGrid } from '@/components/SmartChannelGrid';
-import { useRecommendationStore } from '@/stores/useRecommendationStore'
-
-
+import { useRecommendationStore } from '@/stores/useRecommendationStore';
 
 interface HomePageProps {
   onChannelSelect?: (channel: Channel) => void;
@@ -34,64 +31,24 @@ interface HomePageProps {
 const HomePage: React.FC<HomePageProps> = ({ onChannelSelect, onPlaybackError }) => {
   const { channels, categories, loading } = usePlaylistStore();
   const { favorites, toggleFavorite, isFavorite } = useFavoritesStore();
-  const { getRecentChannels, getMostWatchedChannels, addToHistory } =
-    useWatchHistoryStore();
+  const { getRecentChannels, getMostWatchedChannels, addToHistory } = useWatchHistoryStore();
   const { setCurrentChannel, setCurrentView } = useAppStore();
 
-  // Statistiques générales
-  const stats = useMemo(
-    () => ({
-      totalChannels: channels.length,
-      totalCategories: categories.length,
-      totalFavorites: favorites.length,
-      totalHistory: getRecentChannels().length,
-    }),
-    [channels.length, categories.length, favorites.length, getRecentChannels]
-  );
-  const recommendations = useRecommendationStore(state => state.recommendations)
-const setRecommendations = useRecommendationStore(state => state.setRecommendations)
+  const recommendations = useRecommendationStore((state) => state.recommendations);
+  const setRecommendations = useRecommendationStore((state) => state.setRecommendations);
 
-useEffect(() => {
-  setRecommendations(allChannels, {
-    preferredCategories: ['Sports', 'News']
-  })
-}, [allChannels])
-
-  // Recommandations intelligentes utilisant le nouveau service
-  const recommendedChannels = useMemo(async () => {
-    if (channels.length === 0) return [];
-    
-    try {
-      // Utiliser le service de recommandations intelligentes
-      const userPreferences = {
-        favoriteCategories: favorites.map(fav => {
-          const channel = channels.find(ch => ch.id === fav);
-          return channel?.group || '';
-        }).filter(Boolean),
-        recentChannels: getRecentChannels(10),
-        mostWatchedChannels: getMostWatchedChannels(10)
-      };
-
-      const smartRecommendations = await getSmartRecommendations(
-        'user-id', // Vous devriez avoir un ID utilisateur réel
-        channels,
-        userPreferences
-      );
-
-      return smartRecommendations.slice(0, 12);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des recommandations:', error);
-      // Fallback vers l'ancienne logique
-      const recent = getRecentChannels(6);
-      const mostWatched = getMostWatchedChannels(6);
-      const random = channels
-        .filter((ch) => !recent.includes(ch) && !mostWatched.includes(ch))
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 6);
-
-      return [...recent, ...mostWatched, ...random].slice(0, 12);
+  // Charger les recommandations intelligentes quand les chaînes sont prêtes
+  useEffect(() => {
+    if (channels.length > 0) {
+      setRecommendations(channels, {
+        preferredCategories: ['Sports', 'News'],
+      });
     }
-  }, [channels, favorites, getRecentChannels, getMostWatchedChannels]);
+  }, [channels]);
+
+  const recommendedChannels = useMemo(() => {
+    return recommendations.slice(0, 12);
+  }, [recommendations]);
 
   const trendingChannels = useMemo(() => {
     const popular = categories.sort((a, b) => b.count - a.count).slice(0, 3);
@@ -104,6 +61,16 @@ useEffect(() => {
       .sort(() => Math.random() - 0.5)
       .slice(0, 6);
   }, [channels, favorites]);
+
+  const stats = useMemo(
+    () => ({
+      totalChannels: channels.length,
+      totalCategories: categories.length,
+      totalFavorites: favorites.length,
+      totalHistory: getRecentChannels().length,
+    }),
+    [channels.length, categories.length, favorites.length, getRecentChannels]
+  );
 
   const handlePlayChannel = (channel: Channel) => {
     if (onChannelSelect) {
@@ -131,7 +98,7 @@ useEffect(() => {
 
   return (
     <div className="space-y-8">
-      {/* En-tête de bienvenue */}
+      {/* En-tête */}
       <div className="text-center py-8 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg">
         <h1 className="text-4xl font-bold mb-2">Bienvenue sur StreamVerse</h1>
         <p className="text-xl text-muted-foreground mb-6">
@@ -141,25 +108,13 @@ useEffect(() => {
         {/* Statistiques */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
           <CardStat icon={<Tv />} value={stats.totalChannels} label="Chaînes" />
-          <CardStat
-            icon={<Grid3X3 />}
-            value={stats.totalCategories}
-            label="Catégories"
-          />
-          <CardStat
-            icon={<Heart />}
-            value={stats.totalFavorites}
-            label="Favoris"
-          />
-          <CardStat
-            icon={<Clock />}
-            value={stats.totalHistory}
-            label="Historique"
-          />
+          <CardStat icon={<Grid3X3 />} value={stats.totalCategories} label="Catégories" />
+          <CardStat icon={<Heart />} value={stats.totalFavorites} label="Favoris" />
+          <CardStat icon={<Clock />} value={stats.totalHistory} label="Historique" />
         </div>
       </div>
 
-      {/* Actions */}
+      {/* Actions rapides */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <QuickAction
           icon={<Grid3X3 className="h-6 w-6" />}
@@ -178,8 +133,8 @@ useEffect(() => {
         />
       </div>
 
-      {/* Grille intelligente de chaînes avec recommandations */}
-      {channels.length > 0 && (
+      {/* Recommandations intelligentes */}
+      {recommendedChannels.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
@@ -190,9 +145,9 @@ useEffect(() => {
             </div>
             <Badge variant="secondary">Intelligent</Badge>
           </div>
-          
+
           <SmartChannelGrid
-            channels={channels}
+            channels={recommendedChannels}
             onChannelSelect={handlePlayChannel}
             showRecommendations={true}
             enableFilters={true}
@@ -237,8 +192,7 @@ useEffect(() => {
             Aucune chaîne disponible
           </h3>
           <p className="text-muted-foreground mb-6">
-            Ajoutez des playlists pour commencer à regarder vos chaînes
-            préférées.
+            Ajoutez des playlists pour commencer à regarder vos chaînes préférées.
           </p>
           <Button onClick={() => setCurrentView(ViewType.PLAYLISTS)}>
             Gérer les playlists
@@ -251,7 +205,7 @@ useEffect(() => {
 
 export default HomePage;
 
-/* 🔧 Sous-composants pour factoriser */
+/* 🔧 Sous-composants réutilisables */
 
 type CardStatProps = {
   icon: React.ReactNode;
