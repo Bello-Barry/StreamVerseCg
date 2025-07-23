@@ -1,22 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
-
-import { Play,
-  AlertTriangle, 
-  RefreshCw, 
-  ExternalLink, 
-  Star, 
-  Wifi, 
+import {
+  Play,
+  AlertTriangle,
+  RefreshCw,
+  ExternalLink,
+  Star,
+  Wifi,
   Clock,
   X,
-  CheckCircle
+  CheckCircle,
 } from 'lucide-react'
+
 import { ChannelReliabilityIndicator } from '@/components/ChannelReliabilityIndicator'
 import type { Channel } from '@/types'
 import { useSmartRecommendation } from '@/lib/smartChannelRecommendation'
@@ -37,7 +44,7 @@ export function ChannelAlternativesModal({
   failedChannel,
   allChannels,
   onChannelSelect,
-  onRetry
+  onRetry,
 }: ChannelAlternativesModalProps) {
   const [alternatives, setAlternatives] = useState<Channel[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -57,7 +64,6 @@ export function ChannelAlternativesModal({
 
     setIsLoading(true)
     try {
-      // Obtenir les alternatives recommandées
       const recommendedAlternatives = getChannelAlternatives(
         failedChannel,
         allChannels,
@@ -66,7 +72,6 @@ export function ChannelAlternativesModal({
 
       setAlternatives(recommendedAlternatives)
 
-      // Valider les alternatives en arrière-plan
       recommendedAlternatives.forEach(async (channel) => {
         try {
           await validateChannel(channel.id, channel.url)
@@ -103,8 +108,7 @@ export function ChannelAlternativesModal({
             Problème de Lecture
           </DialogTitle>
           <DialogDescription>
-            La chaîne "{failedChannel.name}" ne peut pas être lue actuellement. 
-            Voici quelques alternatives que vous pourriez apprécier.
+            La chaîne "{failedChannel.name}" ne peut pas être lue actuellement. Voici quelques alternatives que vous pourriez apprécier.
           </DialogDescription>
         </DialogHeader>
 
@@ -204,11 +208,11 @@ export function ChannelAlternativesModal({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {alternatives.map((channel) => (
-                  <Card 
+                  <Card
                     key={channel.id}
                     className={`cursor-pointer transition-all hover:shadow-md ${
-                      selectedAlternative === channel.id 
-                        ? 'ring-2 ring-primary' 
+                      selectedAlternative === channel.id
+                        ? 'ring-2 ring-primary'
                         : 'hover:border-primary/50'
                     }`}
                     onClick={() => handleAlternativeSelect(channel)}
@@ -217,19 +221,14 @@ export function ChannelAlternativesModal({
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                          {channel.tvgLogo ? (
-  <img
-    src={channel.tvgLogo}
-    alt={channel.name}
-    className="w-6 h-6 object-contain"
-  />
-) : (
-  <
-<Play className="w-6 h-6 text-primary" />
-)}
-                               
+                            {channel.tvgLogo ? (
+                              <img
+                                src={channel.tvgLogo}
+                                alt={channel.name}
+                                className="w-6 h-6 object-contain"
+                              />
                             ) : (
-                              <ExternalLink className="h-5 w-5 text-primary" />
+                              <Play className="w-6 h-6 text-primary" />
                             )}
                           </div>
                           <div>
