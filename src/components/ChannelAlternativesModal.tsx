@@ -16,7 +16,8 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { ChannelReliabilityIndicator } from '@/components/ChannelReliabilityIndicator'
-import { useSmartRecommendation, Channel } from '@/lib/smartChannelRecommendation'
+import type { Channel } from '@/types'
+import { useSmartRecommendation } from '@/lib/smartChannelRecommendation'
 import { useChannelValidator } from '@/lib/channelValidator'
 
 interface ChannelAlternativesModalProps {
