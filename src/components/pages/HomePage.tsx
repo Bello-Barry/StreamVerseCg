@@ -20,8 +20,16 @@ import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { ViewType, Channel } from '@/types';
 
+// Import des nouveaux composants
+import { SmartChannelGrid } from '@/components/SmartChannelGrid';
+import { getSmartRecommendations } from '@/lib/smartChannelRecommendation';
 
-const HomePage: React.FC = () => {
+interface HomePageProps {
+  onChannelSelect?: (channel: Channel) => void;
+  onPlaybackError?: (channel: Channel) => void;
+}
+
+const HomePage: React.FC<HomePageProps> = ({ onChannelSelect, onPlaybackError }) => {
   const { channels, categories, loading } = usePlaylistStore();
   const { favorites, toggleFavorite, isFavorite } = useFavoritesStore();
   const { getRecentChannels, getMostWatchedChannels, addToHistory } =
@@ -39,17 +47,41 @@ const HomePage: React.FC = () => {
     [channels.length, categories.length, favorites.length, getRecentChannels]
   );
 
-  // Recommandations
-  const recommendedChannels = useMemo(() => {
-    const recent = getRecentChannels(6);
-    const mostWatched = getMostWatchedChannels(6);
-    const random = channels
-      .filter((ch) => !recent.includes(ch) && !mostWatched.includes(ch))
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 6);
+  // Recommandations intelligentes utilisant le nouveau service
+  const recommendedChannels = useMemo(async () => {
+    if (channels.length === 0) return [];
+    
+    try {
+      // Utiliser le service de recommandations intelligentes
+      const userPreferences = {
+        favoriteCategories: favorites.map(fav => {
+          const channel = channels.find(ch => ch.id === fav);
+          return channel?.group || '';
+        }).filter(Boolean),
+        recentChannels: getRecentChannels(10),
+        mostWatchedChannels: getMostWatchedChannels(10)
+      };
 
-    return [...recent, ...mostWatched, ...random].slice(0, 12);
-  }, [channels, getRecentChannels, getMostWatchedChannels]);
+      const smartRecommendations = await getSmartRecommendations(
+        'user-id', // Vous devriez avoir un ID utilisateur réel
+        channels,
+        userPreferences
+      );
+
+      return smartRecommendations.slice(0, 12);
+    } catch (error) {
+      console.error('Erreur lors de la récupération des recommandations:', error);
+      // Fallback vers l'ancienne logique
+      const recent = getRecentChannels(6);
+      const mostWatched = getMostWatchedChannels(6);
+      const random = channels
+        .filter((ch) => !recent.includes(ch) && !mostWatched.includes(ch))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6);
+
+      return [...recent, ...mostWatched, ...random].slice(0, 12);
+    }
+  }, [channels, favorites, getRecentChannels, getMostWatchedChannels]);
 
   const trendingChannels = useMemo(() => {
     const popular = categories.sort((a, b) => b.count - a.count).slice(0, 3);
@@ -64,7 +96,11 @@ const HomePage: React.FC = () => {
   }, [channels, favorites]);
 
   const handlePlayChannel = (channel: Channel) => {
-    setCurrentChannel(channel);
+    if (onChannelSelect) {
+      onChannelSelect(channel);
+    } else {
+      setCurrentChannel(channel);
+    }
     addToHistory(channel, 0);
   };
 
@@ -89,7 +125,7 @@ const HomePage: React.FC = () => {
       <div className="text-center py-8 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg">
         <h1 className="text-4xl font-bold mb-2">Bienvenue sur StreamVerse</h1>
         <p className="text-xl text-muted-foreground mb-6">
-          Découvrez et regardez vos chaînes IPTV préférées
+          Découvrez et regardez vos chaînes IPTV préférées avec des recommandations intelligentes
         </p>
 
         {/* Statistiques */}
@@ -132,17 +168,27 @@ const HomePage: React.FC = () => {
         />
       </div>
 
-      {/* Recommandations */}
-      {recommendedChannels.length > 0 && (
-        <ChannelSection
-          title="Recommandé pour vous"
-          icon={<Play />}
-          badge="Personnalisé"
-          channels={recommendedChannels}
-          onPlay={handlePlayChannel}
-          onToggleFavorite={handleToggleFavorite}
-          isFavorite={isFavorite}
-        />
+      {/* Grille intelligente de chaînes avec recommandations */}
+      {channels.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-2">
+              <div className="h-6 w-6 text-primary">
+                <Play />
+              </div>
+              <h2 className="text-2xl font-bold">Chaînes Recommandées</h2>
+            </div>
+            <Badge variant="secondary">Intelligent</Badge>
+          </div>
+          
+          <SmartChannelGrid
+            channels={channels}
+            onChannelSelect={handlePlayChannel}
+            showRecommendations={true}
+            enableFilters={true}
+            maxChannelsToShow={12}
+          />
+        </section>
       )}
 
       {/* Tendances */}

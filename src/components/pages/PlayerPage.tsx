@@ -1,3 +1,4 @@
+
 // src/components/pages/PlayerPage.tsx
 
 'use client';
@@ -32,7 +33,11 @@ interface HlsErrorData {
   fatal: boolean;
 }
 
-const PlayerPage: React.FC = () => {
+interface PlayerPageProps {
+  onPlaybackError?: (channel: Channel) => void;
+}
+
+const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
   const { currentChannel, setCurrentChannel, setCurrentView, userPreferences } = useAppStore();
   const { toggleFavorite, isFavorite } = useFavoritesStore();
   const { addToHistory } = useWatchHistoryStore();
@@ -90,13 +95,13 @@ const PlayerPage: React.FC = () => {
             if (data.fatal) {
               setError('Erreur de lecture du flux. Veuillez réessayer.');
               setIsLoading(false);
+              if (onPlaybackError && currentChannel) {
+                onPlaybackError(currentChannel);
+              }
             }
           });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           video.src = currentChannel.url;
-          setIsLoading(false);
-        } else {
-          setError('Format de flux non supporté par votre navigateur.');
           setIsLoading(false);
         }
       } catch (err) {
@@ -114,7 +119,7 @@ const PlayerPage: React.FC = () => {
         hlsRef.current = null;
       }
     };
-  }, [currentChannel, userPreferences.autoplay]);
+  }, [currentChannel, userPreferences.autoplay, onPlaybackError]);
 
   // Gestionnaires d'événements vidéo
   useEffect(() => {

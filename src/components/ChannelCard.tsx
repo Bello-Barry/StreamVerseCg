@@ -10,12 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { ChannelCardProps } from '@/types';
 import { cn } from '@/lib/utils';
 
+// Import du nouvel indicateur de fiabilité
+import { ChannelReliabilityIndicator } from '@/components/ChannelReliabilityIndicator';
+
 const ChannelCard: React.FC<ChannelCardProps> = ({
   channel,
   onPlay,
   onToggleFavorite,
   isFavorite,
-  showCategory = true
+  showCategory = true,
+  showReliabilityIndicator = true // Nouvelle prop pour contrôler l'affichage de l'indicateur
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -77,17 +81,17 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         {/* Image/Logo de la chaîne */}
         <div className="relative aspect-video bg-gradient-to-br from-primary/10 to-primary/5 overflow-hidden rounded-t-lg">
           {isValidImageUrl(channel.tvgLogo) && !imageError ? (
-           <Image
-  src={channel.tvgLogo ?? '/placeholder.svg'}
-  alt={channel.name}
-  fill
-  onError={() => {
-    console.warn(`Erreur chargement logo: ${channel.tvgLogo}`);
-    setImageError(true);
-  }}
-  className="object-cover transition-transform duration-300 group-hover:scale-110"
-  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-/>
+            <Image
+              src={channel.tvgLogo ?? '/placeholder.svg'}
+              alt={channel.name}
+              fill
+              onError={() => {
+                console.warn(`Erreur chargement logo: ${channel.tvgLogo}`);
+                setImageError(true);
+              }}
+              className="object-cover transition-transform duration-300 group-hover:scale-110"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Tv className="h-12 w-12 text-primary/60" />
@@ -117,6 +121,18 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
               🔴 LIVE
             </Badge>
           </div>
+
+          {/* Indicateur de fiabilité - Nouveau */}
+          {showReliabilityIndicator && (
+            <div className="absolute top-2 right-12">
+              <ChannelReliabilityIndicator
+                channelId={channel.id}
+                channelUrl={channel.url}
+                showDetails={false} // Affichage compact sur la carte
+                compact={true}
+              />
+            </div>
+          )}
 
           {/* Bouton favoris */}
           <div className="absolute top-2 right-2">
@@ -175,6 +191,18 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
           </div>
 
           <div className="space-y-2">
+            {/* Indicateur de fiabilité détaillé - Nouveau */}
+            {showReliabilityIndicator && (
+              <div className="mb-2">
+                <ChannelReliabilityIndicator
+                  channelId={channel.id}
+                  channelUrl={channel.url}
+                  showDetails={true}
+                  compact={false}
+                />
+              </div>
+            )}
+
             {showCategory && channel.group && (
               <Badge 
                 variant="secondary" 

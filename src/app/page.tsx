@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import Header from '@/components/Header';
@@ -21,15 +22,24 @@ import { usePlaylistStore } from '@/stores/usePlaylistStore';
 import type { AppState, Channel } from '@/types';
 import { ViewType } from '@/types';
 
+// Import des nouveaux composants
+import { SmartChannelGrid } from '@/components/SmartChannelGrid';
+import { ChannelAlternativesModal } from '@/components/ChannelAlternativesModal';
+
 export default function StreamVersePage() {
-  const { 
-    currentView, 
-    searchQuery, 
-    setCurrentView, 
-    setSearchQuery 
+  const {
+    currentView,
+    searchQuery,
+    setCurrentView,
+    setSearchQuery,
+    setCurrentChannel
   } = useAppStore();
-  
-  const { refreshPlaylists } = usePlaylistStore();
+
+  const { channels, refreshPlaylists } = usePlaylistStore();
+
+  // États pour le modal d'alternatives
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [failedChannel, setFailedChannel] = useState<Channel | null>(null);
 
   // Charger les playlists au démarrage
   useEffect(() => {
@@ -44,10 +54,31 @@ export default function StreamVersePage() {
     setCurrentView(view as ViewType);
   };
 
+  const handleChannelSelect = (channel: Channel) => {
+    setCurrentChannel(channel);
+    setCurrentView(ViewType.PLAYER); // Naviguer vers la page du lecteur
+  };
+
+  // Gérer l'échec de lecture pour ouvrir le modal d'alternatives
+  const handlePlaybackError = (channel: Channel) => {
+    setFailedChannel(channel);
+    setShowAlternatives(true);
+  };
+
+  const handleRetryChannel = (channel: Channel) => {
+    // Logique pour réessayer la chaîne, par exemple en la re-sélectionnant
+    handleChannelSelect(channel);
+    setShowAlternatives(false);
+  };
+
   const renderCurrentView = () => {
     switch (currentView) {
       case ViewType.HOME:
-        return <HomePage />;
+        // Remplacer HomePage par SmartChannelGrid si c'est la vue principale des chaînes
+        // Pour cet exemple, nous allons garder HomePage et montrer comment SmartChannelGrid pourrait être utilisé à l'intérieur
+        // Si HomePage est votre page d'accueil avec une grille de chaînes, vous pourriez la remplacer par:
+        // return <SmartChannelGrid channels={channels} onChannelSelect={handleChannelSelect} showRecommendations={true} enableFilters={true} />;
+        return <HomePage onChannelSelect={handleChannelSelect} onPlaybackError={handlePlaybackError} />;
       case ViewType.CATEGORIES:
         return <CategoriesPage />;
       case ViewType.FAVORITES:
@@ -57,7 +88,7 @@ export default function StreamVersePage() {
       case ViewType.SEARCH:
         return <SearchPage />;
       case ViewType.PLAYER:
-        return <PlayerPage />;
+        return <PlayerPage onPlaybackError={handlePlaybackError} />;
       case ViewType.PLAYLISTS:
         return <PlaylistsPage />;
       case ViewType.ANALYTICS:
@@ -67,7 +98,7 @@ export default function StreamVersePage() {
       case ViewType.THEMES:
         return <ThemesPage />;
       default:
-        return <HomePage />;
+        return <HomePage onChannelSelect={handleChannelSelect} onPlaybackError={handlePlaybackError} />;
     }
   };
 
@@ -87,16 +118,25 @@ export default function StreamVersePage() {
               currentView={currentView}
               onViewChange={handleViewChange}
             />
-            
+
             <main className="container mx-auto px-4 py-6">
               {renderCurrentView()}
             </main>
-            
+
             <Toaster />
+
+            {/* Modal d'alternatives pour les chaînes */}
+            <ChannelAlternativesModal
+              isOpen={showAlternatives}
+              onClose={() => setShowAlternatives(false)}
+              failedChannel={failedChannel}
+              allChannels={channels} // Passer toutes les chaînes disponibles
+              onChannelSelect={handleChannelSelect}
+              onRetry={handleRetryChannel}
+            />
           </div>
         </NotificationProvider>
       </AnalyticsProvider>
     </ThemeProvider>
   );
 }
-
