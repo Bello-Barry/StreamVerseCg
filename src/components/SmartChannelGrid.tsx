@@ -36,6 +36,7 @@ interface SmartChannelGridProps {
   showRecommendations?: boolean
   enableFilters?: boolean
   defaultView?: 'grid' | 'list'
+  maxChannelsToShow?: number
 }
 
 type SortOption = 'name' | 'reliability' | 'category' | 'recent' | 'popular'
