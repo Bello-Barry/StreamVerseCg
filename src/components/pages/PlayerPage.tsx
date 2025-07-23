@@ -24,7 +24,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/stores/useAppStore';
 import { useFavoritesStore } from '@/stores/useFavoritesStore';
 import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
-import { ViewType } from '@/types';
+
+import { ViewType,Channel } from '@/types';
 import { toast } from 'sonner';
 
 interface HlsErrorData {
