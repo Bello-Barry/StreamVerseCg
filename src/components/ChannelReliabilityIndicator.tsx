@@ -10,6 +10,7 @@ interface ChannelReliabilityIndicatorProps {
   channelId: string
   channelUrl: string
   showDetails?: boolean
+  compact?: boolean;
   size?: 'sm' | 'md' | 'lg'
 }
 
