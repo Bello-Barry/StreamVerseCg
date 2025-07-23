@@ -5,7 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { 
+
+
+import { Play,
   AlertTriangle, 
   RefreshCw, 
   ExternalLink, 
@@ -222,7 +224,8 @@ export function ChannelAlternativesModal({
     className="w-6 h-6 object-contain"
   />
 ) : (
-  <Icons.play className="w-6 h-6 text-primary" />
+  <
+<Play className="w-6 h-6 text-primary" />
 )}
                                
                             ) : (
