@@ -83,7 +83,7 @@ class SmartChannelRecommendation {
     limit = 10
   ): Channel[] {
     return allChannels
-      .filter(channel => channel.category.toLowerCase() === category.toLowerCase())
+      .filter(channel => channel.category?.toLowerCase() === category.toLowerCase())
       .map(channel => {
         const status = channelValidator.getChannelStatus(channel.id)
         return {
@@ -194,10 +194,12 @@ class SmartChannelRecommendation {
     const watchCount = this.watchHistory.get(channel.id) || 0
     score += Math.min(watchCount * 5, 25)
 
-    const categoryScore = this.categoryPreferences.get(channel.category) || 0
+    const categoryScore = channel.category
+  ? this.categoryPreferences.get(channel.category) || 0
+  : 0
     score += Math.min(categoryScore * 2, 15)
 
-    if (options.preferredCategories?.includes(channel.category)) {
+    if (channel.category && options.preferredCategories?.includes(channel.category)) {
       score += 15
     }
 
