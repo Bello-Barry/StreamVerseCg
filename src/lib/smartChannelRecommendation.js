@@ -25,8 +25,8 @@ exports.useSmartRecommendation = exports.smartRecommendation = void 0;
 var channelValidator_1 = require("./channelValidator");
 var SmartChannelRecommendation = /** @class */ (function () {
     function SmartChannelRecommendation() {
-        this.watchHistory = new Map(); // channelId -> watch count
-        this.categoryPreferences = new Map(); // category -> preference score
+        this.watchHistory = new Map();
+        this.categoryPreferences = new Map();
         this.lastWatchedChannels = [];
         this.userPreferences = {
             preferredLanguages: [],
@@ -37,30 +37,20 @@ var SmartChannelRecommendation = /** @class */ (function () {
             this.loadUserData();
         }
     }
-    /**
-     * Obtient des recommandations intelligentes de chaînes
-     */
     SmartChannelRecommendation.prototype.getSmartRecommendations = function (allChannels, options) {
         var _this = this;
         if (options === void 0) { options = {}; }
         var _a = options.maxRecommendations, maxRecommendations = _a === void 0 ? 20 : _a, _b = options.minReliability, minReliability = _b === void 0 ? 50 : _b, _c = options.preferredCategories, preferredCategories = _c === void 0 ? [] : _c, _d = options.excludeOfflineChannels, excludeOfflineChannels = _d === void 0 ? true : _d, _e = options.boostPopularChannels, boostPopularChannels = _e === void 0 ? true : _e;
-        // Filtrer les chaînes selon les critères de base
         var filteredChannels = allChannels.filter(function (channel) {
-            // Exclure les chaînes hors ligne si demandé
-            if (excludeOfflineChannels) {
-                var status_1 = channelValidator_1.channelValidator.getChannelStatus(channel.id);
-                if (status_1 && status_1.status === 'offline') {
-                    return false;
-                }
-            }
-            // Vérifier la fiabilité minimale
             var status = channelValidator_1.channelValidator.getChannelStatus(channel.id);
+            if (excludeOfflineChannels && (status === null || status === void 0 ? void 0 : status.status) === 'offline') {
+                return false;
+            }
             if (status && status.reliability < minReliability) {
                 return false;
             }
             return true;
         });
-        // Calculer les scores de recommandation
         var scoredChannels = filteredChannels.map(function (channel) { return ({
             channel: channel,
             score: _this.calculateRecommendationScore(channel, {
@@ -68,19 +58,15 @@ var SmartChannelRecommendation = /** @class */ (function () {
                 boostPopularChannels: boostPopularChannels
             })
         }); });
-        // Trier par score et retourner les meilleures recommandations
         return scoredChannels
             .sort(function (a, b) { return b.score - a.score; })
             .slice(0, maxRecommendations)
             .map(function (item) { return item.channel; });
     };
-    /**
-     * Obtient les chaînes les plus fiables par catégorie
-     */
     SmartChannelRecommendation.prototype.getReliableChannelsByCategory = function (allChannels, category, limit) {
         if (limit === void 0) { limit = 10; }
-        var categoryChannels = allChannels.filter(function (channel) { return channel.category.toLowerCase() === category.toLowerCase(); });
-        return categoryChannels
+        return allChannels
+            .filter(function (channel) { return channel.category.toLowerCase() === category.toLowerCase(); })
             .map(function (channel) {
             var status = channelValidator_1.channelValidator.getChannelStatus(channel.id);
             return {
@@ -91,34 +77,26 @@ var SmartChannelRecommendation = /** @class */ (function () {
         })
             .filter(function (item) { return item.reliability > 0; })
             .sort(function (a, b) {
-            // Prioriser les chaînes en ligne
             if (a.isOnline && !b.isOnline)
                 return -1;
             if (!a.isOnline && b.isOnline)
                 return 1;
-            // Puis par fiabilité
             return b.reliability - a.reliability;
         })
             .slice(0, limit)
             .map(function (item) { return item.channel; });
     };
-    /**
-     * Obtient des alternatives pour une chaîne qui ne fonctionne pas
-     */
     SmartChannelRecommendation.prototype.getChannelAlternatives = function (failedChannel, allChannels, limit) {
         var _this = this;
         if (limit === void 0) { limit = 5; }
-        // Chercher des chaînes similaires dans la même catégorie
         var sameCategory = allChannels.filter(function (channel) {
             return channel.id !== failedChannel.id &&
                 channel.category === failedChannel.category;
         });
-        // Chercher des chaînes avec des noms similaires
         var similarNames = allChannels.filter(function (channel) {
             return channel.id !== failedChannel.id &&
                 _this.calculateNameSimilarity(channel.name, failedChannel.name) > 0.5;
         });
-        // Combiner et scorer les alternatives
         var alternatives = __spreadArray([], new Set(__spreadArray(__spreadArray([], sameCategory, true), similarNames, true)), true);
         return alternatives
             .map(function (channel) {
@@ -135,26 +113,16 @@ var SmartChannelRecommendation = /** @class */ (function () {
             .slice(0, limit)
             .map(function (item) { return item.channel; });
     };
-    /**
-     * Met à jour l'historique de visionnage
-     */
     SmartChannelRecommendation.prototype.updateWatchHistory = function (channelId, category) {
-        // Mettre à jour le compteur de visionnage
         var currentCount = this.watchHistory.get(channelId) || 0;
         this.watchHistory.set(channelId, currentCount + 1);
-        // Mettre à jour les préférences de catégorie
         var currentCategoryScore = this.categoryPreferences.get(category) || 0;
         this.categoryPreferences.set(category, currentCategoryScore + 1);
-        // Mettre à jour les dernières chaînes regardées
         this.lastWatchedChannels = __spreadArray([
             channelId
-        ], this.lastWatchedChannels.filter(function (id) { return id !== channelId; }), true).slice(0, 10); // Garder seulement les 10 dernières
-        // Sauvegarder les données
+        ], this.lastWatchedChannels.filter(function (id) { return id !== channelId; }), true).slice(0, 10);
         this.saveUserData();
     };
-    /**
-     * Obtient les chaînes populaires basées sur l'historique global
-     */
     SmartChannelRecommendation.prototype.getPopularChannels = function (allChannels, limit) {
         if (limit === void 0) { limit = 20; }
         var channelStats = Array.from(this.watchHistory.entries())
@@ -167,9 +135,6 @@ var SmartChannelRecommendation = /** @class */ (function () {
         })
             .filter(function (channel) { return channel !== undefined; });
     };
-    /**
-     * Obtient les catégories préférées de l'utilisateur
-     */
     SmartChannelRecommendation.prototype.getPreferredCategories = function () {
         return Array.from(this.categoryPreferences.entries())
             .map(function (_a) {
@@ -178,57 +143,42 @@ var SmartChannelRecommendation = /** @class */ (function () {
         })
             .sort(function (a, b) { return b.score - a.score; });
     };
-    /**
-     * Calcule le score de recommandation pour une chaîne
-     */
     SmartChannelRecommendation.prototype.calculateRecommendationScore = function (channel, options) {
         var _a;
         var score = 0;
-        // Score de base : fiabilité de la chaîne
         var status = channelValidator_1.channelValidator.getChannelStatus(channel.id);
         if (status) {
-            score += status.reliability * 0.4; // 40% du score basé sur la fiabilité
-            // Bonus pour les chaînes en ligne
+            score += status.reliability * 0.4;
             if (status.status === 'online') {
                 score += 20;
             }
-            // Bonus pour les temps de réponse rapides
             if (status.responseTime && status.responseTime < 2000) {
                 score += 10;
             }
         }
-        // Score basé sur l'historique de visionnage
         var watchCount = this.watchHistory.get(channel.id) || 0;
-        score += Math.min(watchCount * 5, 25); // Maximum 25 points pour l'historique
-        // Score basé sur les préférences de catégorie
+        score += Math.min(watchCount * 5, 25);
         var categoryScore = this.categoryPreferences.get(channel.category) || 0;
-        score += Math.min(categoryScore * 2, 15); // Maximum 15 points pour la catégorie
-        // Bonus pour les catégories préférées spécifiées
+        score += Math.min(categoryScore * 2, 15);
         if ((_a = options.preferredCategories) === null || _a === void 0 ? void 0 : _a.includes(channel.category)) {
             score += 15;
         }
-        // Bonus pour les chaînes récemment regardées (mais pas trop récentes)
         var recentIndex = this.lastWatchedChannels.indexOf(channel.id);
-        if (recentIndex >= 3 && recentIndex <= 7) { // Entre la 4ème et 8ème position
+        if (recentIndex >= 3 && recentIndex <= 7) {
             score += 10;
         }
-        // Bonus pour les langues et pays préférés
         if (channel.language && this.userPreferences.preferredLanguages.includes(channel.language)) {
             score += 8;
         }
         if (channel.country && this.userPreferences.preferredCountries.includes(channel.country)) {
             score += 8;
         }
-        // Boost pour les chaînes populaires globalement
         if (options.boostPopularChannels) {
             var globalPopularity = this.getGlobalPopularityScore(channel.id);
             score += globalPopularity * 0.1;
         }
         return Math.round(score);
     };
-    /**
-     * Calcule la similarité entre deux noms de chaînes
-     */
     SmartChannelRecommendation.prototype.calculateNameSimilarity = function (name1, name2) {
         var normalize = function (str) {
             return str.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -239,7 +189,6 @@ var SmartChannelRecommendation = /** @class */ (function () {
             return 1;
         if (n1.includes(n2) || n2.includes(n1))
             return 0.8;
-        // Calcul de distance de Levenshtein simplifiée
         var maxLength = Math.max(n1.length, n2.length);
         if (maxLength === 0)
             return 1;
@@ -251,30 +200,19 @@ var SmartChannelRecommendation = /** @class */ (function () {
         }
         return matches / maxLength;
     };
-    /**
-     * Obtient le score de popularité global d'une chaîne
-     */
     SmartChannelRecommendation.prototype.getGlobalPopularityScore = function (channelId) {
-        // Simuler un score de popularité basé sur des données fictives
-        // Dans une vraie application, cela viendrait d'analytics globaux
         var hash = this.simpleHash(channelId);
-        return hash % 100; // Score entre 0 et 99
+        return hash % 100;
     };
-    /**
-     * Hash simple pour simuler des données
-     */
     SmartChannelRecommendation.prototype.simpleHash = function (str) {
         var hash = 0;
         for (var i = 0; i < str.length; i++) {
             var char = str.charCodeAt(i);
             hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convertir en 32bit integer
+            hash = hash & hash;
         }
         return Math.abs(hash);
     };
-    /**
-     * Sauvegarde les données utilisateur
-     */
     SmartChannelRecommendation.prototype.saveUserData = function () {
         if (typeof window === 'undefined')
             return;
@@ -291,9 +229,6 @@ var SmartChannelRecommendation = /** @class */ (function () {
             console.error('Erreur lors de la sauvegarde des données utilisateur:', error);
         }
     };
-    /**
-     * Charge les données utilisateur
-     */
     SmartChannelRecommendation.prototype.loadUserData = function () {
         if (typeof window === 'undefined')
             return;
@@ -301,7 +236,14 @@ var SmartChannelRecommendation = /** @class */ (function () {
             var userData = localStorage.getItem('streamverse_user_recommendations');
             if (!userData)
                 return;
-            var data = JSON.parse(userData);
+            var data = void 0;
+            try {
+                data = JSON.parse(userData);
+            }
+            catch (e) {
+                console.error('Erreur de parsing JSON :', e);
+                return;
+            }
             this.watchHistory = new Map(data.watchHistory || []);
             this.categoryPreferences = new Map(data.categoryPreferences || []);
             this.lastWatchedChannels = data.lastWatchedChannels || [];
@@ -313,9 +255,7 @@ var SmartChannelRecommendation = /** @class */ (function () {
     };
     return SmartChannelRecommendation;
 }());
-// Instance singleton
 exports.smartRecommendation = new SmartChannelRecommendation();
-// Hook React pour utiliser le système de recommandation
 function useSmartRecommendation() {
     return {
         getSmartRecommendations: exports.smartRecommendation.getSmartRecommendations.bind(exports.smartRecommendation),

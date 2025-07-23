@@ -132,7 +132,11 @@ export default function StreamVersePage() {
               failedChannel={failedChannel}
               allChannels={channels} // Passer toutes les chaînes disponibles
               onChannelSelect={handleChannelSelect}
-              onRetry={handleRetryChannel}
+              onRetry={() => {
+  if (failedChannel) {
+    handleRetryChannel(failedChannel);
+  }
+}}
             />
           </div>
         </NotificationProvider>

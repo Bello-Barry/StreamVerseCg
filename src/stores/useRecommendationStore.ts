@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Channel } from '@/types';
-import { SmartChannelRecommendation } from '@/lib/smartChannelRecommendation';
+import { smartRecommendation } from '@/lib/smartChannelRecommendation';
 
 interface RecommendationPreferences {
   preferredCategories?: string[];
@@ -16,8 +16,9 @@ interface RecommendationState {
 export const useRecommendationStore = create<RecommendationState>((set) => ({
   recommendations: [],
   setRecommendations: (channels, preferences) => {
-    const recommender = new SmartChannelRecommendation(channels);
-    const result = recommender.recommend(preferences);
+    const result = smartRecommendation.getSmartRecommendations(channels, {
+      preferredCategories: preferences.preferredCategories
+    });
     set({ recommendations: result });
   },
 }));
