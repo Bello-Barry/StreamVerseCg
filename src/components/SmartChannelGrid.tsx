@@ -24,8 +24,9 @@ import {
 } from 'lucide-react'
 import ChannelCard from '@/components/ChannelCard'
 import { ChannelReliabilityIndicator, GlobalChannelStats } from '@/components/ChannelReliabilityIndicator'
+import type { Channel } from '@/types'
 import { useChannelValidator } from '@/lib/channelValidator'
-import { useSmartRecommendation, Channel } from '@/lib/smartChannelRecommendation'
+import { useSmartRecommendation } from '@/lib/smartChannelRecommendation'
 import { usePlaylistStore } from '@/stores/usePlaylistStore'
 import { useFavoritesStore } from '@/stores/useFavoritesStore'
 
