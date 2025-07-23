@@ -440,11 +440,12 @@ export function SmartChannelGrid({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {recommendations.map((channel) => (
                     <div key={channel.id} className="relative">
-                      <ChannelCard
-                        channel={channel}
-                        onClick={() => handleChannelSelect(channel)}
-                        showReliability={true}
-                      />
+<ChannelCard
+  channel={channel}
+  onClick={() => handleChannelSelect(channel)}
+  showReliabilityIndicator={true} // Corrigé ici
+  compact={viewMode === 'list'}
+/>
                       <Badge className="absolute top-2 left-2" variant="secondary">
                         <Star className="h-3 w-3 mr-1" />
                         Recommandé
@@ -476,10 +477,11 @@ export function SmartChannelGrid({
                   {popularChannels.map((channel) => (
                     <div key={channel.id} className="relative">
                       <ChannelCard
-                        channel={channel}
-                        onClick={() => handleChannelSelect(channel)}
-                        showReliability={true}
-                      />
+  channel={channel}
+  onClick={() => handleChannelSelect(channel)}
+  showReliabilityIndicator={true} // Corrigé ici
+  compact={viewMode === 'list'}
+/>
                       <Badge className="absolute top-2 left-2" variant="default">
                         <TrendingUp className="h-3 w-3 mr-1" />
                         Populaire
@@ -516,11 +518,12 @@ export function SmartChannelGrid({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {channelsWithDetails.map((channel) => (
                       <div key={channel.id} className="relative">
-                        <ChannelCard
-                          channel={channel}
-                          onClick={() => handleChannelSelect(channel)}
-                          showReliability={true}
-                        />
+                       <ChannelCard
+  channel={channel}
+  onClick={() => handleChannelSelect(channel)}
+  showReliabilityIndicator={true} // Corrigé ici
+  compact={viewMode === 'list'}
+/>
                         <Badge className="absolute top-2 left-2" variant="default">
                           <Zap className="h-3 w-3 mr-1" />
                           Fiable
