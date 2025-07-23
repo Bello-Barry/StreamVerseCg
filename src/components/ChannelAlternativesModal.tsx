@@ -215,12 +215,16 @@ export function ChannelAlternativesModal({
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                            {channel.logo ? (
-                              <img 
-                                src={channel.logo} 
-                                alt={channel.name}
-                                className="w-8 h-8 rounded object-cover"
-                              />
+                          {channel.tvgLogo ? (
+  <img
+    src={channel.tvgLogo}
+    alt={channel.name}
+    className="w-6 h-6 object-contain"
+  />
+) : (
+  <Icons.play className="w-6 h-6 text-primary" />
+)}
+                               
                             ) : (
                               <ExternalLink className="h-5 w-5 text-primary" />
                             )}
