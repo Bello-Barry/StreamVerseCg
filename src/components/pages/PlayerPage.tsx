@@ -1,372 +1,288 @@
-
-// src/components/pages/PlayerPage.tsx
-
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import Image from 'next/image';
-import Hls from 'hls.js';
 import {
-  Play,
+  ArrowLeft,
+  BadgeInfo,
+  Fullscreen,
+  Loader2,
   Pause,
+  Play,
+  RefreshCcw,
   Volume2,
   VolumeX,
-  Maximize,
-  Minimize,
-  X,
-  Heart,
-  Share2,
+  Zap,
 } from 'lucide-react';
+import Hls from 'hls.js';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  KeyboardEvent,
+} from 'react';
+import { useRouter } from 'next/navigation';
+import { useChannelStore } from '@/stores/useChannelStore';
+import { useUserPreferencesStore } from '@/stores/useUserPreferencesStore';
+import { useRecommendationStore } from '@/stores/useRecommendationStore';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { useAppStore } from '@/stores/useAppStore';
-import { useFavoritesStore } from '@/stores/useFavoritesStore';
-import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
-
-import { ViewType,Channel } from '@/types';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 
-interface HlsErrorData {
-  type: string;
-  details: string;
-  fatal: boolean;
-}
-
-interface PlayerPageProps {
-  onPlaybackError?: (channel: Channel) => void;
-}
-
-const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
-  const { currentChannel, setCurrentChannel, setCurrentView, userPreferences } = useAppStore();
-  const { toggleFavorite, isFavorite } = useFavoritesStore();
-  const { addToHistory } = useWatchHistoryStore();
-
-  const playerContainerRef = useRef<HTMLDivElement>(null);
+const PlayerPage = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const watchStartTimeRef = useRef<number>(Date.now());
-
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(userPreferences.volume);
+  const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showControls, setShowControls] = useState(true);
+  const [qualityLevels, setQualityLevels] = useState<Hls.Level[]>([]);
+  const [selectedQuality, setSelectedQuality] = useState<number | 'auto'>('auto');
 
-  // Initialiser HLS.js
-  useEffect(() => {
-    const initializePlayer = async () => {
-      if (!currentChannel || !videoRef.current) return;
+  const { currentChannel } = useChannelStore();
+  const { userPreferences } = useUserPreferencesStore();
+  const { onPlaybackError } = useRecommendationStore();
+  const router = useRouter();
 
-      const video = videoRef.current;
-      setIsLoading(true);
-      setError(null);
+  const handleClose = () => router.back();
 
-      try {
-        const Hls = (await import('hls.js')).default;
+  const initializePlayer = useCallback(async () => {
+    if (!currentChannel || !videoRef.current) return;
 
-        if (Hls.isSupported()) {
-          if (hlsRef.current) {
-            hlsRef.current.destroy();
-          }
+    const video = videoRef.current;
+    setIsLoading(true);
+    setError(null);
 
-          const hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-            backBufferLength: 90,
-          });
-          hlsRef.current = hls;
-
-          hls.loadSource(currentChannel.url);
-          hls.attachMedia(video);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            setIsLoading(false);
-            if (userPreferences.autoplay) {
-              video.play().catch(console.error);
-            }
-          });
-
-          hls.on(Hls.Events.ERROR, (_event: string, data: HlsErrorData) => {
-            console.error('HLS Error:', data);
-            if (data.fatal) {
-              setError('Erreur de lecture du flux. Veuillez réessayer.');
-              setIsLoading(false);
-              if (onPlaybackError && currentChannel) {
-                onPlaybackError(currentChannel);
-              }
-            }
-          });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = currentChannel.url;
-          setIsLoading(false);
+    try {
+      if (Hls.isSupported()) {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
         }
-      } catch (err) {
-        console.error("Erreur d'initialisation du lecteur:", err);
-        setError("Erreur d'initialisation du lecteur.");
+
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 90,
+        });
+
+        hlsRef.current = hls;
+        hls.attachMedia(video);
+        hls.loadSource(currentChannel.url);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setIsLoading(false);
+          setQualityLevels(hls.levels);
+          if (userPreferences.autoplay) {
+            video.play().catch(console.error);
+          }
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.error('HLS Error:', data);
+          if (data.fatal) {
+            setError("Erreur de lecture du flux. Veuillez réessayer.");
+            setIsLoading(false);
+            if (onPlaybackError && currentChannel) {
+              onPlaybackError(currentChannel);
+            }
+          }
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = currentChannel.url;
         setIsLoading(false);
       }
-    };
+    } catch (err) {
+      console.error('Erreur de lecture:', err);
+      setError('Échec de l\'initialisation du lecteur');
+      setIsLoading(false);
+    }
+  }, [currentChannel, userPreferences.autoplay, onPlaybackError]);
 
+  useEffect(() => {
     initializePlayer();
-
     return () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [currentChannel, userPreferences.autoplay, onPlaybackError]);
+  }, [initializePlayer]);
 
-  // Gestionnaires d'événements vidéo
-  useEffect(() => {
+  const handlePlayPause = () => {
     const video = videoRef.current;
     if (!video) return;
+    isPlaying ? video.pause() : video.play();
+    setIsPlaying(!isPlaying);
+  };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleVolumeChange = () => {
-      setVolume(video.volume);
-      setIsMuted(video.muted);
-    };
-
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('volumechange', handleVolumeChange);
-
-    return () => {
-      video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
-      video.removeEventListener('volumechange', handleVolumeChange);
-    };
-  }, []);
-
-  // Gestion du plein écran
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // Masquer les contrôles automatiquement
-  const hideControls = useCallback(() => {
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false);
-      }
-    }, 3000);
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (isPlaying && showControls) {
-      hideControls();
-    }
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, [isPlaying, showControls, hideControls]);
-
-  // Enregistrer dans l'historique à la fermeture
-  useEffect(() => {
-    const startTime = Date.now();
-    watchStartTimeRef.current = startTime;
-
-    return () => {
-      if (currentChannel) {
-        const watchDuration = Math.floor((Date.now() - startTime) / 1000);
-        if (watchDuration > 5) {
-          addToHistory(currentChannel, watchDuration);
-        }
-      }
-    };
-  }, [currentChannel, addToHistory]);
-
-  // --- Fonctions de contrôle ---
-
-  const handlePlayPause = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    isPlaying ? video.pause() : video.play().catch(console.error);
-  }, [isPlaying]);
-
-  const handleVolumeChange = useCallback((newVolume: number[]) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const vol = newVolume[0];
-    video.volume = vol;
-    setVolume(vol);
-    video.muted = vol === 0;
-  }, []);
-
-  const handleMuteToggle = useCallback(() => {
+  const handleMuteToggle = () => {
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
-  }, []);
+    setIsMuted(video.muted);
+  };
 
-  const handleFullscreenToggle = useCallback(() => {
-    const container = playerContainerRef.current;
-    if (!container) return;
-    if (!document.fullscreenElement) {
-      container.requestFullscreen().catch(console.error);
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0];
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = newVolume;
+    setVolume(newVolume);
+    setIsMuted(newVolume === 0);
+  };
+
+  const handleFullscreenToggle = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
     } else {
-      document.exitFullscreen().catch(console.error);
+      video.requestFullscreen().catch(console.error);
     }
-  }, []);
+  };
 
-  const handleClose = useCallback(() => {
-    setCurrentChannel(null);
-    setCurrentView(ViewType.HOME);
-  }, [setCurrentChannel, setCurrentView]);
+  const handleKeyDown = (e: KeyboardEvent) => {
+    switch (e.key) {
+      case ' ':
+      case 'k':
+        e.preventDefault();
+        handlePlayPause();
+        break;
+      case 'm':
+        handleMuteToggle();
+        break;
+      case 'f':
+        handleFullscreenToggle();
+        break;
+      case 'Escape':
+        handleClose();
+        break;
+      default:
+        break;
+    }
+  };
 
-  const handleToggleFavorite = useCallback(() => {
-    if (!currentChannel) return;
-    const currentlyFavorite = isFavorite(currentChannel.id);
-    toggleFavorite(currentChannel.id);
-    toast.success(currentlyFavorite ? 'Retiré des favoris' : 'Ajouté aux favoris');
-  }, [currentChannel, isFavorite, toggleFavorite]);
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
-  const handleShare = useCallback(() => {
-    if (!currentChannel) return;
-    navigator.clipboard.writeText(`${currentChannel.name} - ${window.location.href}`);
-    toast.success('Lien copié dans le presse-papiers');
-  }, [currentChannel]);
-
-  const handleMouseMove = useCallback(() => {
-    setShowControls(true);
-    hideControls();
-  }, [hideControls]);
+  const handleSelectQuality = (index: number | 'auto') => {
+    if (!hlsRef.current) return;
+    hlsRef.current.currentLevel = index === 'auto' ? -1 : index;
+    setSelectedQuality(index);
+    toast.success(`Qualité sélectionnée : ${index === 'auto' ? 'Auto' : `${hlsRef.current.levels[index].height}p`}`);
+  };
 
   if (!currentChannel) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center py-12">
-        <p className="text-muted-foreground">Aucune chaîne sélectionnée.</p>
-        <Button onClick={() => setCurrentView(ViewType.HOME)} className="mt-4">
-          Retour à l&apos;accueil
+      <div className="flex flex-col items-center justify-center h-screen text-center text-white">
+        <BadgeInfo className="w-8 h-8 mb-2" />
+        <p>Aucune chaîne sélectionnée.</p>
+        <Button onClick={handleClose} className="mt-4">
+          Retour
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div
-        ref={playerContainerRef}
-        className="relative bg-black rounded-lg overflow-hidden aspect-video group"
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => isPlaying && setShowControls(false)}
-      >
-        <video
-          ref={videoRef}
-          className="w-full h-full"
-          poster={currentChannel.tvgLogo}
-          onClick={handlePlayPause}
-          playsInline
-        />
-
-        {(isLoading || error) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white">
-            {isLoading && (
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                <p>Chargement du flux...</p>
-              </div>
-            )}
-            {error && (
-              <div className="text-center">
-                <p className="mb-4">{error}</p>
-                <Button onClick={() => window.location.reload()}>Réessayer</Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div
-          className={`absolute inset-0 bg-gradient-to-t from-black/70 to-transparent transition-opacity duration-300 ${
-            showControls && !error ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          {/* --- Contrôles du haut --- */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Badge variant="destructive">🔴 LIVE</Badge>
-              <h3 className="text-white font-semibold">{currentChannel.name}</h3>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Button variant="ghost" size="icon" onClick={handleToggleFavorite} className="text-white hover:bg-white/20" aria-label={isFavorite(currentChannel.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
-                <Heart className={`h-5 w-5 ${isFavorite(currentChannel.id) ? 'fill-red-500 text-red-500' : ''}`} />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleShare} className="text-white hover:bg-white/20" aria-label="Partager la chaîne">
-                <Share2 className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleClose} className="text-white hover:bg-white/20" aria-label="Fermer le lecteur">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* --- Contrôles du bas --- */}
-          <div className="absolute bottom-4 left-4 right-4">
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="icon" onClick={handlePlayPause} className="text-white hover:bg-white/20" aria-label={isPlaying ? 'Mettre en pause' : 'Lire'}>
-                {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-              </Button>
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" size="icon" onClick={handleMuteToggle} className="text-white hover:bg-white/20" aria-label={isMuted || volume === 0 ? 'Activer le son' : 'Couper le son'}>
-                  {isMuted || volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-                </Button>
-                <Slider value={[isMuted ? 0 : volume]} onValueChange={handleVolumeChange} max={1} step={0.1} className="w-24" />
-              </div>
-              <div className="flex-grow" />
-              <Button variant="ghost" size="icon" onClick={handleFullscreenToggle} className="text-white hover:bg-white/20" aria-label={isFullscreen ? 'Quitter le plein écran' : 'Passer en plein écran'}>
-                {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-              </Button>
-            </div>
+    <div className="relative h-screen w-screen bg-black text-white">
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-contain"
+        controls={false}
+        autoPlay
+        tabIndex={0}
+      />
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent space-y-4">
+        <div className="flex justify-between items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            aria-label="Retour"
+            tabIndex={0}
+          >
+            <ArrowLeft />
+          </Button>
+          <div className="flex space-x-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePlayPause}
+              aria-label={isPlaying ? 'Pause' : 'Lecture'}
+              autoFocus
+              tabIndex={0}
+            >
+              {isPlaying ? <Pause /> : <Play />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleMuteToggle}
+              aria-label="Muet"
+              tabIndex={0}
+            >
+              {isMuted || volume === 0 ? <VolumeX /> : <Volume2 />}
+            </Button>
+            <Slider
+              value={[volume]}
+              max={1}
+              step={0.01}
+              onValueChange={handleVolumeChange}
+              className="w-[120px]"
+              tabIndex={0}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleFullscreenToggle}
+              aria-label="Plein écran"
+              tabIndex={0}
+            >
+              <Fullscreen />
+            </Button>
           </div>
         </div>
-      </div>
-
-      {/* --- Informations de la chaîne --- */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-2">{currentChannel.name}</h2>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {currentChannel.group && <Badge variant="secondary">{currentChannel.group}</Badge>}
-                {currentChannel.language && <Badge variant="outline">{currentChannel.language}</Badge>}
-                {currentChannel.country && <Badge variant="outline">{currentChannel.country}</Badge>}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <p>Source: {currentChannel.playlistSource}</p>
-                {currentChannel.tvgId && <p>ID: {currentChannel.tvgId}</p>}
-              </div>
-            </div>
-            {currentChannel.tvgLogo && (
-              <div className="relative w-16 h-16 flex-shrink-0">
-                <Image
-                  src={currentChannel.tvgLogo}
-                  alt={`Logo de ${currentChannel.name}`}
-                  fill
-                  className="object-contain rounded"
-                  sizes="64px"
-                />
-              </div>
-            )}
+        {qualityLevels.length > 0 && (
+          <div className="flex gap-2 flex-wrap text-sm">
+            <Badge
+              variant={selectedQuality === 'auto' ? 'default' : 'outline'}
+              className="cursor-pointer"
+              onClick={() => handleSelectQuality('auto')}
+            >
+              Auto
+            </Badge>
+            {qualityLevels.map((q, i) => (
+              <Badge
+                key={i}
+                variant={selectedQuality === i ? 'default' : 'outline'}
+                className="cursor-pointer"
+                onClick={() => handleSelectQuality(i)}
+              >
+                {q.height}p
+              </Badge>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-20">
+          <Loader2 className="animate-spin w-8 h-8 text-white" />
+        </div>
+      )}
+      {error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-30 text-white space-y-4">
+          <Zap className="w-8 h-8" />
+          <p>{error}</p>
+          <Button onClick={initializePlayer}>
+            <RefreshCcw className="mr-2 h-4 w-4" />
+            Réessayer
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
