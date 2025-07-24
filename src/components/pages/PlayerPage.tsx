@@ -30,8 +30,11 @@ interface HlsErrorData {
   details: string;
   fatal: boolean;
 }
+type PlayerPageProps = {
+  onPlaybackError?: (channel: Channel) => void;
+};
 
-const PlayerPage: React.FC = () => {
+const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
   const {
     currentChannel,
     setCurrentChannel,
