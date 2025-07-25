@@ -11,7 +11,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tv, Play, Heart, MoreVertical, Trash2 } from 'lucide-react';
 import { Channel } from '@/types';
-import { usePlayerStore } from '@/stores/usePlayerStore';
+import { usePlaylistStore } from '@/stores/usePlaylistStore';
+
 import { useFavoritesStore } from '@/stores/useFavoritesStore';
 import { useState } from 'react';
 import Image from 'next/image';
@@ -22,7 +23,7 @@ type Props = {
 
 export function ChannelCard({ channel }: Props) {
   const [imgError, setImgError] = useState(false);
-  const { play } = usePlayerStore();
+  const { play } = usePlaylistStore();
   const { isFavorite, toggleFavorite, removeFavorite } = useFavoritesStore();
 
   const handlePlay = () => play(channel);
