@@ -27,6 +27,17 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const t = useTranslations('ChannelCard');
 
+  // Helper pour les labels de qualité
+  const getQualityLabel = (quality: Quality): string => {
+    switch (quality) {
+      case Quality.HIGH: return 'HD';
+      case Quality.MEDIUM: return 'SD';
+      case Quality.LOW: return 'LD';
+      case Quality.AUTO: return 'Auto';
+      default: return '';
+    }
+  };
+
   // Mémorisation des mappings
   const categoryColors = useMemo(() => ({
     'News': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
@@ -49,14 +60,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
     'Italy': '🇮🇹',
     'Canada': '🇨🇦',
     'Australia': '🇦🇺'
-  }), []);
-
-  // Map pour afficher la qualité de manière lisible
-  const qualityMap: Record<Quality, string> = useMemo(() => ({
-    [Quality.AUTO]: 'Auto',
-    [Quality.HIGH]: 'HD',
-    [Quality.MEDIUM]: 'SD',
-    [Quality.LOW]: 'LD'
   }), []);
 
   const handlePlay = useCallback((e?: React.MouseEvent | React.KeyboardEvent) => {
@@ -217,10 +220,12 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </Button>
           </div>
 
-          {/* Badge de qualité - VERSION CORRIGÉE */}
+          {/* SOLUTION ULTIME - Badge de qualité */}
           {channel.quality && channel.quality !== Quality.AUTO && (
             <Badge className="absolute bottom-2 left-2 bg-background/80 text-foreground z-10">
-              {qualityMap[channel.quality]}
+              {channel.quality === Quality.HIGH ? 'HD' : 
+               channel.quality === Quality.MEDIUM ? 'SD' : 
+               channel.quality === Quality.LOW ? 'LD' : ''}
             </Badge>
           )}
         </div>
