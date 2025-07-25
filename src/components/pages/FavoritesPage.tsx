@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useMemo, useState, useCallback, useRef } from 'react'
-import { Heart, Trash2, Download, Upload } from 'lucide-react'
+import { Heart, Trash2, Download, Upload, Settings, CheckCircle, Shield, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import ChannelCard from '@/components/ChannelCard'
 import { usePlaylistStore } from '@/stores/usePlaylistStore'
 import { useFavoritesStore } from '@/stores/useFavoritesStore'
@@ -13,8 +15,156 @@ import { useAppStore } from '@/stores/useAppStore'
 import { toast } from 'sonner'
 import type { Channel } from '@/types'
 
-// --- Sous-composants mémoïsés ---
+// --- Composant AdminPanel ---
+const AdminPanel = React.memo(function AdminPanel({ className }: { className?: string }) {
+  const [adminSecret, setAdminSecret] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [lastGenerated, setLastGenerated] = useState<string>('')
+  
+  const { channels } = usePlaylistStore()
+  const { favorites } = useFavoritesStore()
 
+  const generateVerifiedChannels = async () => {
+    if (!adminSecret.trim()) {
+      toast.error('Veuillez entrer la clé secrète admin')
+      return
+    }
+
+    if (favorites.length === 0) {
+      toast.error('Aucun favori à exporter')
+      return
+    }
+
+    setIsGenerating(true)
+
+    try {
+      const response = await fetch('/api/admin/generate-verified-channels', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          secret: adminSecret,
+          favorites,
+          allChannels: channels,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        toast.success(
+          `✅ Fichier généré avec succès ! ${result.channelsCount} chaînes vérifiées`
+        )
+        setLastGenerated(new Date().toLocaleString('fr-FR'))
+        
+        // Optionnel: recharger la page pour voir les changements
+        setTimeout(() => window.location.reload(), 2000)
+      } else {
+        toast.error(result.error || 'Erreur lors de la génération')
+      }
+    } catch (error) {
+      toast.error('Erreur réseau lors de la génération')
+      console.error('Erreur:', error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-orange-500" />
+          Panneau Admin
+        </CardTitle>
+        <CardDescription>
+          Générer le fichier des chaînes vérifiées à partir de vos favoris actuels ({favorites.length} chaînes)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <label htmlFor="admin-secret" className="text-sm font-medium">
+            Clé secrète admin :
+          </label>
+          <Input
+            id="admin-secret"
+            type="password"
+            placeholder="Entrez la clé secrète..."
+            value={adminSecret}
+            onChange={(e) => setAdminSecret(e.target.value)}
+          />
+        </div>
+
+        <Button 
+          onClick={generateVerifiedChannels} 
+          disabled={isGenerating || !adminSecret.trim()}
+          className="w-full"
+        >
+          {isGenerating ? (
+            <>
+              <Upload className="h-4 w-4 mr-2 animate-spin" />
+              Génération en cours...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Générer verified-channels.json
+            </>
+          )}
+        </Button>
+
+        {lastGenerated && (
+          <div className="flex items-center gap-2 text-sm text-green-600">
+            <CheckCircle className="h-4 w-4" />
+            Dernière génération : {lastGenerated}
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground">
+          <AlertCircle className="h-3 w-3 inline mr-1" />
+          Cette action va créer/remplacer le fichier public/verified-channels.json
+        </div>
+      </CardContent>
+    </Card>
+  )
+})
+
+// --- Composant Statistiques ---
+const FavoritesStats = React.memo(function FavoritesStats({
+  totalFavorites,
+  categories
+}: {
+  totalFavorites: number
+  categories: Record<string, Channel[]>
+}) {
+  const categoriesCount = Object.keys(categories).length
+  const topCategory = Object.entries(categories)
+    .sort(([,a], [,b]) => b.length - a.length)[0]
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+      <div className="text-center">
+        <div className="text-2xl font-bold text-primary">{totalFavorites}</div>
+        <div className="text-sm text-muted-foreground">Chaînes favorites</div>
+      </div>
+      <div className="text-center">
+        <div className="text-2xl font-bold text-primary">{categoriesCount}</div>
+        <div className="text-sm text-muted-foreground">Catégories</div>
+      </div>
+      <div className="text-center">
+        <div className="text-2xl font-bold text-primary">
+          {topCategory ? topCategory[1].length : 0}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {topCategory ? `${topCategory[0]} (top)` : 'Aucune catégorie'}
+        </div>
+      </div>
+    </div>
+  )
+})
+
+// --- Sous-composants mémoïsés existants ---
 const FavoritesHeader = React.memo(function FavoritesHeader({
   count,
   onExport,
@@ -26,31 +176,51 @@ const FavoritesHeader = React.memo(function FavoritesHeader({
   onImportClick: () => void
   onClearAll: () => void
 }) {
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
+
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center space-x-2">
-          <Heart className="h-8 w-8 text-red-500" />
-          <span>Mes Favoris</span>
-        </h1>
-        <p className="text-muted-foreground">
-          {count} chaîne{count !== 1 ? 's' : ''} favorite{count !== 1 ? 's' : ''}
-        </p>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center space-x-2">
+            <Heart className="h-8 w-8 text-red-500" />
+            <span>Mes Favoris</span>
+          </h1>
+          <p className="text-muted-foreground">
+            {count} chaîne{count !== 1 ? 's' : ''} favorite{count !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={onExport} disabled={count === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            Exporter
+          </Button>
+          <Button variant="outline" size="sm" onClick={onImportClick}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importer
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowAdminPanel(!showAdminPanel)}
+            disabled={count === 0}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Admin
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onClearAll} disabled={count === 0}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Tout supprimer
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center space-x-2">
-        <Button variant="outline" size="sm" onClick={onExport} disabled={count === 0}>
-          <Download className="h-4 w-4 mr-2" />
-          Exporter
-        </Button>
-        <Button variant="outline" size="sm" onClick={onImportClick}>
-          <Upload className="h-4 w-4 mr-2" />
-          Importer
-        </Button>
-        <Button variant="destructive" size="sm" onClick={onClearAll} disabled={count === 0}>
-          <Trash2 className="h-4 w-4 mr-2" />
-          Tout supprimer
-        </Button>
-      </div>
+
+      {/* Panneau admin collapsible */}
+      <Collapsible open={showAdminPanel} onOpenChange={setShowAdminPanel}>
+        <CollapsibleContent>
+          <AdminPanel className="mt-4" />
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   )
 })
@@ -156,7 +326,6 @@ const EmptyState = React.memo(function EmptyState({
 })
 
 // --- Composant principal ---
-
 export default function FavoritesPage() {
   const { channels } = usePlaylistStore()
   const {
@@ -298,6 +467,11 @@ export default function FavoritesPage() {
 
       {favoriteChannels.length > 0 ? (
         <>
+          <FavoritesStats 
+            totalFavorites={favoriteChannels.length}
+            categories={favoritesByCategory}
+          />
+
           <FilterControls
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
