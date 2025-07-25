@@ -12,6 +12,21 @@ import { cn } from '@/lib/utils';
 import { ChannelReliabilityIndicator } from '@/components/ChannelReliabilityIndicator';
 import { useTranslations } from 'next-intl';
 
+// Définition des couleurs avec type constant
+const CATEGORY_COLORS = {
+  'News': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  'Sports': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  'Entertainment': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+  'Movies': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+  'Music': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
+  'Documentary': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  'Kids': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+  'General': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
+  'Undefined': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+} as const;
+
+type CategoryColorKey = keyof typeof CATEGORY_COLORS;
+
 const ChannelCard: React.FC<ChannelCardProps> = ({
   channel,
   onPlay,
@@ -27,29 +42,10 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const t = useTranslations('ChannelCard');
 
-  // Helper pour les labels de qualité
-  const getQualityLabel = (quality: Quality): string => {
-    switch (quality) {
-      case Quality.HIGH: return 'HD';
-      case Quality.MEDIUM: return 'SD';
-      case Quality.LOW: return 'LD';
-      case Quality.AUTO: return 'Auto';
-      default: return '';
-    }
-  };
-
-  // Mémorisation des mappings
-  const categoryColors = useMemo(() => ({
-    'News': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-    'Sports': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-    'Entertainment': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-    'Movies': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    'Music': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
-    'Documentary': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-    'Kids': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-    'General': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300',
-    'Undefined': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-  }), []);
+  // Helper pour obtenir la couleur de catégorie
+  const getCategoryColor = useCallback((category: string): string => {
+    return CATEGORY_COLORS[category as CategoryColorKey] || CATEGORY_COLORS.General;
+  }, []);
 
   const countryFlags = useMemo(() => ({
     'France': '🇫🇷',
@@ -77,7 +73,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
     onToggleFavorite(channel);
   }, [onToggleFavorite, channel]);
 
-  // Gestion du focus TV étendue
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement === cardRef.current) {
@@ -90,7 +85,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         }
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           e.preventDefault();
-          // Logique de navigation entre cartes (à gérer dans le composant parent)
         }
       }
     };
@@ -161,7 +155,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </div>
           )}
 
-          {/* Overlay interactif */}
           <div className={cn(
             "absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity duration-300 z-20",
             (isHovered || isFocused) ? "opacity-100" : "opacity-0"
@@ -179,14 +172,12 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </Button>
           </div>
 
-          {/* Badge LIVE */}
           <div className="absolute top-2 left-2 z-10">
             <Badge variant="destructive" className="text-xs">
               🔴 {t('liveBadge')}
             </Badge>
           </div>
 
-          {/* Indicateur de fiabilité */}
           {showReliabilityIndicator && (
             <div className="absolute top-2 right-12 z-10">
               <ChannelReliabilityIndicator
@@ -198,7 +189,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </div>
           )}
 
-          {/* Bouton favori */}
           <div className="absolute top-2 right-2 z-10">
             <Button
               variant="ghost"
@@ -220,7 +210,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </Button>
           </div>
 
-          {/* SOLUTION ULTIME - Badge de qualité */}
           {channel.quality && channel.quality !== Quality.AUTO && (
             <Badge className="absolute bottom-2 left-2 bg-background/80 text-foreground z-10">
               {channel.quality === Quality.HIGH ? 'HD' : 
@@ -230,7 +219,6 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
           )}
         </div>
 
-        {/* Informations de la chaîne */}
         <div className="p-4">
           <div className="flex items-start justify-between mb-2">
             <h3 className="font-semibold text-lg leading-tight line-clamp-2 group-hover:text-primary transition-colors">
@@ -281,7 +269,11 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             {showCategory && channel.group && (
               <Badge 
                 variant="secondary" 
-                className={cn("text-xs", categoryColors[channel.group] || categoryColors['General'])}
+                className={cn(
+                  "text-xs",
+                  // Solution avec fonction helper
+                  getCategoryColor(channel.group)
+                )}
               >
                 {t(`categories.${channel.group}`, { defaultValue: channel.group })}
               </Badge>
