@@ -87,7 +87,8 @@ export interface Channel {
   playlistSource: string;
   language?: string;
   country?: string;
-  category?: string; // ← celui-là manque ailleurs
+  category?: string;
+  quality?: Quality; // Utilisation de l'enum existant
 }
 
 export interface Playlist {
