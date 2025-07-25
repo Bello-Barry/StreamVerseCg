@@ -1,179 +1,348 @@
-'use client';
-
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { parseM3UContent, parseXtreamContent } from '@/lib/parsers';
-import { Playlist, PlaylistStatus, Channel, Category } from '@/types';
-import { nanoid } from 'nanoid';
-
-type PlaylistManagerState = {
-  playlists: Playlist[];
-  channels: Channel[];
-  categories: Category[];
-  loading: boolean;
-  error: string | null;
-
-  addPlaylist: (playlist: Playlist) => void;
-  updatePlaylist: (id: string, updates: Partial<Playlist>) => void;
-  removePlaylist: (id: string) => void;
-  refreshPlaylists: () => Promise<void>;
-  searchChannels: (term: string) => Channel[];
-  resetStore: () => void;
-};
-
-const defaultPlaylists: Playlist[] = [
-  {
-    id: 'schumijo-fr',
-    name: '🇫🇷 Schumijo FR',
-    url: 'https://raw.githubusercontent.com/schumijo/iptv-fr/main/fr.m3u',
-    type: 'url',
-    status: 'active',
-    lastUpdate: new Date(),
-    isDefault: true
-  },
-  {
-    id: 'iptv-org-france',
-    name: '🇫🇷 IPTV-org France',
-    url: 'https://iptv-org.github.io/iptv/countries/fr.m3u',
-    type: 'url',
-    status: 'active',
-    lastUpdate: new Date(),
-    isDefault: true
-  }
-];
-
-const initialState: Omit<PlaylistManagerState, keyof ReturnType<typeof create>> = {
-  playlists: defaultPlaylists,
-  channels: [],
-  categories: [],
-  loading: false,
-  error: null
-};
-
-export const usePlaylistStore = create<PlaylistManagerState>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
-
-      addPlaylist: (playlist) =>
-        set((state) => {
-          const exists = state.playlists.find((p) => p.id === playlist.id);
-          if (exists) return state;
-
-          return {
-            playlists: [...state.playlists, { ...playlist, lastUpdate: new Date() }]
-          };
-        }),
-
-      updatePlaylist: (id, updates) =>
-        set((state) => ({
-          playlists: state.playlists.map((playlist) =>
-            playlist.id === id
-              ? {
-                  ...playlist,
-                  ...updates,
-                  lastUpdate: updates.lastUpdate ?? new Date()
-                }
-              : playlist
-          )
-        })),
-
-      removePlaylist: (id) =>
-        set((state) => {
-          const toRemove = state.playlists.find((p) => p.id === id);
-          if (!toRemove || toRemove.isDefault) return state;
-
-          return {
-            playlists: state.playlists.filter((p) => p.id !== id)
-          };
-        }),
-
+ 'use client';  
+  
+import { create } from 'zustand';  
+import { persist, createJSONStorage } from 'zustand/middleware';  
+import {  
+  Playlist,  
+  Channel,  
+  Category,  
+  PlaylistManagerState,  
+  M3UParseResult,  
+  PlaylistStatus  
+} from '@/types';  
+import { parseM3UContent } from '@/lib/m3uParser';  
+import { parseXtreamContent } from '@/lib/xtreamParser';  
+  
+interface PlaylistStore extends PlaylistManagerState {  
+  addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;  
+  updatePlaylist: (id: string, updates: Partial<Playlist>) => void;  
+  removePlaylist: (id: string) => void;  
+  togglePlaylistStatus: (id: string) => void;  
+  refreshPlaylists: () => Promise<void>;  
+  refreshPlaylist: (id: string) => Promise<void>;  
+  getChannelsByCategory: (category: string) => Channel[];  
+  searchChannels: (query: string) => Channel[];  
+  getCategories: () => Category[];  
+  getCategoryCount: (category: string) => number;  
+  setLoading: (loading: boolean) => void;  
+  setError: (error: string | null) => void;  
+  clearError: () => void;  
+  resetStore: () => void;  
+}  
+  
+const initialState: PlaylistManagerState = {  
+  playlists: [],  
+  channels: [],  
+  categories: [],  
+  loading: false,  
+  error: null  
+};  
+  
+const defaultPlaylists: Playlist[] = [  
+  {  
+    id: 'schumijo-fr',  
+    name: 'Chaînes Françaises (Schumijo)',  
+    url: 'https://raw.githubusercontent.com/schumijo/iptv/main/fr.m3u8',  
+    type: 'url',  
+    status: PlaylistStatus.ACTIVE,  
+    description: 'Playlist française de Schumijo avec chaînes françaises',  
+    isRemovable: false  
+  },  
+  {  
+    id: 'iptv-org-france',  
+    name: 'IPTV-Org (France)',  
+    url: 'https://iptv-org.github.io/iptv/languages/fra.m3u',  
+    type: 'url',  
+    status: PlaylistStatus.ACTIVE,  
+    description: 'Chaînes françaises de IPTV-Org',  
+    isRemovable: false  
+  }  
+];  
+  
+export const usePlaylistStore = create<PlaylistStore>()(  
+  persist(  
+    (set, get) => ({  
+      ...initialState,  
+  
+      addPlaylist: async (playlistData) => {  
+        const newPlaylist: Playlist = {  
+          ...playlistData,  
+          id: `playlist-${Date.now()}`,  
+          lastUpdate: new Date(),  
+          status: PlaylistStatus.ACTIVE,  
+          isRemovable: true  
+        };  
+  
+        set((state) => ({  
+          playlists: [...state.playlists, newPlaylist]  
+        }));  
+  
+        await get().refreshPlaylist(newPlaylist.id);  
+      },  
+  
+      updatePlaylist: (id, updates) =>  
+        set((state) => ({  
+          playlists: state.playlists.map((playlist) =>  
+            playlist.id === id  
+              ? { ...playlist, ...updates, lastUpdate: new Date() }  
+              : playlist  
+          )  
+        })),  
+  
+      removePlaylist: (id) => {  
+        const { playlists } = get();  
+        const playlist = playlists.find((p) => p.id === id);  
+        if (playlist && playlist.isRemovable === false) {  
+          console.warn(`Impossible de supprimer la playlist "${playlist.name}" car elle est protégée.`);  
+          return;  
+        }  
+  
+        set((state) => ({  
+          playlists: state.playlists.filter((playlist) => playlist.id !== id),  
+          channels: state.channels.filter((channel) => channel.playlistSource !== id)  
+        }));  
+      },  
+  
+      togglePlaylistStatus: (id) =>  
+        set((state) => ({  
+          playlists: state.playlists.map((playlist) =>  
+            playlist.id === id  
+              ? {  
+                  ...playlist,  
+                  status:  
+                    playlist.status === PlaylistStatus.ACTIVE  
+                      ? PlaylistStatus.INACTIVE  
+                      : PlaylistStatus.ACTIVE,  
+                  lastUpdate: new Date()  
+                }  
+              : playlist  
+          )  
+        })),  
+  
       refreshPlaylists: async () => {
-        const { playlists } = get();
-        set({ loading: true, error: null });
+  const { playlists } = get();
+  set({ loading: true, error: null });
 
-        let allChannels: Channel[] = [];
-        let allCategories: Category[] = [];
+  try {
+    const activePlaylists = playlists.filter(
+      (p) => p.status === PlaylistStatus.ACTIVE
+    );
+    const allChannels: Channel[] = [];
 
-        try {
-          for (const playlist of playlists) {
-            try {
-              let channels: Channel[] = [];
+    for (const playlist of activePlaylists) {
+      try {
+        let parseResult: M3UParseResult;
 
-              if (playlist.type === 'xtream') {
-                channels = await parseXtreamContent(playlist);
-              } else if (playlist.type === 'url' || playlist.type === 'content') {
-                channels = await parseM3UContent(playlist);
-              }
+        if (
+          playlist.type === 'xtream' &&
+          playlist.xtreamConfig?.server &&
+          playlist.xtreamConfig?.username &&
+          playlist.xtreamConfig?.password
+        ) {
+          parseResult = await parseXtreamContent(
+            playlist.xtreamConfig,
+            playlist.id
+          );
+        } else if (playlist.type === 'url' && playlist.url) {
+          // Début de la modification
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-              allChannels = [...allChannels, ...channels];
-            } catch (err: any) {
-              console.error(`Erreur de parsing de la playlist ${playlist.name}`, err);
-              set((state) => ({
-                playlists: state.playlists.map((p) =>
-                  p.id === playlist.id
-                    ? { ...p, status: 'error', error: err.message || 'Erreur inconnue' }
-                    : p
-                )
-              }));
+          try {
+            const response = await fetch(playlist.url, { 
+              signal: controller.signal 
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
+            const content = await response.text();
+            parseResult = parseM3UContent(content, playlist.id);
+          } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
           }
+          // Fin de la modification
+        } else if (playlist.content) {
+          parseResult = parseM3UContent(playlist.content, playlist.id);
+        } else {
+          continue;
+        }
 
-          const categoryMap = new Map<string, Category>();
-          for (const channel of allChannels) {
-            if (channel.groupTitle) {
-              categoryMap.set(channel.groupTitle, {
-                id: nanoid(),
-                name: channel.groupTitle
-              });
-            }
-          }
+        if (parseResult.channels.length > 0) {
+          allChannels.push(...parseResult.channels);
 
-          set({
-            channels: allChannels,
-            categories: Array.from(categoryMap.values()),
-            loading: false
+          get().updatePlaylist(playlist.id, {
+            channelCount: parseResult.channels.length,
+            status: PlaylistStatus.ACTIVE
           });
-        } catch (err: any) {
-          set({ error: err.message || 'Erreur inconnue', loading: false });
         }
-      },
-
-      searchChannels: (term) => {
-        const normalized = (str: string) =>
-          str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-        return get().channels.filter((channel) => {
-          const name = normalized(channel.name);
-          const query = normalized(term);
-          return name.includes(query);
+      } catch (error) {
+        console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
+        get().updatePlaylist(playlist.id, {
+          status: PlaylistStatus.ERROR
         });
-      },
-
-      resetStore: () =>
-        set({
-          ...initialState,
-          playlists: defaultPlaylists
-        })
-    }),
-    {
-      name: 'playlist-store',
-      version: 1,
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          const hasDefaults =
-            state.playlists?.some((p) => p.id === 'schumijo-fr' || p.id === 'iptv-org-france');
-
-          if (!hasDefaults || !Array.isArray(state.playlists) || state.playlists.length === 0) {
-            state.playlists = defaultPlaylists;
-          }
-
-          // Petit délai pour charger les chaînes après réhydratation
-          setTimeout(() => {
-            state.refreshPlaylists?.();
-          }, 100);
-        }
       }
     }
-  )
+
+    set({
+      channels: allChannels,
+      categories: get().getCategories(),
+      loading: false
+    });
+  } catch (error) {
+    set({
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+      loading: false
+    });
+  }
+},
+  
+      refreshPlaylist: async (id) => {
+  const { playlists } = get();
+  const playlist = playlists.find((p) => p.id === id);
+
+  if (!playlist || playlist.status !== PlaylistStatus.ACTIVE) return;
+
+  set({ loading: true });
+
+  try {
+    let parseResult: M3UParseResult;
+
+    if (
+      playlist.type === 'xtream' &&
+      playlist.xtreamConfig?.server &&
+      playlist.xtreamConfig?.username &&
+      playlist.xtreamConfig?.password
+    ) {
+      parseResult = await parseXtreamContent(
+        playlist.xtreamConfig,
+        playlist.id
+      );
+    } else if (playlist.type === 'url' && playlist.url) {
+      // Début de la modification - Ajout de l'AbortController
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const response = await fetch(playlist.url, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const content = await response.text();
+        parseResult = parseM3UContent(content, playlist.id);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+      // Fin de la modification
+    } else if (playlist.content) {
+      parseResult = parseM3UContent(playlist.content, playlist.id);
+    } else {
+      throw new Error('Configuration de playlist invalide');
+    }
+
+    if (parseResult.channels.length > 0) {
+      set((state) => ({
+        channels: [
+          ...state.channels.filter(
+            (c) => c.playlistSource !== playlist.id
+          ),
+          ...parseResult.channels
+        ],
+        loading: false
+      }));
+
+      get().updatePlaylist(id, {
+        channelCount: parseResult.channels.length,
+        status: PlaylistStatus.ACTIVE
+      });
+    } else {
+      throw new Error('Aucune chaîne trouvée dans la playlist');
+    }
+  } catch (error) {
+    console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
+    get().updatePlaylist(id, { status: PlaylistStatus.ERROR });
+    set({ loading: false });
+  }
+},
+  
+      getChannelsByCategory: (category) => {  
+        const { channels } = get();  
+        return channels.filter(  
+          (channel) => (channel.group || 'Undefined') === category  
+        );  
+      },  
+  
+      searchChannels: (query) => {
+  const { channels } = get();
+  if (!query.trim()) return channels;
+  
+  const terms = query.toLowerCase().split(' ');
+  return channels.filter(channel => 
+    terms.every(term => 
+      channel.name.toLowerCase().includes(term) ||
+      (channel.group || '').toLowerCase().includes(term)
+  );
+},
+  
+      getCategories: () => {  
+        const { channels } = get();  
+        const categoryMap = new Map<string, Channel[]>();  
+  
+        channels.forEach((channel) => {  
+          const category = channel.group || 'Undefined';  
+          if (!categoryMap.has(category)) categoryMap.set(category, []);  
+          categoryMap.get(category)!.push(channel);  
+        });  
+  
+        return Array.from(categoryMap.entries())  
+          .map(([name, channels]) => ({  
+            name,  
+            channels,  
+            count: channels.length  
+          }))  
+          .sort((a, b) => b.count - a.count);  
+      },  
+  
+      getCategoryCount: (category) => {  
+        const { channels } = get();  
+        return channels.filter(  
+          (channel) => (channel.group || 'Undefined') === category  
+        ).length;  
+      },  
+  
+      setLoading: (loading) => set({ loading }),  
+      setError: (error) => set({ error }),  
+      clearError: () => set({ error: null }),  
+  
+      resetStore: () =>  
+        set({  
+          ...initialState,  
+          playlists: defaultPlaylists  
+        })  
+    }),  
+    {  
+      name: 'streamverse-playlist-store',  
+      storage: createJSONStorage(() => localStorage),  
+      partialize: (state) => ({  
+        playlists: state.playlists  
+      }),  
+     onRehydrateStorage: () => (state) => {
+  let timeoutId: NodeJS.Timeout;
+  if (state && state.playlists.length === 0) {
+    state.playlists = defaultPlaylists;
+  }
+  if (state) {
+    timeoutId = setTimeout(() => state.refreshPlaylists(), 100);
+  }
+  return () => clearTimeout(timeoutId);
+}
+    }  
+  )  
 );
