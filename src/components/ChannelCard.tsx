@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChannelCardProps } from '@/types';
+import { ChannelCardProps, Quality } from '@/types'; // Import ajouté
 import { cn } from '@/lib/utils';
 import { ChannelReliabilityIndicator } from '@/components/ChannelReliabilityIndicator';
 import { useTranslations } from 'next-intl';
@@ -49,6 +49,14 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
     'Italy': '🇮🇹',
     'Canada': '🇨🇦',
     'Australia': '🇦🇺'
+  }), []);
+
+  // Map pour afficher la qualité de manière lisible
+  const qualityMap = useMemo(() => ({
+    [Quality.HIGH]: 'HD',
+    [Quality.MEDIUM]: 'SD',
+    [Quality.LOW]: 'LD',
+    [Quality.AUTO]: 'Auto'
   }), []);
 
   const handlePlay = useCallback((e?: React.MouseEvent | React.KeyboardEvent) => {
@@ -209,11 +217,13 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </Button>
           </div>
 
-          {/* Badge de qualité */}
-          {channel.quality && (
-            <Badge className="absolute bottom-2 left-2 bg-background/80 text-foreground z-10">
-              {channel.quality}p
-            </Badge>
+          {/* Badge de qualité - CORRECTION APPLIQUÉE */}
+          {channel.quality && ( // Solution temporaire - voir explication
+{channel.quality && channel.quality !== Quality.AUTO && (
+  <Badge className="absolute bottom-2 left-2 bg-background/80 text-foreground z-10">
+    {qualityMap[channel.quality]}
+  </Badge>
+)}
           )}
         </div>
 
