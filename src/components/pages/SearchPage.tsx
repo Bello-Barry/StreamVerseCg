@@ -1,9 +1,13 @@
-// src/components/pages/SearchPage.tsx
-
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Search, Filter, X, Tv } from 'lucide-react';
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
+import { Search, Filter, X, Tv, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -20,105 +24,104 @@ import { usePlaylistStore } from '@/stores/usePlaylistStore';
 import { useFavoritesStore } from '@/stores/useFavoritesStore';
 import { useWatchHistoryStore } from '@/stores/useWatchHistoryStore';
 import { useAppStore } from '@/stores/useAppStore';
-import { SearchFilters, Channel } from '@/types'; // Correction: Importer le type Channel
+import { SearchFilters, Channel } from '@/types';
 
-// Amélioration: Hook pour "débouncer" une valeur (limite la fréquence des mises à jour)
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
-    return () => {
-      clearTimeout(handler);
-    };
+    return () => clearTimeout(handler);
   }, [value, delay]);
   return debouncedValue;
 }
 
 const SearchPage: React.FC = () => {
-  // Correction: `categories` n'est pas utilisé, on le retire.
   const { channels } = usePlaylistStore();
   const { toggleFavorite, isFavorite } = useFavoritesStore();
   const { addToHistory } = useWatchHistoryStore();
-  const { searchQuery, setCurrentChannel, setSearchQuery: setGlobalSearchQuery } = useAppStore();
+  const {
+    searchQuery,
+    setCurrentChannel,
+    setSearchQuery: setGlobalSearchQuery,
+  } = useAppStore();
 
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Amélioration: Appliquer un délai à la recherche pour de meilleures performances
   const debouncedSearchQuery = useDebounce(localSearchQuery, 300);
 
-  // Synchroniser la recherche globale vers la recherche locale si elle change
   useEffect(() => {
     setLocalSearchQuery(searchQuery);
   }, [searchQuery]);
 
-  // Options de filtres (catégories, langues, pays)
   const filterOptions = useMemo(() => {
-    const categoriesSet = new Set<string>();
-    const languagesSet = new Set<string>();
-    const countriesSet = new Set<string>();
+    const categories = new Set<string>();
+    const languages = new Set<string>();
+    const countries = new Set<string>();
 
-    for (const channel of channels) {
-      if (channel.group) categoriesSet.add(channel.group);
-      if (channel.language) languagesSet.add(channel.language);
-      if (channel.country) countriesSet.add(channel.country);
+    for (const c of channels) {
+      if (c.group) categories.add(c.group);
+      if (c.language) languages.add(c.language);
+      if (c.country) countries.add(c.country);
     }
 
     return {
-      categories: Array.from(categoriesSet).sort(),
-      languages: Array.from(languagesSet).sort(),
-      countries: Array.from(countriesSet).sort(),
+      categories: Array.from(categories).sort(),
+      languages: Array.from(languages).sort(),
+      countries: Array.from(countries).sort(),
     };
   }, [channels]);
 
-  // Résultats de recherche filtrés et mémorisés
+  const channelsPreprocessed = useMemo(() => {
+    return channels.map((c) => ({
+      ...c,
+      nameLower: c.name.toLowerCase(),
+      groupLower: c.group?.toLowerCase() || '',
+    }));
+  }, [channels]);
+
   const searchResults = useMemo(() => {
-    const query = debouncedSearchQuery.toLowerCase().trim();
+    const q = debouncedSearchQuery.toLowerCase().trim();
+    if (!q && !Object.values(filters).some(Boolean)) return [];
 
-    // Si aucun filtre ni recherche, on ne retourne rien pour ne pas surcharger l'UI
-    if (!query && !Object.values(filters).some(Boolean)) {
-      return [];
-    }
-
-    return channels.filter((channel) => {
-      // Filtrage par texte
-      if (query) {
-        const nameMatch = channel.name.toLowerCase().includes(query);
-        const groupMatch = (channel.group || '').toLowerCase().includes(query);
-        if (!nameMatch && !groupMatch) {
-          return false;
-        }
-      }
-
-      // Filtrage par catégorie, langue, pays
-      if (filters.category && channel.group !== filters.category) return false;
-      if (filters.language && channel.language !== filters.language) return false;
-      if (filters.country && channel.country !== filters.country) return false;
-
+    return channelsPreprocessed.filter((c) => {
+      if (q && !c.nameLower.includes(q) && !c.groupLower.includes(q))
+        return false;
+      if (filters.category && c.group !== filters.category) return false;
+      if (filters.language && c.language !== filters.language) return false;
+      if (filters.country && c.country !== filters.country) return false;
       return true;
     });
-  }, [channels, debouncedSearchQuery, filters]);
+  }, [channelsPreprocessed, debouncedSearchQuery, filters]);
 
-  // Correction: Typage des paramètres `channel`
-  const handlePlayChannel = useCallback((channel: Channel) => {
-    setCurrentChannel(channel);
-    addToHistory(channel, 0);
-  }, [setCurrentChannel, addToHistory]);
+  const handlePlayChannel = useCallback(
+    (channel: Channel) => {
+      setCurrentChannel(channel);
+      addToHistory(channel, 0);
+    },
+    [setCurrentChannel, addToHistory]
+  );
 
-  const handleToggleFavorite = useCallback((channel: Channel) => {
-    toggleFavorite(channel.id);
-  }, [toggleFavorite]);
+  const handleToggleFavorite = useCallback(
+    (channel: Channel) => {
+      toggleFavorite(channel.id);
+    },
+    [toggleFavorite]
+  );
 
   const handleClearFilters = useCallback(() => {
     setFilters({});
     setLocalSearchQuery('');
-    setGlobalSearchQuery(''); // Effacer aussi la recherche globale
+    setGlobalSearchQuery('');
+    inputRef.current?.focus();
   }, [setGlobalSearchQuery]);
 
-  const hasActiveFilters = Object.values(filters).some(Boolean) || debouncedSearchQuery.trim();
+  const hasActiveFilters =
+    Object.values(filters).some(Boolean) || debouncedSearchQuery.trim();
 
   return (
     <div className="space-y-6">
@@ -128,7 +131,8 @@ const SearchPage: React.FC = () => {
           <span>Recherche de Chaînes</span>
         </h1>
         <p className="text-muted-foreground">
-          Trouvez vos chaînes préférées parmi {channels.length.toLocaleString()} chaînes disponibles.
+          Trouvez vos chaînes préférées parmi{' '}
+          {channels.length.toLocaleString()} chaînes disponibles.
         </p>
       </div>
 
@@ -136,18 +140,23 @@ const SearchPage: React.FC = () => {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={inputRef}
             type="text"
             placeholder="Nom de chaîne, catégorie..."
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
-            className="h-12 pl-10 pr-12 text-lg"
+            className="h-12 pl-10 pr-12 text-lg focus-visible:ring-2"
             aria-label="Rechercher des chaînes"
+            tabIndex={0}
           />
           {localSearchQuery && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLocalSearchQuery('')}
+              onClick={() => {
+                setLocalSearchQuery('');
+                inputRef.current?.focus();
+              }}
               className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
               aria-label="Effacer la recherche"
             >
@@ -159,7 +168,12 @@ const SearchPage: React.FC = () => {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters((v) => !v)}
+            tabIndex={0}
+            aria-label="Afficher/Masquer les filtres"
+          >
             <Filter className="mr-2 h-4 w-4" />
             Filtres
             {Object.values(filters).filter(Boolean).length > 0 && (
@@ -169,36 +183,62 @@ const SearchPage: React.FC = () => {
             )}
           </Button>
           {hasActiveFilters && (
-            <Button variant="ghost" onClick={handleClearFilters}>
+            <Button
+              variant="ghost"
+              onClick={handleClearFilters}
+              aria-label="Effacer la recherche et les filtres"
+            >
               <X className="mr-2 h-4 w-4" />
               Effacer
             </Button>
           )}
         </div>
         <div className="text-sm text-muted-foreground">
-          {searchResults.length.toLocaleString()} résultat{searchResults.length !== 1 ? 's' : ''}
+          {searchResults.length.toLocaleString()} résultat
+          {searchResults.length !== 1 ? 's' : ''}
         </div>
       </div>
 
       {showFilters && (
-        <Card>
+        <Card className="transition-all animate-in fade-in duration-300">
           <CardContent className="p-6">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               {(['category', 'language', 'country'] as const).map((filterType) => (
                 <div key={filterType}>
-                  <label htmlFor={`filter-${filterType}`} className="mb-2 block text-sm font-medium capitalize">{filterType}</label>
+                  <label
+                    htmlFor={`filter-${filterType}`}
+                    className="mb-2 block text-sm font-medium capitalize"
+                  >
+                    {filterType}
+                  </label>
                   <Select
                     value={filters[filterType] || ''}
-                    onValueChange={(value) => setFilters((prev) => ({ ...prev, [filterType]: value || undefined }))}
+                    onValueChange={(value) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        [filterType]: value || undefined,
+                      }))
+                    }
                   >
                     <SelectTrigger id={`filter-${filterType}`}>
-                      <SelectValue placeholder={`Toutes les ${filterType === 'category' ? 'catégories' : filterType}s`} />
+                      <SelectValue
+                        placeholder={`Toutes les ${
+                          filterType === 'category' ? 'catégories' : filterType + 's'
+                        }`}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">{`Toutes les ${filterType === 'category' ? 'catégories' : filterType}s`}</SelectItem>
-                      {filterOptions[`${filterType}s` as keyof typeof filterOptions].map((option) => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
+                      <SelectItem value="">
+                        Toutes les{' '}
+                        {filterType === 'category' ? 'catégories' : filterType + 's'}
+                      </SelectItem>
+                      {filterOptions[`${filterType}s` as keyof typeof filterOptions].map(
+                        (option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        )
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -211,22 +251,33 @@ const SearchPage: React.FC = () => {
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-2">
           {debouncedSearchQuery && (
-            // Correction: Remplacement des guillemets par des apostrophes
-            <Badge variant="secondary">Recherche: '{debouncedSearchQuery}'</Badge>
+            <Badge variant="secondary">Recherche : '{debouncedSearchQuery}'</Badge>
           )}
-          {Object.entries(filters).map(([key, value]) => value && (
-            <Badge key={key} variant="secondary" className="flex items-center gap-1">
-              <span className="capitalize">{key}: {value}</span>
-              <Button
-                variant="ghost" size="icon"
-                onClick={() => setFilters((p) => ({ ...p, [key]: undefined }))}
-                className="h-4 w-4 p-0 hover:bg-transparent"
-                aria-label={`Retirer le filtre ${key}`}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </Badge>
-          ))}
+          {Object.entries(filters).map(
+            ([key, value]) =>
+              value && (
+                <Badge
+                  key={key}
+                  variant="secondary"
+                  className="flex items-center gap-1"
+                >
+                  <span className="capitalize">
+                    {key} : {value}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      setFilters((prev) => ({ ...prev, [key]: undefined }))
+                    }
+                    className="h-4 w-4 p-0 hover:bg-transparent"
+                    aria-label={`Retirer le filtre ${key} : ${value}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </Badge>
+              )
+          )}
         </div>
       )}
 
@@ -239,6 +290,7 @@ const SearchPage: React.FC = () => {
               onPlay={handlePlayChannel}
               onToggleFavorite={handleToggleFavorite}
               isFavorite={isFavorite(channel.id)}
+              tabIndex={0}
             />
           ))}
         </div>
@@ -251,7 +303,9 @@ const SearchPage: React.FC = () => {
               ? "Essayez de modifier ou d'élargir vos critères de recherche."
               : 'Commencez à taper dans la barre de recherche pour trouver des chaînes.'}
           </p>
-          {hasActiveFilters && <Button onClick={handleClearFilters}>Effacer la recherche et les filtres</Button>}
+          {hasActiveFilters && (
+            <Button onClick={handleClearFilters}>Effacer la recherche et les filtres</Button>
+          )}
         </div>
       )}
     </div>
