@@ -282,8 +282,11 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             <div className="flex items-center space-x-3 text-sm text-muted-foreground">
               {channel.country && (
                 <div className="flex items-center space-x-1">
-                  <span>{countryFlags[channel.country] || '🌍'}</span>
-                  <span>{channel.country}</span>
+                <span>
+  {channel.country in countryFlags
+    ? countryFlags[channel.country as keyof typeof countryFlags]
+    : '🌍'}
+</span>
                 </div>
               )}
               {channel.language && (
