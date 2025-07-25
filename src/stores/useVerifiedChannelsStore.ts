@@ -1,6 +1,3 @@
-
-// 4. Store étendu pour gérer les chaînes vérifiées
-// stores/useVerifiedChannelsStore.ts
 import { create } from 'zustand';
 import { Channel } from '@/types';
 
@@ -9,12 +6,10 @@ interface VerifiedChannelsStore {
   loading: boolean;
   lastUpdated: string;
   
-  // Actions
   setVerifiedChannels: (channels: Channel[]) => void;
   setLoading: (loading: boolean) => void;
   setLastUpdated: (date: string) => void;
   
-  // Helpers
   isVerified: (channelId: string) => boolean;
   getVerifiedChannel: (channelId: string) => Channel | undefined;
   getVerifiedCount: () => number;
@@ -39,27 +34,3 @@ export const useVerifiedChannelsStore = create<VerifiedChannelsStore>((set, get)
   
   getVerifiedCount: () => get().verifiedChannels.length,
 }));
-
-// 5. Composant ChannelCard modifié pour afficher le badge vérifié
-// Modification à apporter dans ton ChannelCard existant
-export function ChannelCardWithVerified({ channel, ...props }: any) {
-  const { isVerified } = useVerifiedChannelsStore();
-  const verified = isVerified(channel.id);
-
-  return (
-    <div className="relative">
-      {/* Badge vérifié en overlay */}
-      {verified && (
-        <div className="absolute top-2 right-2 z-10">
-          <div className="bg-green-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
-            <CheckCircle className="h-3 w-3" />
-            Vérifié
-          </div>
-        </div>
-      )}
-      
-      {/* Ton ChannelCard existant */}
-      <ChannelCard channel={channel} {...props} />
-    </div>
-  );
-}
