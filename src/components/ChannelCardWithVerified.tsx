@@ -1,6 +1,6 @@
 import { CheckCircle } from 'lucide-react';
 import { useVerifiedChannelsStore } from '@/stores/useVerifiedChannelsStore';
-import { ChannelCard } from './ChannelCard'; // Assurez-vous d'importer correctement votre ChannelCard existant
+import ChannelCard from '@/components/ChannelCard' // Assurez-vous d'importer correctement votre ChannelCard existant
 
 export function ChannelCardWithVerified({ channel, ...props }: any) {
   const { isVerified } = useVerifiedChannelsStore();
