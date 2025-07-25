@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChannelCardProps, Quality } from '@/types'; // Import ajouté
+import { ChannelCardProps, Quality } from '@/types';
 import { cn } from '@/lib/utils';
 import { ChannelReliabilityIndicator } from '@/components/ChannelReliabilityIndicator';
 import { useTranslations } from 'next-intl';
@@ -52,11 +52,11 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   }), []);
 
   // Map pour afficher la qualité de manière lisible
-  const qualityMap = useMemo(() => ({
+  const qualityMap: Record<Quality, string> = useMemo(() => ({
+    [Quality.AUTO]: 'Auto',
     [Quality.HIGH]: 'HD',
     [Quality.MEDIUM]: 'SD',
-    [Quality.LOW]: 'LD',
-    [Quality.AUTO]: 'Auto'
+    [Quality.LOW]: 'LD'
   }), []);
 
   const handlePlay = useCallback((e?: React.MouseEvent | React.KeyboardEvent) => {
@@ -217,13 +217,11 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             </Button>
           </div>
 
-          {/* Badge de qualité - CORRECTION APPLIQUÉE */}
-          {channel.quality && ( // Solution temporaire - voir explication
-{channel.quality && channel.quality !== Quality.AUTO && (
-  <Badge className="absolute bottom-2 left-2 bg-background/80 text-foreground z-10">
-    {qualityMap[channel.quality]}
-  </Badge>
-)}
+          {/* Badge de qualité - VERSION CORRIGÉE */}
+          {channel.quality && channel.quality !== Quality.AUTO && (
+            <Badge className="absolute bottom-2 left-2 bg-background/80 text-foreground z-10">
+              {qualityMap[channel.quality]}
+            </Badge>
           )}
         </div>
 
