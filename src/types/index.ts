@@ -89,6 +89,8 @@ export interface Channel {
   country?: string;
   category?: string;
   quality?: Quality; // Utilisation de l'enum existant
+  popularityScore?: number;
+  isNew?: boolean; // Note: nous avons aussi utilisé `isNew` dans le composant, donc ajoutons-le aussi si nécessaire
 }
 
 export interface Playlist {
