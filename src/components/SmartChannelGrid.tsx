@@ -85,27 +85,6 @@ export function SmartChannelGrid({
     }
   }, [viewMode])
 
-  // Navigation TV avec clavier
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!gridRef.current) return
-      
-      // Vérifie si l'élément est focus pour éviter les conflits
-      if (gridRef.current.contains(document.activeElement)) {
-        if (e.key === 'ArrowRight') {
-          e.preventDefault()
-          setCurrentPage(p => Math.min(totalPages, p + 1))
-        } else if (e.key === 'ArrowLeft') {
-          e.preventDefault()
-          setCurrentPage(p => Math.max(1, p - 1))
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [totalPages])
-
   // Catégories uniques
   const categories = useMemo(() => {
     const cats = [...new Set(channels.map(c => c.category || '').filter(Boolean))].sort()
@@ -209,13 +188,35 @@ export function SmartChannelGrid({
     favorites
   ])
 
+  // Calculer le nombre total de pages
+  const totalPages = Math.ceil(filteredAndSortedChannels.length / itemsPerPage)
+
+  // Navigation TV avec clavier
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!gridRef.current) return
+      
+      // Vérifie si l'élément est focus pour éviter les conflits
+      if (gridRef.current.contains(document.activeElement)) {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          setCurrentPage(p => Math.min(totalPages, p + 1))
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          setCurrentPage(p => Math.max(1, p - 1))
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [totalPages])
+
   // Pagination
   const paginatedChannels = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
     return filteredAndSortedChannels.slice(startIndex, startIndex + itemsPerPage)
   }, [filteredAndSortedChannels, currentPage, itemsPerPage])
-
-  const totalPages = Math.ceil(filteredAndSortedChannels.length / itemsPerPage)
 
   // Recommandations intelligentes
   const recommendations = useMemo(() => {
