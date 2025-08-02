@@ -1,0 +1,355 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radius: 0.75rem;
+  /* Thème clair avec couleurs modernes */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 262.1 83.3% 57.8%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 220 14.3% 95.9%;
+  --secondary-foreground: 220.9 39.3% 11%;
+  --muted: 220 14.3% 95.9%;
+  --muted-foreground: 220 8.9% 46.1%;
+  --accent: 220 14.3% 95.9%;
+  --accent-foreground: 220.9 39.3% 11%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 262.1 83.3% 57.8%;
+}
+
+.dark {
+  /* Thème sombre avec couleurs modernes */
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 263.4 70% 50.4%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 215 27.9% 16.9%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 215 27.9% 16.9%;
+  --muted-foreground: 217.9 10.6% 64.9%;
+  --accent: 215 27.9% 16.9%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 215 27.9% 16.9%;
+  --input: 215 27.9% 16.9%;
+  --ring: 263.4 70% 50.4%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Amélioration des scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+  
+  /* Animations personnalisées */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+    }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+  
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
+  }
+  
+  /* Effets de glassmorphism */
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    background-color: hsl(var(--card) / 0.8);
+    border: 1px solid hsl(var(--border) / 0.3);
+  }
+  
+  /* Gradients modernes */
+  .gradient-primary {
+    background: linear-gradient(135deg, 
+      hsl(var(--primary)), 
+      hsl(var(--primary) / 0.8)
+    );
+  }
+  
+  .gradient-card {
+    background: linear-gradient(135deg, 
+      hsl(var(--card)), 
+      hsl(var(--muted) / 0.5)
+    );
+  }
+  
+  /* Ombres modernes */
+  .shadow-modern {
+    box-shadow: 
+      0 1px 3px hsl(var(--foreground) / 0.1),
+      0 1px 2px hsl(var(--foreground) / 0.06);
+  }
+  
+  .shadow-modern-lg {
+    box-shadow: 
+      0 10px 15px -3px hsl(var(--foreground) / 0.1),
+      0 4px 6px -2px hsl(var(--foreground) / 0.05);
+  }
+  
+  /* Transitions fluides */
+  .transition-modern {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Hover effects */
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 20px 25px -5px hsl(var(--foreground) / 0.1),
+      0 10px 10px -5px hsl(var(--foreground) / 0.04);
+  }
+  
+  .hover-glow:hover {
+    box-shadow: 
+      0 0 20px hsl(var(--primary) / 0.3),
+      0 0 40px hsl(var(--primary) / 0.1);
+  }
+}
+
+/* Styles spécifiques pour l'application IPTV */
+@layer components {
+  .channel-card {
+    @apply bg-card border border-border rounded-lg p-4 transition-modern;
+    @apply hover:border-primary/50 hover:shadow-modern-lg;
+  }
+  
+  .channel-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .playlist-card {
+    @apply glass rounded-xl p-6 transition-modern;
+    @apply hover:shadow-modern-lg;
+  }
+  
+  .playlist-card:hover {
+    transform: translateY(-2px);
+  }
+  
+  .nav-item {
+    @apply px-4 py-2 rounded-lg transition-modern;
+    @apply hover:bg-accent hover:text-accent-foreground;
+  }
+  
+  .nav-item.active {
+    @apply bg-primary text-primary-foreground shadow-modern;
+  }
+  
+  .search-input {
+    @apply bg-background/50 backdrop-blur-sm border-border/50;
+    @apply focus:border-primary focus:ring-2 focus:ring-primary/20;
+  }
+  
+  .status-badge {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-active {
+    @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400;
+  }
+  
+  .status-inactive {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400;
+  }
+  
+  .status-error {
+    @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400;
+  }
+}
+
+/* Responsive Design */
+@layer utilities {
+  /* Mobile First Approach */
+  .container {
+    @apply w-full mx-auto px-4;
+  }
+  
+  @media (min-width: 640px) {
+    .container {
+      @apply max-w-screen-sm px-6;
+    }
+  }
+  
+  @media (min-width: 768px) {
+    .container {
+      @apply max-w-screen-md px-8;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .container {
+      @apply max-w-screen-lg px-8;
+    }
+  }
+  
+  @media (min-width: 1280px) {
+    .container {
+      @apply max-w-screen-xl px-8;
+    }
+  }
+  
+  /* Responsive Grid */
+  .responsive-grid {
+    @apply grid gap-4;
+    @apply grid-cols-1;
+    @apply sm:grid-cols-2;
+    @apply md:grid-cols-2;
+    @apply lg:grid-cols-3;
+    @apply xl:grid-cols-4;
+    @apply 2xl:grid-cols-5;
+  }
+  
+  /* Responsive Text */
+  .responsive-title {
+    @apply text-2xl sm:text-3xl lg:text-4xl font-bold;
+  }
+  
+  .responsive-subtitle {
+    @apply text-lg sm:text-xl lg:text-2xl font-semibold;
+  }
+  
+  .responsive-body {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+  
+  /* Touch Targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Safe Areas pour les appareils mobiles */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Orientation spécifique */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .landscape-compact {
+      @apply py-2;
+    }
+    
+    .landscape-compact .nav-item {
+      @apply px-2 py-1 text-sm;
+    }
+  }
+  
+  /* High DPI / Retina */
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .retina-border {
+      border-width: 0.5px;
+    }
+  }
+  
+  /* Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-slide-in,
+    .animate-pulse-glow {
+      animation: none;
+    }
+    
+    .transition-modern {
+      transition: none;
+    }
+  }
+  
+  /* Dark Mode Utilities */
+  .dark-mode-toggle {
+    @apply transition-colors duration-300;
+  }
+  
+  /* Focus Visible pour l'accessibilité */
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+  
+  /* Scrollbar personnalisée pour mobile */
+  @media (max-width: 768px) {
+    .custom-scrollbar {
+      scrollbar-width: thin;
+      scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    }
+  }
+}
