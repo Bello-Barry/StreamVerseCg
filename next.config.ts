@@ -1,14 +1,13 @@
 import type { NextConfig } from 'next';
-import withPWA from '@next-pwa/next-pwa';
+import withPWA from '@next/pwa';
 
 /**
- * @type {import('@next-pwa/next-pwa').PWAOptions}
+ * @type {import('@next/pwa').PWAConfig}
  */
 const pwaConfig = {
   dest: 'public',
   // Activez 'disable' en mode développement pour éviter la génération du service worker
   // Cela rend le debug plus facile, le service worker peut être un peu capricieux
-  // @ts-ignore
   disable: process.env.NODE_ENV === 'development',
   register: true,
   scope: '/',
