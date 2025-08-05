@@ -1,18 +1,32 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    /*
+     * Options de base de TypeScript.
+     * Celles-ci sont essentielles pour la plupart des projets Next.js.
+     */
+    "target": "ES2022", // Cible une version de langage plus récente pour tirer parti des dernières fonctionnalités.
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
+    "strict": true, // Active toutes les options de vérification de type strictes pour un code plus robuste.
+    "forceConsistentCasingInFileNames": true, // Assure une cohérence dans la casse des noms de fichiers.
+
+    /*
+     * Options de gestion des modules.
+     * Recommandées pour Next.js 15 avec l'App Router.
+     */
+    "noEmit": true, // TypeScript ne génère pas de fichiers de sortie, Next.js s'en charge.
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "preserve", // Permet à Next.js de gérer la compilation JSX.
     "incremental": true,
+
+    /*
+     * Configuration spécifique à Next.js.
+     */
     "plugins": [
       {
         "name": "next"
@@ -22,9 +36,14 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-  ,
-  "exclude": ["cypress"]
-
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules", // Exclut les dépendances.
+    "cypress" // Exclut le dossier de tests E2E.
+  ]
 }
