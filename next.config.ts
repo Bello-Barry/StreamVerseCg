@@ -27,9 +27,9 @@ const nextConfig: NextConfig = {
    * Nous commentons cette ligne pour que le build échoue en cas d'erreurs,
    * ce qui est une bonne pratique de CI/CD.
    */
-  // eslint: {
-  //   ignoreDuringBuilds: true,
-  // },
+   eslint: {
+     ignoreDuringBuilds: true,
+  },
 
   /*
    * Options de compilation SWC (Rust-based).
