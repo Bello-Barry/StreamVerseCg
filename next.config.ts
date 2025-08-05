@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next';
-import withPWA from '@next/pwa';
+import withPWA from 'next-pwa';
 
 /**
- * @type {import('@next/pwa').PWAConfig}
+ * @type {import('next-pwa').PWAConfig}
  */
 const pwaConfig = {
   dest: 'public',
@@ -75,14 +75,6 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          // Ajout de Content-Security-Policy (CSP) pour HLS.js et autres
-          // C'est un exemple de base, il peut nécessiter des ajustements
-          // en fonction de vos besoins précis.
-          // 'self' permet de charger les ressources depuis le même domaine.
-          // 'unsafe-inline' pour les styles et scripts en ligne, mais doit être évité si possible.
-          // 'blob:' pour les objets HLS.
-          // 'data:' pour les images encodées en base64.
-          // 'http://*', 'https://*' pour les sources de streaming externes.
           {
             key: 'Content-Security-Policy',
             value: `default-src 'self' 'unsafe-inline'; \
