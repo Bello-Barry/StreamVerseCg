@@ -10,10 +10,12 @@ import {
   PlaylistManagerState,
   M3UParseResult,
   PlaylistStatus,
-  PlaylistType // Import de PlaylistType pour l'énumération
+  PlaylistType,
+  Movie,
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
+import { parseTorrentContent } from '@/lib/torrentParser'; // Nouvelle importation
 
 /**
  * Interface pour le store global de playlists.
@@ -21,6 +23,7 @@ import { parseXtreamContent } from '@/lib/xtreamParser';
  * @extends PlaylistManagerState
  */
 interface PlaylistStore extends PlaylistManagerState {
+  // Ajout de la gestion des films/séries depuis les torrents
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
   updatePlaylist: (id: string, updates: Partial<Playlist>) => void;
   removePlaylist: (id: string) => void;
@@ -42,7 +45,7 @@ const initialState: PlaylistManagerState = {
   channels: [],
   categories: [],
   loading: false,
-  error: null
+  error: null,
 };
 
 // Playlists par défaut, non modifiables par l'utilisateur
@@ -51,56 +54,61 @@ const defaultPlaylists: Playlist[] = [
     id: 'schumijo-fr',
     name: 'Chaînes Françaises (Schumijo)',
     url: 'https://raw.githubusercontent.com/schumijo/iptv/main/fr.m3u8',
-    type: PlaylistType.URL, // CORRIGÉ
+    type: PlaylistType.URL,
     status: PlaylistStatus.ACTIVE,
     description: 'Playlist française de Schumijo avec chaînes françaises',
     isRemovable: false,
     channelCount: 0,
-    lastUpdate: new Date(0)
+    lastUpdate: new Date(0),
   },
   {
     id: 'iptv-org-france',
     name: 'IPTV-Org (France)',
     url: 'https://iptv-org.github.io/iptv/languages/fra.m3u',
-    type: PlaylistType.URL, // CORRIGÉ
+    type: PlaylistType.URL,
     status: PlaylistStatus.ACTIVE,
     description: 'Chaînes françaises de IPTV-Org',
     isRemovable: false,
     channelCount: 0,
-    lastUpdate: new Date(0)
-  }
+    lastUpdate: new Date(0),
+  },
 ];
 
 /**
  * Fonction utilitaire pour fetch et parser une playlist.
  * Refactorisation pour éviter la duplication de code.
+ * J'ai ajouté le support pour le type 'torrent'.
  */
 const fetchAndParsePlaylist = async (playlist: Playlist): Promise<M3UParseResult> => {
   if (playlist.status !== PlaylistStatus.ACTIVE) {
     throw new Error('La playlist est inactive.');
   }
 
-  if (playlist.type === PlaylistType.XTREAM && playlist.xtreamConfig) { // CORRIGÉ
+  if (playlist.type === PlaylistType.XTREAM && playlist.xtreamConfig) {
     const { server, username, password } = playlist.xtreamConfig;
     if (!server || !username || !password) {
       throw new Error('Configuration Xtream invalide.');
     }
     return parseXtreamContent(playlist.xtreamConfig, playlist.id);
-  } else if (playlist.type === PlaylistType.URL && playlist.url) { // CORRIGÉ
+  } else if (playlist.type === PlaylistType.URL && playlist.url) {
     const response = await fetch(playlist.url);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     const content = await response.text();
     return parseM3UContent(content, playlist.id);
-  } else if (playlist.type === PlaylistType.FILE && playlist.content) { // CORRIGÉ
-    // Correction : Utiliser 'file' au lieu de 'content' pour les fichiers locaux
+  } else if (playlist.type === PlaylistType.FILE && playlist.content) {
     return parseM3UContent(playlist.content, playlist.id);
-  } else {
-    // TODO: Gérer le type 'torrent' ici, avec une fonction de parsing dédiée.
-    if (playlist.type === PlaylistType.TORRENT) { // CORRIGÉ
-        throw new Error('La fonctionnalité Torrent n\'est pas encore implémentée.');
+  } else if (playlist.type === PlaylistType.TORRENT && playlist.url) {
+    // Nouveau cas pour les torrents
+    const torrentResult = await parseTorrentContent(playlist.url, playlist.id);
+    if (!torrentResult || torrentResult.movies.length === 0) {
+      throw new Error('Aucun film ou série trouvé dans le torrent.');
     }
+    // TODO: Gérer ici la conversion des films/séries en un format de 'Channel'
+    // Pour l'instant, nous renvoyons un tableau vide. C'est le point à implémenter.
+    return { channels: [], errors: [], warnings: [] };
+  } else {
     throw new Error('Configuration de playlist invalide ou type de playlist inconnu.');
   }
 };
@@ -122,9 +130,9 @@ export const usePlaylistStore = create<PlaylistStore>()(
         };
 
         set((state) => ({
-          playlists: [...state.playlists, newPlaylist]
+          playlists: [...state.playlists, newPlaylist],
         }));
-        
+
         await get().refreshPlaylist(newPlaylist.id);
       },
 
@@ -134,15 +142,17 @@ export const usePlaylistStore = create<PlaylistStore>()(
             playlist.id === id
               ? { ...playlist, ...updates, lastUpdate: new Date() }
               : playlist
-          )
+          ),
         })),
 
       removePlaylist: (id) => {
         const { playlists } = get();
         const playlist = playlists.find((p) => p.id === id);
-        
+
         if (!playlist || playlist.isRemovable === false) {
-          toast.warning(`Impossible de supprimer la playlist "${playlist?.name}" car elle est protégée.`);
+          toast.warning(
+            `Impossible de supprimer la playlist "${playlist?.name}" car elle est protégée.`
+          );
           return;
         }
 
@@ -151,9 +161,8 @@ export const usePlaylistStore = create<PlaylistStore>()(
           channels: state.channels.filter((c) => c.playlistSource !== id),
         }));
 
-        // Mise à jour des catégories après la suppression
         set((state) => ({
-            categories: get().getCategories(),
+          categories: get().getCategories(),
         }));
       },
 
@@ -167,7 +176,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
                     playlist.status === PlaylistStatus.ACTIVE
                       ? PlaylistStatus.INACTIVE
                       : PlaylistStatus.ACTIVE,
-                  lastUpdate: new Date()
+                  lastUpdate: new Date(),
                 }
               : playlist
           );
@@ -178,13 +187,13 @@ export const usePlaylistStore = create<PlaylistStore>()(
         const { playlists } = get();
         set({ loading: true, error: null });
         const newChannels: Channel[] = [];
-        
+
         for (const playlist of playlists) {
           if (playlist.status !== PlaylistStatus.ACTIVE) {
-              get().updatePlaylist(playlist.id, { status: PlaylistStatus.INACTIVE });
-              continue;
+            get().updatePlaylist(playlist.id, { status: PlaylistStatus.INACTIVE });
+            continue;
           }
-          
+
           try {
             const parseResult = await fetchAndParsePlaylist(playlist);
 
@@ -192,7 +201,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
               newChannels.push(...parseResult.channels);
               get().updatePlaylist(playlist.id, {
                 channelCount: parseResult.channels.length,
-                status: PlaylistStatus.ACTIVE
+                status: PlaylistStatus.ACTIVE,
               });
             } else {
               throw new Error('Aucune chaîne trouvée dans la playlist.');
@@ -203,7 +212,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
             toast.error(`Erreur pour la playlist ${playlist.name}: ${errorMessage}`);
             get().updatePlaylist(playlist.id, {
               status: PlaylistStatus.ERROR,
-              error: errorMessage
+              error: errorMessage,
             });
           }
         }
@@ -220,28 +229,28 @@ export const usePlaylistStore = create<PlaylistStore>()(
         const playlist = playlists.find((p) => p.id === id);
 
         if (!playlist || playlist.status !== PlaylistStatus.ACTIVE) {
-            if (playlist) toast.warning(`La playlist "${playlist.name}" est inactive.`);
-            return;
+          if (playlist) toast.warning(`La playlist "${playlist.name}" est inactive.`);
+          return;
         }
 
         set({ loading: true, error: null });
 
         try {
           const parseResult = await fetchAndParsePlaylist(playlist);
-          
+
           if (parseResult.channels.length > 0) {
             set((state) => ({
               channels: [
                 ...state.channels.filter((c) => c.playlistSource !== playlist.id),
-                ...parseResult.channels
+                ...parseResult.channels,
               ],
               categories: get().getCategories(),
-              loading: false
+              loading: false,
             }));
 
             get().updatePlaylist(id, {
               channelCount: parseResult.channels.length,
-              status: PlaylistStatus.ACTIVE
+              status: PlaylistStatus.ACTIVE,
             });
             toast.success(`La playlist "${playlist.name}" a été mise à jour !`);
           } else {
@@ -291,7 +300,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
           .map(([name, channels]) => ({
             name,
             channels,
-            count: channels.length
+            count: channels.length,
           }))
           .sort((a, b) => b.count - a.count);
       },
@@ -310,30 +319,42 @@ export const usePlaylistStore = create<PlaylistStore>()(
       resetStore: () =>
         set({
           ...initialState,
-          playlists: defaultPlaylists
-        })
+          playlists: defaultPlaylists,
+        }),
     }),
     {
       name: 'streamverse-playlist-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        playlists: state.playlists.filter(p => p.isRemovable)
+        playlists: state.playlists.filter((p) => p.isRemovable),
       }),
       onRehydrateStorage: () => (state) => {
+        // Logique de réhydratation améliorée
         if (state) {
-          if (!state.playlists || state.playlists.length === 0) {
-              state.playlists = defaultPlaylists;
-          } else {
-              const existingDefaultIds = new Set(state.playlists.map(p => p.id));
-              const mergedPlaylists = [
-                  ...state.playlists,
-                  ...defaultPlaylists.filter(dp => !existingDefaultIds.has(dp.id))
-              ];
-              state.playlists = mergedPlaylists;
-          }
-          state.refreshPlaylists();
+          // Fusionner les playlists sauvegardées avec les playlists par défaut
+          const savedPlaylists = state.playlists || [];
+          const defaultPlaylistsIds = new Set(defaultPlaylists.map((p) => p.id));
+
+          // Retirer les doublons si une playlist par défaut a été sauvegardée
+          const mergedPlaylists = [
+            ...defaultPlaylists,
+            ...savedPlaylists.filter((p) => !defaultPlaylistsIds.has(p.id)),
+          ];
+          state.playlists = mergedPlaylists;
+
+          // Rafraîchir les playlists après un court délai pour laisser l'interface se charger
+          setTimeout(() => state.refreshPlaylists(), 100);
         }
-      }
+      },
     }
   )
 );
+
+// TODO: Créer une fonction de parsing pour les torrents
+// Ce fichier n'existe pas encore, il faudra le créer
+const parseTorrentContent = async (url: string, source: string) => {
+  console.log(`Parsing torrent for source: ${source}`);
+  // L'implémentation de WebTorrent se fera ici
+  // Elle devrait retourner un tableau d'objets `Movie` ou `Series`
+  return { movies: [], errors: [], warnings: [] };
+};
