@@ -93,7 +93,6 @@ export interface Episode {
   length?: number;
 }
 
-
 // Interface pour une playlist. J'ai rendu plusieurs propriétés obligatoires
 // pour une meilleure robustesse du typage et pour correspondre à la logique actuelle.
 export interface Playlist {
@@ -153,6 +152,7 @@ export interface PlaylistManagerState {
   playlists: Playlist[];
   channels: Channel[];
   categories: Category[];
+  torrents: Map<string, (Movie | Series)[]>; // Ajout de la map pour les torrents
   loading: boolean;
   error: string | null;
 }
@@ -179,6 +179,20 @@ export interface WatchHistoryState {
   addToHistory: (channel: Channel, duration: number) => void;
   clearHistory: () => void;
   getWatchStats: () => WatchStats;
+}
+
+// Interfaces spécifiques aux parsers
+export interface M3UParseResult {
+  channels: Channel[];
+  errors: string[];
+  warnings: string[];
+}
+
+export interface TorrentParserResult {
+  movies: Movie[];
+  series: Series[];
+  errors: string[];
+  warnings: string[];
 }
 
 // Formulaires
@@ -220,11 +234,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-export interface M3UParseResult {
-  channels: Channel[];
-  errors: string[];
-  warnings: string[];
-}
 
 // Hooks
 export interface UseM3UParserReturn {
@@ -277,4 +286,3 @@ export interface PlayerProps {
   onClose: () => void;
   autoplay?: boolean;
 }
-
