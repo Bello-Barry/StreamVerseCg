@@ -19,7 +19,10 @@ import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Separator } from '@/components/ui/separator';
 
-// Schéma de validation Zod harmonisé avec l'énumération PlaylistType
+/**
+ * Zod Schema pour la validation de la playlist.
+ * Amélioré pour inclure la validation des URLs de torrent.
+ */
 const playlistSchema = z.object({
   name: z.string().min(1, 'Le nom est requis.').max(100),
   type: z.nativeEnum(PlaylistType),
@@ -29,9 +32,15 @@ const playlistSchema = z.object({
   xtreamUsername: z.string().optional(),
   xtreamPassword: z.string().optional(),
 }).refine(
-  (data) => data.type !== PlaylistType.URL || (data.url && z.string().url().safeParse(data.url).success),
+  (data) => {
+    // Valider l'URL pour les types URL et TORRENT
+    if (data.type === PlaylistType.URL || data.type === PlaylistType.TORRENT) {
+      return data.url && z.string().url().safeParse(data.url).success;
+    }
+    return true;
+  },
   {
-    message: 'Une URL valide est requise pour le type URL.',
+    message: 'Une URL valide est requise pour ce type de playlist.',
     path: ['url'],
   }
 ).refine(
@@ -63,8 +72,11 @@ const getPlaylistIcon = (type: PlaylistType) => {
   }
 };
 
-
-// Composant principal de la page
+/**
+ * Composant principal de la page de gestion des playlists.
+ * @component
+ * @returns {React.FC}
+ */
 const PlaylistsPage: React.FC = () => {
   const {
     playlists,
@@ -72,7 +84,6 @@ const PlaylistsPage: React.FC = () => {
     addPlaylist,
     updatePlaylist,
     removePlaylist,
-    togglePlaylistStatus,
     refreshPlaylist,
     refreshPlaylists,
   } = usePlaylistStore();
@@ -81,24 +92,33 @@ const PlaylistsPage: React.FC = () => {
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
 
   const form = useForm<PlaylistFormData>({
     resolver: zodResolver(playlistSchema),
-    defaultValues: { 
-      name: '', 
-      url: '', 
-      type: PlaylistType.URL, // Utilisation de l'enum
-      description: '', 
-      xtreamServer: '', 
-      xtreamUsername: '', 
-      xtreamPassword: '' 
+    defaultValues: {
+      name: '',
+      url: '',
+      type: PlaylistType.URL,
+      description: '',
+      xtreamServer: '',
+      xtreamUsername: '',
+      xtreamPassword: ''
     },
   });
 
   const watchType = form.watch('type');
 
   const resetFormAndState = useCallback(() => {
-    form.reset({ name: '', url: '', type: PlaylistType.URL, description: '', xtreamServer: '', xtreamUsername: '', xtreamPassword: '' });
+    form.reset({
+      name: '',
+      url: '',
+      type: PlaylistType.URL,
+      description: '',
+      xtreamServer: '',
+      xtreamUsername: '',
+      xtreamPassword: ''
+    });
     setEditingPlaylist(null);
     setFileContent('');
     setIsDialogOpen(false);
@@ -122,23 +142,17 @@ const PlaylistsPage: React.FC = () => {
         status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE,
       };
 
-      if (data.type === PlaylistType.TORRENT) {
-        toast.info("La fonctionnalité d'ajout de torrents n'est pas encore implémentée.");
-        // Gérer ici le fichier torrent si nécessaire, mais pour l'instant on prévient juste
-        return;
-      }
-
       if (editingPlaylist) {
         await updatePlaylist(editingPlaylist.id, playlistData);
         toast.success(`La playlist "${data.name}" a été mise à jour.`);
       } else {
-        await addPlaylist(playlistData as any); // Le typage est géré dans le store
+        await addPlaylist(playlistData as any);
         toast.success(`La playlist "${data.name}" a été ajoutée.`);
       }
 
       resetFormAndState();
     } catch (error) {
-      console.error(error);
+      console.error("Erreur lors de la soumission du formulaire:", error);
       toast.error("Erreur lors de la sauvegarde", {
         description: error instanceof Error ? error.message : "Une erreur inconnue est survenue.",
       });
@@ -195,17 +209,15 @@ const PlaylistsPage: React.FC = () => {
   const handleRefreshClick = useCallback(async (id: string) => {
     toast.promise(refreshPlaylist(id), {
       loading: 'Actualisation de la playlist...',
-      success: (data) => `La playlist a été actualisée. ${data} chaînes trouvées.`,
+      success: 'La playlist a été actualisée.',
       error: (err) => `Erreur lors de l'actualisation : ${err.message || 'erreur inconnue'}`,
     });
   }, [refreshPlaylist]);
 
   const handleRefreshAll = useCallback(async () => {
-    toast.promise(refreshPlaylists(), {
-      loading: 'Actualisation de toutes les playlists...',
-      success: 'Toutes les playlists ont été actualisées avec succès.',
-      error: (err) => `Erreur lors de l'actualisation des playlists : ${err.message || 'erreur inconnue'}`,
-    });
+    setIsRefreshingAll(true);
+    await refreshPlaylists();
+    setIsRefreshingAll(false);
   }, [refreshPlaylists]);
 
 
@@ -223,8 +235,8 @@ const PlaylistsPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleRefreshAll} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser tout
+          <Button variant="outline" onClick={handleRefreshAll} disabled={isRefreshingAll}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshingAll ? 'animate-spin' : ''}`} /> Actualiser tout
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -250,7 +262,7 @@ const PlaylistsPage: React.FC = () => {
                       <SelectItem value={PlaylistType.URL}>URL M3U / M3U8</SelectItem>
                       <SelectItem value={PlaylistType.FILE}>Fichier Local (.m3u)</SelectItem>
                       <SelectItem value={PlaylistType.XTREAM}>Xtream Codes</SelectItem>
-                      <SelectItem value={PlaylistType.TORRENT} disabled>Torrent (à venir)</SelectItem>
+                      <SelectItem value={PlaylistType.TORRENT}>Torrent (Lien ou Fichier)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -297,6 +309,16 @@ const PlaylistsPage: React.FC = () => {
                           {form.formState.errors.xtreamPassword && <p className="text-sm text-red-500 mt-1">{form.formState.errors.xtreamPassword.message}</p>}
                         </div>
                       </div>
+                    </motion.div>
+                  )}
+                  {watchType === PlaylistType.TORRENT && (
+                    <motion.div key="torrent-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+                      <label htmlFor="url" className="text-sm font-medium">Lien Torrent (magnet: ou URL)</label>
+                      <Input id="url" {...form.register('url')} placeholder="magnet:?xt=urn:btih:..." type="url" className="mt-1" />
+                      {form.formState.errors.url && <p className="text-sm text-red-500 mt-1">{form.formState.errors.url.message}</p>}
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Collez ici un lien "magnet" ou une URL directe vers un fichier `.torrent`.
+                      </p>
                     </motion.div>
                   )}
                 </AnimatePresence>
