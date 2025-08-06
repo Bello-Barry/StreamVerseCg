@@ -1,4 +1,4 @@
-// Enums
+// Enums : Utilisation d'énums pour des valeurs strictes et lisibles.
 export enum ViewType {
   HOME = 'home',
   CATEGORIES = 'categories',
@@ -7,6 +7,7 @@ export enum ViewType {
   SEARCH = 'search',
   PLAYER = 'player',
   PLAYLISTS = 'playlists',
+  SETTINGS = 'settings',
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
   THEMES = 'themes'
@@ -32,50 +33,21 @@ export enum Quality {
   LOW = 'low'
 }
 
-export interface ThemeColors {
-  primary: string;
-  secondary: string;
-  background: string;
-  text: string;
-  card: string;
+// Ajout du type 'torrent' pour la gestion future des films/séries
+export enum PlaylistType {
+  URL = 'url',
+  FILE = 'file',
+  XTREAM = 'xtream',
+  TORRENT = 'torrent'
 }
 
-export interface ThemeFonts {
-  heading: string;
-  body: string;
-  mono: string;
+// Interfaces de données principales
+export interface XtreamConfig {
+  server: string;
+  username: string;
+  password: string;
 }
 
-export interface ThemeDefinition {
-  id: string;
-  name: string;
-  colors: ThemeColors;
-  fonts: ThemeFonts;
-  glassmorphism: boolean;
-  gradients: boolean;
-  borderRadius: number;
-}
-
-export type CustomThemeSettings = {
-  colors: {
-    primary?: string;
-    secondary?: string;
-    accent?: string;
-    background?: string;
-    card?: string;
-    border?: string;
-  };
-  fonts: {
-    heading: string;
-    body: string;
-    mono: string;
-  };
-  glassmorphism: boolean;
-  gradients: boolean;
-  borderRadius: number;
-};
-
-// Types généraux
 export interface Channel {
   id: string;
   name: string;
@@ -83,29 +55,60 @@ export interface Channel {
   tvgId?: string;
   tvgName?: string;
   tvgLogo?: string;
-  group?: string;
+  group?: string; // Catégorie du groupe
   playlistSource: string;
   language?: string;
   country?: string;
-  category?: string; // ← celui-là manque ailleurs
+  category?: string; // TODO: Vérifier la redondance avec 'group' et choisir un nom définitif.
 }
 
+export interface Movie {
+  id: string;
+  name: string;
+  infoHash: string;
+  magnetURI: string;
+  poster?: string;
+  category?: string;
+  playlistSource: string;
+  length?: number; // Durée en secondes
+  files?: Array<{ name: string; url: string; length: number }>;
+}
+
+export interface Series {
+  id: string;
+  name: string;
+  poster?: string;
+  category?: string;
+  playlistSource: string;
+  episodes: Episode[];
+}
+
+export interface Episode {
+  id: string;
+  name: string;
+  season: number;
+  episode: number;
+  infoHash: string;
+  magnetURI: string;
+  length?: number;
+}
+
+
+// Interface pour une playlist. J'ai rendu plusieurs propriétés obligatoires
+// pour une meilleure robustesse du typage et pour correspondre à la logique actuelle.
 export interface Playlist {
   id: string;
   name: string;
+  type: PlaylistType; // Utilisation de l'enum pour la cohérence
+  status: PlaylistStatus;
+  lastUpdate: Date; // Rendu obligatoire car toujours créé avec new Date()
+  channelCount: number; // Rendu obligatoire pour éviter les `undefined`
+  isRemovable: boolean; // Rendu obligatoire pour la logique de suppression
   url?: string;
   content?: string;
-  type: 'url' | 'file' | 'xtream';
-  status: PlaylistStatus;
-  lastUpdate?: Date;
-  channelCount?: number;
   description?: string;
-  isRemovable?: boolean;
-  xtreamConfig?: {
-    server: string;
-    username: string;
-    password: string;
-  };
+  xtreamConfig?: XtreamConfig;
+  error?: string;
 }
 
 export interface Category {
@@ -145,7 +148,15 @@ export interface SearchFilters {
   quality?: string;
 }
 
-// App State
+// Interfaces du Store
+export interface PlaylistManagerState {
+  playlists: Playlist[];
+  channels: Channel[];
+  categories: Category[];
+  loading: boolean;
+  error: string | null;
+}
+
 export interface AppState {
   currentView: ViewType;
   currentChannel: Channel | null;
@@ -153,15 +164,6 @@ export interface AppState {
   selectedCategory: string | null;
   isPlaying: boolean;
   userPreferences: UserPreferences;
-}
-
-// Stores
-export interface PlaylistManagerState {
-  playlists: Playlist[];
-  channels: Channel[];
-  categories: Category[];
-  loading: boolean;
-  error: string | null;
 }
 
 export interface FavoritesState {
@@ -183,7 +185,7 @@ export interface WatchHistoryState {
 export interface PlaylistFormData {
   name: string;
   url?: string;
-  type: 'url' | 'file' | 'xtream';
+  type: PlaylistType; // Utilisation de l'enum
   description?: string;
   xtreamServer?: string;
   xtreamUsername?: string;
@@ -246,8 +248,6 @@ export interface UsePlayerReturn {
 }
 
 // Composants UI
-// ... (autres exports)
-
 export interface ChannelCardProps {
   channel: Channel;
   onPlay: (channel: Channel) => void;
@@ -256,9 +256,8 @@ export interface ChannelCardProps {
   showCategory?: boolean;
   showReliabilityIndicator?: boolean;
   compact?: boolean;
+  tabIndex?: number;
 }
-
-
 
 export interface CategoryGridProps {
   categories: Category[];
@@ -278,3 +277,4 @@ export interface PlayerProps {
   onClose: () => void;
   autoplay?: boolean;
 }
+
