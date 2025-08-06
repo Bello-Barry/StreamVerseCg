@@ -8,16 +8,12 @@ import {
   Sun,
   Moon,
   Monitor,
-  Font,
-  Text,
-  Type,
   Maximize2,
-  Minimize2,
   Plus,
   Save,
-  Palette as PaletteIcon,
   Brush,
   ChevronDown,
+  Text,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,8 +92,6 @@ const ThemesPage: React.FC = () => {
   };
 
   const handleSaveTheme = () => {
-    // Cette fonction pourrait sauvegarder le thème dans un état global ou dans le localStorage
-    // pour le rendre persistant entre les sessions. Pour l'instant, on se contente d'une toast.
     toast.info('La sauvegarde de thème n\'est pas encore implémentée.');
   };
 
@@ -139,7 +133,6 @@ const ThemesPage: React.FC = () => {
               </Select>
             </div>
             
-            {/* Affichage des thèmes personnalisés (simulation) */}
             {customThemes.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mt-4">Mes thèmes personnalisés</h3>
