@@ -33,31 +33,41 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import type { ThemeDefinition, Theme, ThemeColors } from '@/types';
 import { useAppStore } from '@/stores/useAppStore';
 
-// Définition de thèmes par défaut pour la démonstration
-const defaultThemes: ThemeDefinition[] = [
-  {
-    id: 'streamverse-default',
-    name: 'StreamVerse Par défaut',
-    colors: {
-      primary: '#0D9488', // teal-600
-      secondary: '#E2E8F0', // slate-200
-      background: '#0F172A', // slate-900
-      text: '#F1F5F9', // slate-100
-      card: '#1E293B', // slate-800
-    },
-    fonts: {
-      heading: 'font-sans',
-      body: 'font-sans',
-      mono: 'font-mono',
-    },
-    glassmorphism: false,
-    gradients: false,
-    borderRadius: 0.5,
-  },
-];
+// Définition des types pour ce fichier uniquement
+// NOTE: C'est une solution temporaire pour éviter d'éditer '@/types'.
+// Il est recommandé de centraliser ces types dans '@/types/index.ts' plus tard.
+export enum Theme {
+  LIGHT = 'light',
+  DARK = 'dark',
+  SYSTEM = 'system',
+}
+
+export interface ThemeColors {
+  primary: string;
+  secondary: string;
+  background: string;
+  text: string;
+  card: string;
+}
+
+export interface ThemeFonts {
+  heading: string;
+  body: string;
+  mono: string;
+}
+
+export interface ThemeDefinition {
+  id: string;
+  name: string;
+  colors: ThemeColors;
+  fonts: ThemeFonts;
+  glassmorphism: boolean;
+  gradients: boolean;
+  borderRadius: number;
+}
+// Fin des types locaux
 
 type CustomTheme = {
   name: string;
@@ -92,7 +102,7 @@ const ThemesPage: React.FC = () => {
   };
 
   const handleSaveTheme = () => {
-    toast.info('La sauvegarde de thème n\'est pas encore implémentée.');
+    toast.info("La sauvegarde de thème n'est pas encore implémentée.");
   };
 
   const handleColorChange = (key: keyof ThemeColors, value: string) => {
@@ -120,41 +130,62 @@ const ThemesPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Label htmlFor="theme-select" className="min-w-[100px]">Thème de l'application</Label>
-              <Select value={currentTheme} onValueChange={(value) => setTheme(value as Theme)}>
+              <Label htmlFor="theme-select" className="min-w-[100px]">
+                Thème de l'application
+              </Label>
+              <Select
+                value={currentTheme}
+                onValueChange={(value) => setTheme(value as Theme)}
+              >
                 <SelectTrigger id="theme-select">
                   <SelectValue placeholder="Sélectionner un thème" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={Theme.LIGHT}><Sun className="h-4 w-4 mr-2" /> Clair</SelectItem>
-                  <SelectItem value={Theme.DARK}><Moon className="h-4 w-4 mr-2" /> Sombre</SelectItem>
-                  <SelectItem value={Theme.SYSTEM}><Monitor className="h-4 w-4 mr-2" /> Système</SelectItem>
+                  <SelectItem value={Theme.LIGHT}>
+                    <Sun className="h-4 w-4 mr-2" /> Clair
+                  </SelectItem>
+                  <SelectItem value={Theme.DARK}>
+                    <Moon className="h-4 w-4 mr-2" /> Sombre
+                  </SelectItem>
+                  <SelectItem value={Theme.SYSTEM}>
+                    <Monitor className="h-4 w-4 mr-2" /> Système
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            
+
             {customThemes.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mt-4">Mes thèmes personnalisés</h3>
-                  {customThemes.map((theme) => (
-                    <div key={theme.name} className="flex items-center justify-between p-2 border rounded-md mt-2">
-                      <span>{theme.name}</span>
-                      <div className="flex items-center gap-2">
-                         <div
-                          className="h-6 w-6 rounded-full border"
-                          style={{ backgroundColor: theme.colors.primary }}
-                          title="Couleur Primaire"
-                        />
-                        <Button variant="outline" size="sm">Appliquer</Button>
-                      </div>
+              <div>
+                <h3 className="text-lg font-semibold mt-4">
+                  Mes thèmes personnalisés
+                </h3>
+                {customThemes.map((theme) => (
+                  <div
+                    key={theme.name}
+                    className="flex items-center justify-between p-2 border rounded-md mt-2"
+                  >
+                    <span>{theme.name}</span>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-6 w-6 rounded-full border"
+                        style={{ backgroundColor: theme.colors.primary }}
+                        title="Couleur Primaire"
+                      />
+                      <Button variant="outline" size="sm">
+                        Appliquer
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              )}
-            
+                  </div>
+                ))}
+              </div>
+            )}
+
             <Collapsible>
               <CollapsibleTrigger asChild>
-                <Button variant="outline" className="w-full justify-between mt-4">
+                <Button
+                  variant="outline"
+                  className="w-full justify-between mt-4"
+                >
                   <span className="flex items-center gap-2">
                     <Plus className="h-4 w-4" />
                     Créer un thème personnalisé
@@ -174,15 +205,21 @@ const ThemesPage: React.FC = () => {
                       <Input
                         type="color"
                         value={value}
-                        onChange={(e) => handleColorChange(key as keyof ThemeColors, e.target.value)}
+                        onChange={(e) =>
+                          handleColorChange(key as keyof ThemeColors, e.target.value)
+                        }
                         className="h-10 w-10 p-0 cursor-pointer"
                       />
                       <div className="flex-1">
-                        <Label>{key.charAt(0).toUpperCase() + key.slice(1)}</Label>
+                        <Label>
+                          {key.charAt(0).toUpperCase() + key.slice(1)}
+                        </Label>
                         <Input
                           type="text"
                           value={value}
-                          onChange={(e) => handleColorChange(key as keyof ThemeColors, e.target.value)}
+                          onChange={(e) =>
+                            handleColorChange(key as keyof ThemeColors, e.target.value)
+                          }
                         />
                       </div>
                     </div>
@@ -214,7 +251,9 @@ const ThemesPage: React.FC = () => {
               </div>
               <Switch
                 checked={userPreferences.fullscreenOnPlay}
-                onCheckedChange={(checked) => updateUserPreferences({ fullscreenOnPlay: checked })}
+                onCheckedChange={(checked) =>
+                  updateUserPreferences({ fullscreenOnPlay: checked })
+                }
               />
             </div>
             <div className="flex items-center justify-between">
@@ -224,7 +263,9 @@ const ThemesPage: React.FC = () => {
               </div>
               <Switch
                 checked={userPreferences.glassmorphism}
-                onCheckedChange={(checked) => updateUserPreferences({ glassmorphism: checked })}
+                onCheckedChange={(checked) =>
+                  updateUserPreferences({ glassmorphism: checked })
+                }
               />
             </div>
           </CardContent>
