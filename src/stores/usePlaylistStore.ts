@@ -350,11 +350,3 @@ export const usePlaylistStore = create<PlaylistStore>()(
   )
 );
 
-// TODO: Créer une fonction de parsing pour les torrents
-// Ce fichier n'existe pas encore, il faudra le créer
-const parseTorrentContent = async (url: string, source: string) => {
-  console.log(`Parsing torrent for source: ${source}`);
-  // L'implémentation de WebTorrent se fera ici
-  // Elle devrait retourner un tableau d'objets `Movie` ou `Series`
-  return { movies: [], errors: [], warnings: [] };
-};
