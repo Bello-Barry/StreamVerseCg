@@ -1,9 +1,7 @@
-// src/components/pages/PlaylistsPage.tsx
-
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Edit, Trash2, RefreshCw, Upload, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, RefreshCw, Upload, AlertCircle, CheckCircle, XCircle, Link, FileText, Wifi, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,25 +14,57 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { PlaylistFormData, Playlist, PlaylistStatus } from '@/types';
+import { PlaylistFormData, Playlist, PlaylistStatus, PlaylistType } from '@/types';
 import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Separator } from '@/components/ui/separator';
 
+// Schéma de validation Zod harmonisé avec l'énumération PlaylistType
 const playlistSchema = z.object({
   name: z.string().min(1, 'Le nom est requis.').max(100),
-  type: z.enum(['url', 'file', 'xtream']),
+  type: z.nativeEnum(PlaylistType),
   url: z.string().optional(),
   description: z.string().max(500).optional(),
   xtreamServer: z.string().optional(),
   xtreamUsername: z.string().optional(),
   xtreamPassword: z.string().optional(),
 }).refine(
-  (data) => data.type !== 'url' || (data.url && z.string().url().safeParse(data.url).success),
+  (data) => data.type !== PlaylistType.URL || (data.url && z.string().url().safeParse(data.url).success),
   {
     message: 'Une URL valide est requise pour le type URL.',
     path: ['url'],
   }
+).refine(
+  (data) => data.type !== PlaylistType.XTREAM || (data.xtreamServer && data.xtreamUsername && data.xtreamPassword),
+  {
+    message: 'Les identifiants Xtream sont requis pour le type Xtream.',
+    path: ['xtreamServer'],
+  }
 );
 
+// Fonctions utilitaires pour le composant
+const getStatusInfo = (status: PlaylistStatus | string) => {
+  switch (status) {
+    case 'active': return { Icon: CheckCircle, text: 'Active', color: 'bg-green-500' };
+    case 'error': return { Icon: XCircle, text: 'Erreur', color: 'bg-red-500' };
+    case 'inactive': return { Icon: AlertCircle, text: 'Inactive', color: 'bg-yellow-500' };
+    case 'loading': return { Icon: RefreshCw, text: 'Chargement...', color: 'bg-blue-500' };
+    default: return { Icon: AlertCircle, text: 'Inconnu', color: 'bg-gray-500' };
+  }
+};
+
+const getPlaylistIcon = (type: PlaylistType) => {
+  switch (type) {
+    case PlaylistType.URL: return <Link className="h-4 w-4" />;
+    case PlaylistType.FILE: return <FileText className="h-4 w-4" />;
+    case PlaylistType.XTREAM: return <Wifi className="h-4 w-4" />;
+    case PlaylistType.TORRENT: return <Film className="h-4 w-4" />;
+    default: return null;
+  }
+};
+
+
+// Composant principal de la page
 const PlaylistsPage: React.FC = () => {
   const {
     playlists,
@@ -54,13 +84,21 @@ const PlaylistsPage: React.FC = () => {
 
   const form = useForm<PlaylistFormData>({
     resolver: zodResolver(playlistSchema),
-    defaultValues: { name: '', url: '', type: 'url', description: '', xtreamServer: '', xtreamUsername: '', xtreamPassword: '' },
+    defaultValues: { 
+      name: '', 
+      url: '', 
+      type: PlaylistType.URL, // Utilisation de l'enum
+      description: '', 
+      xtreamServer: '', 
+      xtreamUsername: '', 
+      xtreamPassword: '' 
+    },
   });
 
   const watchType = form.watch('type');
 
   const resetFormAndState = useCallback(() => {
-    form.reset({ name: '', url: '', type: 'url', description: '', xtreamServer: '', xtreamUsername: '', xtreamPassword: '' });
+    form.reset({ name: '', url: '', type: PlaylistType.URL, description: '', xtreamServer: '', xtreamUsername: '', xtreamPassword: '' });
     setEditingPlaylist(null);
     setFileContent('');
     setIsDialogOpen(false);
@@ -68,13 +106,13 @@ const PlaylistsPage: React.FC = () => {
 
   const handleSubmit = useCallback(async (data: PlaylistFormData) => {
     try {
-      const playlistData: Omit<Playlist, 'id'> = {
+      const playlistData: Omit<Playlist, 'id' | 'lastUpdate' | 'channelCount' | 'isRemovable'> = {
         name: data.name,
         type: data.type,
         url: data.url,
         description: data.description,
-        content: data.type === 'file' ? fileContent : undefined,
-        xtreamConfig: data.type === 'xtream'
+        content: data.type === PlaylistType.FILE ? fileContent : undefined,
+        xtreamConfig: data.type === PlaylistType.XTREAM
           ? {
               server: data.xtreamServer || '',
               username: data.xtreamUsername || '',
@@ -82,16 +120,19 @@ const PlaylistsPage: React.FC = () => {
             }
           : undefined,
         status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE,
-        channelCount: 0,
-        
-        isRemovable: true,
       };
+
+      if (data.type === PlaylistType.TORRENT) {
+        toast.info("La fonctionnalité d'ajout de torrents n'est pas encore implémentée.");
+        // Gérer ici le fichier torrent si nécessaire, mais pour l'instant on prévient juste
+        return;
+      }
 
       if (editingPlaylist) {
         await updatePlaylist(editingPlaylist.id, playlistData);
         toast.success(`La playlist "${data.name}" a été mise à jour.`);
       } else {
-        await addPlaylist(playlistData);
+        await addPlaylist(playlistData as any); // Le typage est géré dans le store
         toast.success(`La playlist "${data.name}" a été ajoutée.`);
       }
 
@@ -142,34 +183,39 @@ const PlaylistsPage: React.FC = () => {
         form.setValue('name', file.name.replace(/\.[^/.]+$/, ''));
       }
     };
+    reader.onerror = () => {
+      toast.error("Erreur de lecture du fichier.", {
+        description: "Veuillez réessayer ou vérifier que le fichier est valide."
+      });
+    }
     reader.readAsText(file);
     event.target.value = '';
   }, [form]);
+
+  const handleRefreshClick = useCallback(async (id: string) => {
+    toast.promise(refreshPlaylist(id), {
+      loading: 'Actualisation de la playlist...',
+      success: (data) => `La playlist a été actualisée. ${data} chaînes trouvées.`,
+      error: (err) => `Erreur lors de l'actualisation : ${err.message || 'erreur inconnue'}`,
+    });
+  }, [refreshPlaylist]);
+
+  const handleRefreshAll = useCallback(async () => {
+    toast.promise(refreshPlaylists(), {
+      loading: 'Actualisation de toutes les playlists...',
+      success: 'Toutes les playlists ont été actualisées avec succès.',
+      error: (err) => `Erreur lors de l'actualisation des playlists : ${err.message || 'erreur inconnue'}`,
+    });
+  }, [refreshPlaylists]);
+
 
   useEffect(() => {
     if (!isDialogOpen) resetFormAndState();
   }, [isDialogOpen, resetFormAndState]);
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'active': return { Icon: CheckCircle, text: 'Active', variant: 'default', color: 'text-green-500' };
-      case 'error': return { Icon: XCircle, text: 'Erreur', variant: 'destructive', color: 'text-red-500' };
-      case 'inactive': return { Icon: AlertCircle, text: 'Inactive', variant: 'secondary', color: 'text-yellow-500' };
-      default: return { Icon: AlertCircle, text: 'Inconnu', variant: 'outline', color: 'text-gray-500' };
-    }
-  };
-  
-  // ✅ Mapping des variantes personnalisées vers celles autorisées par <Badge>
-  const variantMap: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    success: 'default',
-    info: 'secondary',
-    warning: 'destructive',
-  }
-  
-
   return (
-    <div className="space-y-6">
- <div className="flex items-center justify-between">
+    <div className="container mx-auto p-4 md:p-8 space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold">Gestion des Playlists</h1>
           <p className="text-muted-foreground mt-1">
@@ -177,8 +223,8 @@ const PlaylistsPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={() => refreshPlaylists()} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser
+          <Button variant="outline" onClick={handleRefreshAll} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser tout
           </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -189,58 +235,72 @@ const PlaylistsPage: React.FC = () => {
                 <DialogTitle>{editingPlaylist ? 'Modifier la playlist' : 'Ajouter une playlist'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                {/* Champ Nom */}
                 <div>
                   <label htmlFor="name" className="text-sm font-medium">Nom de la playlist</label>
                   <Input id="name" {...form.register('name')} placeholder="Ex: Chaînes françaises" className="mt-1" />
                   {form.formState.errors.name && <p className="text-sm text-red-500 mt-1">{form.formState.errors.name.message}</p>}
                 </div>
+                {/* Champ Type */}
                 <div>
                   <label htmlFor="type" className="text-sm font-medium">Type de source</label>
-                  <Select value={watchType} onValueChange={(v: 'url' | 'file' | 'xtream') => form.setValue('type', v)}>
+                  <Select value={watchType} onValueChange={(v: PlaylistType) => form.setValue('type', v)}>
                     <SelectTrigger id="type" className="mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="url">URL M3U</SelectItem>
-                      <SelectItem value="file">Fichier Local</SelectItem>
-                      <SelectItem value="xtream">Xtream Codes</SelectItem>
+                      <SelectItem value={PlaylistType.URL}>URL M3U / M3U8</SelectItem>
+                      <SelectItem value={PlaylistType.FILE}>Fichier Local (.m3u)</SelectItem>
+                      <SelectItem value={PlaylistType.XTREAM}>Xtream Codes</SelectItem>
+                      <SelectItem value={PlaylistType.TORRENT} disabled>Torrent (à venir)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Sélectionnez le type de votre source de playlist.
+                  </p>
                 </div>
-                {watchType === 'url' && (
-                  <div>
-                    <label htmlFor="url" className="text-sm font-medium">URL de la playlist</label>
-                    <Input id="url" {...form.register('url')} placeholder="https://example.com/playlist.m3u" type="url" className="mt-1" />
-                    {form.formState.errors.url && <p className="text-sm text-red-500 mt-1">{form.formState.errors.url.message}</p>}
-                  </div>
-                )}
-                {watchType === 'file' && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Fichier M3U</label>
-                    <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById('file-upload')?.click()}>
-                      <Upload className="mr-2 h-4 w-4" /> Choisir un fichier
-                    </Button>
-                    <input id="file-upload" type="file" accept=".m3u,.m3u8" onChange={handleFileUpload} className="hidden" />
-                    {fileContent && <p className="text-sm text-muted-foreground mt-2">Fichier chargé. Vous pouvez modifier son contenu ci-dessous.</p>}
-                    <Textarea value={fileContent} onChange={(e) => setFileContent(e.target.value)} placeholder="Le contenu du fichier M3U apparaîtra ici..." rows={5} />
-                  </div>
-                )}
-                {watchType === 'xtream' && (
-                  <div className="space-y-4 rounded-md border p-4">
-                    <div>
-                      <label htmlFor="xtreamServer" className="text-sm font-medium">Serveur Xtream</label>
-                      <Input id="xtreamServer" {...form.register('xtreamServer')} placeholder="http://server:port" type="url" className="mt-1" />
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Champs dynamiques avec animations */}
+                <AnimatePresence mode="wait">
+                  {watchType === PlaylistType.URL && (
+                    <motion.div key="url-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+                      <label htmlFor="url" className="text-sm font-medium">URL de la playlist</label>
+                      <Input id="url" {...form.register('url')} placeholder="https://example.com/playlist.m3u" type="url" className="mt-1" />
+                      {form.formState.errors.url && <p className="text-sm text-red-500 mt-1">{form.formState.errors.url.message}</p>}
+                    </motion.div>
+                  )}
+                  {watchType === PlaylistType.FILE && (
+                    <motion.div key="file-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="space-y-2">
+                      <label className="text-sm font-medium">Fichier M3U</label>
+                      <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById('file-upload')?.click()}>
+                        <Upload className="mr-2 h-4 w-4" /> {fileContent ? 'Fichier chargé' : 'Choisir un fichier'}
+                      </Button>
+                      <input id="file-upload" type="file" accept=".m3u,.m3u8" onChange={handleFileUpload} className="hidden" />
+                      {fileContent && (
+                        <Textarea value={fileContent} onChange={(e) => setFileContent(e.target.value)} placeholder="Le contenu du fichier M3U apparaîtra ici..." rows={5} />
+                      )}
+                    </motion.div>
+                  )}
+                  {watchType === PlaylistType.XTREAM && (
+                    <motion.div key="xtream-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="space-y-4 rounded-md border p-4">
                       <div>
-                        <label htmlFor="xtreamUsername" className="text-sm font-medium">Nom d'utilisateur</label>
-                        <Input id="xtreamUsername" {...form.register('xtreamUsername')} placeholder="username" className="mt-1" />
+                        <label htmlFor="xtreamServer" className="text-sm font-medium">Serveur Xtream</label>
+                        <Input id="xtreamServer" {...form.register('xtreamServer')} placeholder="http://server:port" type="url" className="mt-1" />
+                        {form.formState.errors.xtreamServer && <p className="text-sm text-red-500 mt-1">{form.formState.errors.xtreamServer.message}</p>}
                       </div>
-                      <div>
-                        <label htmlFor="xtreamPassword" className="text-sm font-medium">Mot de passe</label>
-                        <Input id="xtreamPassword" {...form.register('xtreamPassword')} placeholder="password" type="password" className="mt-1" />
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="xtreamUsername" className="text-sm font-medium">Nom d'utilisateur</label>
+                          <Input id="xtreamUsername" {...form.register('xtreamUsername')} placeholder="username" className="mt-1" />
+                          {form.formState.errors.xtreamUsername && <p className="text-sm text-red-500 mt-1">{form.formState.errors.xtreamUsername.message}</p>}
+                        </div>
+                        <div>
+                          <label htmlFor="xtreamPassword" className="text-sm font-medium">Mot de passe</label>
+                          <Input id="xtreamPassword" {...form.register('xtreamPassword')} placeholder="********" type="password" className="mt-1" />
+                          {form.formState.errors.xtreamPassword && <p className="text-sm text-red-500 mt-1">{form.formState.errors.xtreamPassword.message}</p>}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {/* Champ Description */}
                 <div>
                   <label htmlFor="description" className="text-sm font-medium">Description (optionnel)</label>
                   <Textarea id="description" {...form.register('description')} placeholder="Quelques notes sur cette playlist..." rows={3} className="mt-1" />
@@ -249,7 +309,7 @@ const PlaylistsPage: React.FC = () => {
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button type="button" variant="ghost" onClick={resetFormAndState}>Annuler</Button>
                   <Button type="submit" disabled={form.formState.isSubmitting || loading}>
-                    {loading ? 'Sauvegarde...' : editingPlaylist ? 'Mettre à jour' : 'Ajouter'}
+                    {form.formState.isSubmitting ? 'Sauvegarde...' : editingPlaylist ? 'Mettre à jour' : 'Ajouter'}
                   </Button>
                 </div>
               </form>
@@ -258,62 +318,74 @@ const PlaylistsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {playlists.map((playlist) => {
-          const status = getStatusInfo(playlist.status);
-          return (
-            <Card key={playlist.id} className="flex flex-col justify-between">
-              <div>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="flex-1 pr-2">{playlist.name}</CardTitle>
- <Badge variant={variantMap[status.variant] ?? 'default'}
-                    className="flex-shrink-0"
-                  >
-                    <status.Icon className={`mr-1 h-3 w-3 ${status.color}`} />
-                    {status.text}
-                  </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <div className="flex justify-between"><span>Type:</span><span className="font-medium text-foreground capitalize">{playlist.type}</span></div>
-                    <div className="flex justify-between"><span>Chaînes:</span><span className="font-medium text-foreground">{playlist.channelCount ?? 'N/A'}</span></div>
-                    <div className="flex justify-between"><span>Mise à jour:</span><span className="font-medium text-foreground">{playlist.lastUpdate ? new Date(playlist.lastUpdate).toLocaleDateString() : 'Jamais'}</span></div>
-                  </div>
-                </CardContent>
-              </div>
-              <div className="flex items-center justify-between p-4 border-t mt-4">
-                <Button variant="ghost" size="sm" onClick={() => togglePlaylistStatus(playlist.id)}>
-                  {playlist.status === 'active' ? 'Désactiver' : 'Activer'}
-                </Button>
-                <div className="flex items-center">
-                  <Button variant="ghost" size="icon" onClick={() => refreshPlaylist(playlist.id)} disabled={loading} title="Actualiser"><RefreshCw className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(playlist)} title="Modifier"><Edit className="h-4 w-4" /></Button>
-                  {playlist.isRemovable !== false && (
-                    <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => setPlaylistToDelete(playlist)} title="Supprimer"><Trash2 className="h-4 w-4" /></Button>
-                  )}
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+      <Separator />
 
-      {playlists.length === 0 && !loading && (
-        <div className="text-center py-16 border-2 border-dashed rounded-lg">
-          <h3 className="text-xl font-semibold mb-2">Aucune playlist pour le moment</h3>
-          <p className="text-muted-foreground mb-4">Ajoutez votre première playlist pour commencer à explorer.</p>
-          <Button onClick={() => setIsDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> Ajouter une playlist</Button>
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {playlists.map((playlist) => {
+            const statusInfo = getStatusInfo(playlist.status);
+            return (
+              <motion.div
+                key={playlist.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Card className="flex flex-col h-full">
+                  <CardHeader className="flex-row items-center justify-between p-4 pb-2">
+                    <div className="flex items-center space-x-2">
+                       <span className={`h-2.5 w-2.5 rounded-full ${statusInfo.color}`} />
+                       <CardTitle className="text-lg font-semibold truncate flex-1">
+                         {playlist.name}
+                       </CardTitle>
+                    </div>
+                     <Badge variant="secondary" className="flex items-center space-x-1">
+                      {getPlaylistIcon(playlist.type)}
+                       <span>{playlist.type.toUpperCase()}</span>
+                     </Badge>
+                  </CardHeader>
+                  <CardContent className="flex-grow p-4 pt-0 text-sm text-muted-foreground space-y-2">
+                    <p>{playlist.description || 'Aucune description fournie.'}</p>
+                    <div className="flex justify-between items-center text-xs text-muted-foreground">
+                      <span>Chaînes: {playlist.channelCount}</span>
+                      <span>Mise à jour: {playlist.lastUpdate ? new Date(playlist.lastUpdate).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                  </CardContent>
+                  <div className="flex items-center justify-between p-4 border-t mt-auto">
+                    <Button variant="ghost" size="sm" onClick={() => togglePlaylistStatus(playlist.id)} disabled={loading}>
+                      {playlist.status === PlaylistStatus.ACTIVE ? 'Désactiver' : 'Activer'}
+                    </Button>
+                    <div className="flex items-center space-x-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleRefreshClick(playlist.id)} disabled={loading} title="Actualiser"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(playlist)} title="Modifier"><Edit className="h-4 w-4" /></Button>
+                      {playlist.isRemovable !== false && (
+                        <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-500/10" onClick={() => setPlaylistToDelete(playlist)} title="Supprimer"><Trash2 className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            );
+          })}
+          {playlists.length === 0 && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="col-span-full">
+              <div className="text-center py-16 border-2 border-dashed rounded-lg">
+                <h3 className="text-xl font-semibold mb-2">Aucune playlist pour le moment</h3>
+                <p className="text-muted-foreground mb-4">Ajoutez votre première playlist pour commencer à explorer.</p>
+                <Button onClick={() => setIsDialogOpen(true)}><Plus className="mr-2 h-4 w-4" /> Ajouter une playlist</Button>
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       <AlertDialog open={!!playlistToDelete} onOpenChange={(open) => !open && setPlaylistToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer cette playlist ?</AlertDialogTitle>
             <AlertDialogDescription>
-              La playlist "{playlistToDelete?.name}" sera supprimée définitivement. Cette action est irréversible.
+              La playlist "<span className="font-semibold">{playlistToDelete?.name}</span>" sera supprimée définitivement. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -324,7 +396,6 @@ const PlaylistsPage: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    
     </div>
   );
 };
