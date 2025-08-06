@@ -4,20 +4,16 @@ import React, { useState } from 'react';
 import { useTheme } from 'next-themes';
 import {
   Palette,
-  Droplet,
   Sun,
   Moon,
   Monitor,
-  Maximize2,
   Plus,
   Save,
   Brush,
   ChevronDown,
-  Text,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,16 +30,9 @@ import {
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/useAppStore';
+import { Theme } from '@/types'; // Garder l'importation de Theme
 
-// Définition des types pour ce fichier uniquement
-// NOTE: C'est une solution temporaire pour éviter d'éditer '@/types'.
-// Il est recommandé de centraliser ces types dans '@/types/index.ts' plus tard.
-export enum Theme {
-  LIGHT = 'light',
-  DARK = 'dark',
-  SYSTEM = 'system',
-}
-
+// Définition des types pour ce fichier uniquement, afin d'éviter de modifier '@/types'
 export interface ThemeColors {
   primary: string;
   secondary: string;
@@ -63,11 +52,7 @@ export interface ThemeDefinition {
   name: string;
   colors: ThemeColors;
   fonts: ThemeFonts;
-  glassmorphism: boolean;
-  gradients: boolean;
-  borderRadius: number;
 }
-// Fin des types locaux
 
 type CustomTheme = {
   name: string;
@@ -75,8 +60,9 @@ type CustomTheme = {
 };
 
 const ThemesPage: React.FC = () => {
-  const { theme, setTheme } = useTheme();
-  const { userPreferences, updateUserPreferences } = useAppStore();
+  const { setTheme } = useTheme();
+  const currentTheme = useAppStore((state) => state.userPreferences.theme);
+
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([]);
   const [newThemeName, setNewThemeName] = useState('');
   const [newThemeColors, setNewThemeColors] = useState<ThemeColors>({
@@ -101,15 +87,9 @@ const ThemesPage: React.FC = () => {
     toast.success(`Le thème "${newThemeName}" a été créé.`);
   };
 
-  const handleSaveTheme = () => {
-    toast.info("La sauvegarde de thème n'est pas encore implémentée.");
-  };
-
   const handleColorChange = (key: keyof ThemeColors, value: string) => {
     setNewThemeColors((prevColors) => ({ ...prevColors, [key]: value }));
   };
-
-  const currentTheme = userPreferences.theme;
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-8">
@@ -234,43 +214,13 @@ const ThemesPage: React.FC = () => {
           </CardContent>
         </Card>
       </section>
-
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Text className="h-5 w-5 text-primary" />
-              Paramètres d'affichage
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Maximize2 className="h-4 w-4" />
-                <Label>Mode plein écran par défaut</Label>
-              </div>
-              <Switch
-                checked={userPreferences.fullscreenOnPlay}
-                onCheckedChange={(checked) =>
-                  updateUserPreferences({ fullscreenOnPlay: checked })
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Droplet className="h-4 w-4" />
-                <Label>Afficher le glassmorphism (Effet de verre)</Label>
-              </div>
-              <Switch
-                checked={userPreferences.glassmorphism}
-                onCheckedChange={(checked) =>
-                  updateUserPreferences({ glassmorphism: checked })
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      
+      {/* NOTE : J'ai retiré la section "Paramètres d'affichage" car elle dépendait
+        des propriétés 'fullscreenOnPlay' et 'glassmorphism' qui ne sont pas
+        présentes dans la version actuelle de tes types et de ton store Zustand.
+        Pour éviter les erreurs, cette section a été supprimée.
+        Tu pourras la réintégrer une fois que tu auras mis à jour tes types et ton store.
+      */}
     </div>
   );
 };
