@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
    * Options de compilation SWC (Rust-based).
    * C'est la valeur par défaut pour Next.js 15, mais on peut la personnaliser si nécessaire.
    */
-  swcMinify: true,
+  //swcMinify: true,
 
   /*
    * Optimisation des images.
