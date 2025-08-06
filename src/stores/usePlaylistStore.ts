@@ -12,18 +12,16 @@ import {
   PlaylistStatus,
   PlaylistType,
   Movie,
-  TorrentResource,
   Series,
   TorrentParserResult,
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
-import { parseTorrentContent } from '@/lib/torrentParser'; // Nouvelle importation
+import { parseTorrentContent } from '@/lib/torrentParser';
 
 /**
  * Interface pour le store global de playlists, étendue pour supporter les torrents.
  * @interface PlaylistStore
- * @extends PlaylistManagerState
  */
 interface PlaylistStore extends PlaylistManagerState {
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
@@ -47,7 +45,7 @@ const initialState: PlaylistManagerState = {
   playlists: [],
   channels: [],
   categories: [],
-  torrents: new Map<string, TorrentResource[]>(), // Initialise la Map des torrents
+  torrents: new Map<string, (Movie | Series)[]>(), // Initialise la Map des torrents
   loading: false,
   error: null,
 };
@@ -80,7 +78,6 @@ const defaultPlaylists: Playlist[] = [
 
 /**
  * Fonction utilitaire pour fetch et parser une playlist de manière générique.
- * Cette fonction gère tous les types de playlists (URL, Fichier, Xtream, Torrent).
  * @param {Playlist} playlist La playlist à traiter.
  * @returns {Promise<M3UParseResult | TorrentParserResult>}
  */
@@ -116,7 +113,6 @@ const fetchAndProcessPlaylist = async (
       return parseM3UContent(playlist.content, playlist.id);
 
     case PlaylistType.TORRENT:
-      // Le contenu du torrent est soit une URL (magnet, etc.) soit le contenu binaire d'un fichier.
       if (!playlist.url && !playlist.content) {
         throw new Error('Lien ou fichier torrent manquant.');
       }
@@ -131,6 +127,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
   persist(
     (set, get) => ({
       ...initialState,
+      torrents: new Map<string, (Movie | Series)[]>(),
 
       addPlaylist: async (playlistData) => {
         const newPlaylist: Playlist = {
@@ -205,7 +202,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
         const { playlists } = get();
         set({ loading: true, error: null });
         const newChannels: Channel[] = [];
-        const newTorrents = new Map<string, TorrentResource[]>();
+        const newTorrents = new Map<string, (Movie | Series)[]>();
 
         for (const playlist of playlists) {
           if (playlist.status !== PlaylistStatus.ACTIVE) {
@@ -218,6 +215,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
             let count = 0;
 
             if ('channels' in parseResult) {
+              // Résultat de parsing M3U ou Xtream
               if (parseResult.channels.length > 0) {
                 newChannels.push(...parseResult.channels);
                 count = parseResult.channels.length;
@@ -225,7 +223,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
                 throw new Error('Aucune chaîne trouvée dans la playlist.');
               }
             } else {
-              // C'est un résultat de torrent
+              // Résultat de parsing Torrent
               const resources = [...(parseResult.movies || []), ...(parseResult.series || [])];
               if (resources.length > 0) {
                 newTorrents.set(playlist.id, resources);
@@ -274,6 +272,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
           let count = 0;
 
           if ('channels' in parseResult) {
+            // Résultat de parsing M3U ou Xtream
             if (parseResult.channels.length > 0) {
               set((state) => ({
                 channels: [
@@ -288,7 +287,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
               throw new Error('Aucune chaîne trouvée dans la playlist.');
             }
           } else {
-            // C'est un résultat de torrent
+            // Résultat de parsing Torrent
             const resources = [...(parseResult.movies || []), ...(parseResult.series || [])];
             if (resources.length > 0) {
               set((state) => {
@@ -374,6 +373,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
         set({
           ...initialState,
           playlists: defaultPlaylists,
+          torrents: new Map<string, (Movie | Series)[]>(),
         }),
     }),
     {
@@ -383,20 +383,19 @@ export const usePlaylistStore = create<PlaylistStore>()(
         playlists: state.playlists.filter((p) => p.isRemovable),
       }),
       onRehydrateStorage: () => (state) => {
-        // Logique de réhydratation améliorée
         if (state) {
-          // Fusionner les playlists sauvegardées avec les playlists par défaut
           const savedPlaylists = state.playlists || [];
           const defaultPlaylistsIds = new Set(defaultPlaylists.map((p) => p.id));
 
-          // Retirer les doublons si une playlist par défaut a été sauvegardée
           const mergedPlaylists = [
             ...defaultPlaylists,
             ...savedPlaylists.filter((p) => !defaultPlaylistsIds.has(p.id)),
           ];
           state.playlists = mergedPlaylists;
 
-          // Rafraîchir les playlists après un court délai pour laisser l'interface se charger
+          // Assurer que la map de torrents est initialisée
+          state.torrents = state.torrents || new Map<string, (Movie | Series)[]>();
+
           setTimeout(() => state.refreshPlaylists(), 100);
         }
       },
