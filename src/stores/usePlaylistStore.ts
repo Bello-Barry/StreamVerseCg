@@ -9,7 +9,8 @@ import {
   Category,
   PlaylistManagerState,
   M3UParseResult,
-  PlaylistStatus
+  PlaylistStatus,
+  PlaylistType // Import de PlaylistType pour l'énumération
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
@@ -50,7 +51,7 @@ const defaultPlaylists: Playlist[] = [
     id: 'schumijo-fr',
     name: 'Chaînes Françaises (Schumijo)',
     url: 'https://raw.githubusercontent.com/schumijo/iptv/main/fr.m3u8',
-    type: 'url',
+    type: PlaylistType.URL, // CORRIGÉ
     status: PlaylistStatus.ACTIVE,
     description: 'Playlist française de Schumijo avec chaînes françaises',
     isRemovable: false,
@@ -61,7 +62,7 @@ const defaultPlaylists: Playlist[] = [
     id: 'iptv-org-france',
     name: 'IPTV-Org (France)',
     url: 'https://iptv-org.github.io/iptv/languages/fra.m3u',
-    type: 'url',
+    type: PlaylistType.URL, // CORRIGÉ
     status: PlaylistStatus.ACTIVE,
     description: 'Chaînes françaises de IPTV-Org',
     isRemovable: false,
@@ -79,25 +80,25 @@ const fetchAndParsePlaylist = async (playlist: Playlist): Promise<M3UParseResult
     throw new Error('La playlist est inactive.');
   }
 
-  if (playlist.type === 'xtream' && playlist.xtreamConfig) {
+  if (playlist.type === PlaylistType.XTREAM && playlist.xtreamConfig) { // CORRIGÉ
     const { server, username, password } = playlist.xtreamConfig;
     if (!server || !username || !password) {
       throw new Error('Configuration Xtream invalide.');
     }
     return parseXtreamContent(playlist.xtreamConfig, playlist.id);
-  } else if (playlist.type === 'url' && playlist.url) {
+  } else if (playlist.type === PlaylistType.URL && playlist.url) { // CORRIGÉ
     const response = await fetch(playlist.url);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     const content = await response.text();
     return parseM3UContent(content, playlist.id);
-  } else if (playlist.type === 'file' && playlist.content) {
+  } else if (playlist.type === PlaylistType.FILE && playlist.content) { // CORRIGÉ
     // Correction : Utiliser 'file' au lieu de 'content' pour les fichiers locaux
     return parseM3UContent(playlist.content, playlist.id);
   } else {
     // TODO: Gérer le type 'torrent' ici, avec une fonction de parsing dédiée.
-    if (playlist.type === 'torrent') {
+    if (playlist.type === PlaylistType.TORRENT) { // CORRIGÉ
         throw new Error('La fonctionnalité Torrent n\'est pas encore implémentée.');
     }
     throw new Error('Configuration de playlist invalide ou type de playlist inconnu.');
