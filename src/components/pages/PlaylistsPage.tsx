@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Edit, Trash2, RefreshCw, Upload, AlertCircle, CheckCircle, XCircle, Link, FileText, Wifi, Film } from 'lucide-react';
+import { Plus, Edit, Trash2, RefreshCw, Upload, AlertCircle, CheckCircle, XCircle, Link, FileText, Wifi, Film, CloudUpload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -84,7 +84,7 @@ const PlaylistsPage: React.FC = () => {
     addPlaylist,
     updatePlaylist,
     removePlaylist,
-    togglePlaylistStatus, // <-- Corrigé : La fonction est bien de retour.
+    togglePlaylistStatus,
     refreshPlaylist,
     refreshPlaylists,
   } = usePlaylistStore();
@@ -93,6 +93,7 @@ const PlaylistsPage: React.FC = () => {
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+  const [torrentFileContent, setTorrentFileContent] = useState<File | null>(null); // Nouvel état pour le fichier torrent
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
 
   const form = useForm<PlaylistFormData>({
@@ -122,6 +123,7 @@ const PlaylistsPage: React.FC = () => {
     });
     setEditingPlaylist(null);
     setFileContent('');
+    setTorrentFileContent(null); // Réinitialiser le fichier torrent
     setIsDialogOpen(false);
   }, [form]);
 
@@ -130,21 +132,32 @@ const PlaylistsPage: React.FC = () => {
       const playlistData: Omit<Playlist, 'id' | 'lastUpdate' | 'channelCount' | 'isRemovable'> = {
         name: data.name,
         type: data.type,
-        url: data.url,
         description: data.description,
-        content: data.type === PlaylistType.FILE ? fileContent : undefined,
-        xtreamConfig: data.type === PlaylistType.XTREAM
-          ? {
-              server: data.xtreamServer || '',
-              username: data.xtreamUsername || '',
-              password: data.xtreamPassword || '',
-            }
-          : undefined,
         status: editingPlaylist?.status ?? PlaylistStatus.INACTIVE,
       };
 
+      if (data.type === PlaylistType.URL) {
+        playlistData.url = data.url;
+      } else if (data.type === PlaylistType.FILE) {
+        playlistData.content = fileContent;
+      } else if (data.type === PlaylistType.XTREAM) {
+        playlistData.xtreamConfig = {
+          server: data.xtreamServer || '',
+          username: data.xtreamUsername || '',
+          password: data.xtreamPassword || '',
+        };
+      } else if (data.type === PlaylistType.TORRENT) {
+        // Gérer le torrent, que ce soit une URL ou un fichier local
+        if (data.url) {
+          playlistData.url = data.url;
+        } else if (torrentFileContent) {
+          // L'implémentation pour le fichier local viendra plus tard, mais le store est prêt pour la recevoir
+          playlistData.content = await torrentFileContent.text(); // On lit le fichier ici
+        }
+      }
+
       if (editingPlaylist) {
-        await updatePlaylist(editingPlaylist.id, playlistData);
+        await updatePlaylist(editingPlaylist.id, playlistData as any);
         toast.success(`La playlist "${data.name}" a été mise à jour.`);
       } else {
         await addPlaylist(playlistData as any);
@@ -158,7 +171,7 @@ const PlaylistsPage: React.FC = () => {
         description: error instanceof Error ? error.message : "Une erreur inconnue est survenue.",
       });
     }
-  }, [editingPlaylist, fileContent, updatePlaylist, addPlaylist, resetFormAndState]);
+  }, [editingPlaylist, fileContent, torrentFileContent, updatePlaylist, addPlaylist, resetFormAndState]);
 
   const handleEdit = useCallback((playlist: Playlist) => {
     setEditingPlaylist(playlist);
@@ -171,7 +184,16 @@ const PlaylistsPage: React.FC = () => {
       xtreamUsername: playlist.xtreamConfig?.username || '',
       xtreamPassword: playlist.xtreamConfig?.password || '',
     });
-    if (playlist.content) setFileContent(playlist.content);
+    if (playlist.content) {
+      if (playlist.type === PlaylistType.FILE) {
+        setFileContent(playlist.content);
+      } else if (playlist.type === PlaylistType.TORRENT) {
+        // Pour les torrents, on ne peut pas réinjecter le contenu du fichier dans un input file
+        // On pourrait créer un faux fichier, mais ce n'est pas nécessaire pour l'UI
+        // L'URL du torrent est stockée dans `playlist.url`
+        setTorrentFileContent(null);
+      }
+    }
     setIsDialogOpen(true);
   }, [form]);
 
@@ -187,7 +209,7 @@ const PlaylistsPage: React.FC = () => {
     }
   }, [playlistToDelete, removePlaylist]);
 
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleM3uFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -204,6 +226,18 @@ const PlaylistsPage: React.FC = () => {
       });
     }
     reader.readAsText(file);
+    event.target.value = '';
+  }, [form]);
+
+  const handleTorrentFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setTorrentFileContent(file);
+    if (!form.getValues('name')) {
+      form.setValue('name', file.name.replace(/\.[^/.]+$/, ''));
+    }
+    // On met l'URL du formulaire à vide pour éviter une double validation
+    form.setValue('url', '');
     event.target.value = '';
   }, [form]);
 
@@ -282,10 +316,10 @@ const PlaylistsPage: React.FC = () => {
                   {watchType === PlaylistType.FILE && (
                     <motion.div key="file-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="space-y-2">
                       <label className="text-sm font-medium">Fichier M3U</label>
-                      <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById('file-upload')?.click()}>
+                      <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById('m3u-file-upload')?.click()}>
                         <Upload className="mr-2 h-4 w-4" /> {fileContent ? 'Fichier chargé' : 'Choisir un fichier'}
                       </Button>
-                      <input id="file-upload" type="file" accept=".m3u,.m3u8" onChange={handleFileUpload} className="hidden" />
+                      <input id="m3u-file-upload" type="file" accept=".m3u,.m3u8" onChange={handleM3uFileUpload} className="hidden" />
                       {fileContent && (
                         <Textarea value={fileContent} onChange={(e) => setFileContent(e.target.value)} placeholder="Le contenu du fichier M3U apparaîtra ici..." rows={5} />
                       )}
@@ -313,13 +347,23 @@ const PlaylistsPage: React.FC = () => {
                     </motion.div>
                   )}
                   {watchType === PlaylistType.TORRENT && (
-                    <motion.div key="torrent-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+                    <motion.div key="torrent-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="space-y-2">
                       <label htmlFor="url" className="text-sm font-medium">Lien Torrent (magnet: ou URL)</label>
-                      <Input id="url" {...form.register('url')} placeholder="magnet:?xt=urn:btih:..." type="url" className="mt-1" />
+                      <Input id="url" {...form.register('url')} placeholder="magnet:?xt=urn:btih:..." type="text" className="mt-1" />
                       {form.formState.errors.url && <p className="text-sm text-red-500 mt-1">{form.formState.errors.url.message}</p>}
                       <p className="text-sm text-muted-foreground mt-2">
                         Collez ici un lien "magnet" ou une URL directe vers un fichier `.torrent`.
                       </p>
+                      <div className="flex items-center space-x-2 my-2">
+                        <Separator />
+                        <span className="text-sm text-muted-foreground">OU</span>
+                        <Separator />
+                      </div>
+                      <label className="text-sm font-medium">Fichier Torrent local</label>
+                      <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById('torrent-file-upload')?.click()}>
+                        <CloudUpload className="mr-2 h-4 w-4" /> {torrentFileContent ? torrentFileContent.name : 'Choisir un fichier .torrent'}
+                      </Button>
+                      <input id="torrent-file-upload" type="file" accept=".torrent" onChange={handleTorrentFileUpload} className="hidden" />
                     </motion.div>
                   )}
                 </AnimatePresence>

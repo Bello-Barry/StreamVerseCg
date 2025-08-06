@@ -12,18 +12,20 @@ import {
   PlaylistStatus,
   PlaylistType,
   Movie,
+  TorrentResource,
+  Series,
+  TorrentParserResult,
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
 import { parseTorrentContent } from '@/lib/torrentParser'; // Nouvelle importation
 
 /**
- * Interface pour le store global de playlists.
+ * Interface pour le store global de playlists, étendue pour supporter les torrents.
  * @interface PlaylistStore
  * @extends PlaylistManagerState
  */
 interface PlaylistStore extends PlaylistManagerState {
-  // Ajout de la gestion des films/séries depuis les torrents
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
   updatePlaylist: (id: string, updates: Partial<Playlist>) => void;
   removePlaylist: (id: string) => void;
@@ -40,10 +42,12 @@ interface PlaylistStore extends PlaylistManagerState {
   resetStore: () => void;
 }
 
+// État initial du store
 const initialState: PlaylistManagerState = {
   playlists: [],
   channels: [],
   categories: [],
+  torrents: new Map<string, TorrentResource[]>(), // Initialise la Map des torrents
   loading: false,
   error: null,
 };
@@ -75,44 +79,53 @@ const defaultPlaylists: Playlist[] = [
 ];
 
 /**
- * Fonction utilitaire pour fetch et parser une playlist.
- * Refactorisation pour éviter la duplication de code.
- * J'ai ajouté le support pour le type 'torrent'.
+ * Fonction utilitaire pour fetch et parser une playlist de manière générique.
+ * Cette fonction gère tous les types de playlists (URL, Fichier, Xtream, Torrent).
+ * @param {Playlist} playlist La playlist à traiter.
+ * @returns {Promise<M3UParseResult | TorrentParserResult>}
  */
-const fetchAndParsePlaylist = async (playlist: Playlist): Promise<M3UParseResult> => {
+const fetchAndProcessPlaylist = async (
+  playlist: Playlist
+): Promise<M3UParseResult | TorrentParserResult> => {
   if (playlist.status !== PlaylistStatus.ACTIVE) {
     throw new Error('La playlist est inactive.');
   }
 
-  if (playlist.type === PlaylistType.XTREAM && playlist.xtreamConfig) {
-    const { server, username, password } = playlist.xtreamConfig;
-    if (!server || !username || !password) {
-      throw new Error('Configuration Xtream invalide.');
-    }
-    return parseXtreamContent(playlist.xtreamConfig, playlist.id);
-  } else if (playlist.type === PlaylistType.URL && playlist.url) {
-    const response = await fetch(playlist.url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    const content = await response.text();
-    return parseM3UContent(content, playlist.id);
-  } else if (playlist.type === PlaylistType.FILE && playlist.content) {
-    return parseM3UContent(playlist.content, playlist.id);
-  } else if (playlist.type === PlaylistType.TORRENT && playlist.url) {
-    // Nouveau cas pour les torrents
-    const torrentResult = await parseTorrentContent(playlist.url, playlist.id);
-    if (!torrentResult || torrentResult.movies.length === 0) {
-      throw new Error('Aucun film ou série trouvé dans le torrent.');
-    }
-    // TODO: Gérer ici la conversion des films/séries en un format de 'Channel'
-    // Pour l'instant, nous renvoyons un tableau vide. C'est le point à implémenter.
-    return { channels: [], errors: [], warnings: [] };
-  } else {
-    throw new Error('Configuration de playlist invalide ou type de playlist inconnu.');
+  switch (playlist.type) {
+    case PlaylistType.XTREAM:
+      if (!playlist.xtreamConfig) {
+        throw new Error('Configuration Xtream invalide.');
+      }
+      return parseXtreamContent(playlist.xtreamConfig, playlist.id);
+
+    case PlaylistType.URL:
+      if (!playlist.url) {
+        throw new Error('URL de playlist invalide.');
+      }
+      const response = await fetch(playlist.url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const content = await response.text();
+      return parseM3UContent(content, playlist.id);
+
+    case PlaylistType.FILE:
+      if (!playlist.content) {
+        throw new Error('Contenu de fichier invalide.');
+      }
+      return parseM3UContent(playlist.content, playlist.id);
+
+    case PlaylistType.TORRENT:
+      // Le contenu du torrent est soit une URL (magnet, etc.) soit le contenu binaire d'un fichier.
+      if (!playlist.url && !playlist.content) {
+        throw new Error('Lien ou fichier torrent manquant.');
+      }
+      return parseTorrentContent(playlist.url || playlist.content!, playlist.id);
+
+    default:
+      throw new Error('Type de playlist inconnu.');
   }
 };
-
 
 export const usePlaylistStore = create<PlaylistStore>()(
   persist(
@@ -156,10 +169,15 @@ export const usePlaylistStore = create<PlaylistStore>()(
           return;
         }
 
-        set((state) => ({
-          playlists: state.playlists.filter((p) => p.id !== id),
-          channels: state.channels.filter((c) => c.playlistSource !== id),
-        }));
+        set((state) => {
+          const newTorrents = new Map(state.torrents);
+          newTorrents.delete(id); // Supprime les torrents associés
+          return {
+            playlists: state.playlists.filter((p) => p.id !== id),
+            channels: state.channels.filter((c) => c.playlistSource !== id),
+            torrents: newTorrents,
+          };
+        });
 
         set((state) => ({
           categories: get().getCategories(),
@@ -187,6 +205,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
         const { playlists } = get();
         set({ loading: true, error: null });
         const newChannels: Channel[] = [];
+        const newTorrents = new Map<string, TorrentResource[]>();
 
         for (const playlist of playlists) {
           if (playlist.status !== PlaylistStatus.ACTIVE) {
@@ -195,17 +214,31 @@ export const usePlaylistStore = create<PlaylistStore>()(
           }
 
           try {
-            const parseResult = await fetchAndParsePlaylist(playlist);
+            const parseResult = await fetchAndProcessPlaylist(playlist);
+            let count = 0;
 
-            if (parseResult.channels.length > 0) {
-              newChannels.push(...parseResult.channels);
-              get().updatePlaylist(playlist.id, {
-                channelCount: parseResult.channels.length,
-                status: PlaylistStatus.ACTIVE,
-              });
+            if ('channels' in parseResult) {
+              if (parseResult.channels.length > 0) {
+                newChannels.push(...parseResult.channels);
+                count = parseResult.channels.length;
+              } else {
+                throw new Error('Aucune chaîne trouvée dans la playlist.');
+              }
             } else {
-              throw new Error('Aucune chaîne trouvée dans la playlist.');
+              // C'est un résultat de torrent
+              const resources = [...(parseResult.movies || []), ...(parseResult.series || [])];
+              if (resources.length > 0) {
+                newTorrents.set(playlist.id, resources);
+                count = resources.length;
+              } else {
+                throw new Error('Aucun film ou série trouvé dans le torrent.');
+              }
             }
+
+            get().updatePlaylist(playlist.id, {
+              channelCount: count,
+              status: PlaylistStatus.ACTIVE,
+            });
           } catch (error) {
             console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
             const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -219,6 +252,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
         set({
           channels: newChannels,
+          torrents: newTorrents,
           categories: get().getCategories(),
           loading: false,
         });
@@ -236,26 +270,46 @@ export const usePlaylistStore = create<PlaylistStore>()(
         set({ loading: true, error: null });
 
         try {
-          const parseResult = await fetchAndParsePlaylist(playlist);
+          const parseResult = await fetchAndProcessPlaylist(playlist);
+          let count = 0;
 
-          if (parseResult.channels.length > 0) {
-            set((state) => ({
-              channels: [
-                ...state.channels.filter((c) => c.playlistSource !== playlist.id),
-                ...parseResult.channels,
-              ],
-              categories: get().getCategories(),
-              loading: false,
-            }));
-
-            get().updatePlaylist(id, {
-              channelCount: parseResult.channels.length,
-              status: PlaylistStatus.ACTIVE,
-            });
-            toast.success(`La playlist "${playlist.name}" a été mise à jour !`);
+          if ('channels' in parseResult) {
+            if (parseResult.channels.length > 0) {
+              set((state) => ({
+                channels: [
+                  ...state.channels.filter((c) => c.playlistSource !== playlist.id),
+                  ...parseResult.channels,
+                ],
+                categories: get().getCategories(),
+                loading: false,
+              }));
+              count = parseResult.channels.length;
+            } else {
+              throw new Error('Aucune chaîne trouvée dans la playlist.');
+            }
           } else {
-            throw new Error('Aucune chaîne trouvée dans la playlist');
+            // C'est un résultat de torrent
+            const resources = [...(parseResult.movies || []), ...(parseResult.series || [])];
+            if (resources.length > 0) {
+              set((state) => {
+                const newTorrents = new Map(state.torrents);
+                newTorrents.set(playlist.id, resources);
+                return {
+                  torrents: newTorrents,
+                  loading: false,
+                };
+              });
+              count = resources.length;
+            } else {
+              throw new Error('Aucun film ou série trouvé dans le torrent.');
+            }
           }
+
+          get().updatePlaylist(id, {
+            channelCount: count,
+            status: PlaylistStatus.ACTIVE,
+          });
+          toast.success(`La playlist "${playlist.name}" a été mise à jour !`);
         } catch (error) {
           console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
           const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -349,4 +403,3 @@ export const usePlaylistStore = create<PlaylistStore>()(
     }
   )
 );
-
