@@ -21,7 +21,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * Zod Schema pour la validation de la playlist.
- * Amélioré pour inclure la validation des URLs de torrent.
+ * Le schéma a été mis à jour pour être plus robuste et plus simple.
  */
 const playlistSchema = z.object({
   name: z.string().min(1, 'Le nom est requis.').max(100),
@@ -31,25 +31,24 @@ const playlistSchema = z.object({
   xtreamServer: z.string().optional(),
   xtreamUsername: z.string().optional(),
   xtreamPassword: z.string().optional(),
-}).refine(
-  (data) => {
-    // Valider l'URL pour les types URL et TORRENT
-    if (data.type === PlaylistType.URL || data.type === PlaylistType.TORRENT) {
-      return data.url && z.string().url().safeParse(data.url).success;
-    }
-    return true;
-  },
-  {
-    message: 'Une URL valide est requise pour ce type de playlist.',
-    path: ['url'],
+}).superRefine((data, ctx) => {
+  if (data.type === PlaylistType.URL && (!data.url || !z.string().url().safeParse(data.url).success)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Une URL valide est requise pour ce type de playlist.',
+      path: ['url'],
+    });
   }
-).refine(
-  (data) => data.type !== PlaylistType.XTREAM || (data.xtreamServer && data.xtreamUsername && data.xtreamPassword),
-  {
-    message: 'Les identifiants Xtream sont requis pour le type Xtream.',
-    path: ['xtreamServer'],
+  if (data.type === PlaylistType.XTREAM && (!data.xtreamServer || !data.xtreamUsername || !data.xtreamPassword)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Les identifiants Xtream sont requis pour le type Xtream.',
+      path: ['xtreamServer'],
+    });
   }
-);
+  // Pas de validation de l'URL du torrent ici, car cela dépend d'un état local (le fichier)
+  // et non du formulaire directement. On gérera ça dans handleSubmit.
+});
 
 // Fonctions utilitaires pour le composant
 const getStatusInfo = (status: PlaylistStatus | string) => {
@@ -57,7 +56,7 @@ const getStatusInfo = (status: PlaylistStatus | string) => {
     case 'active': return { Icon: CheckCircle, text: 'Active', color: 'bg-green-500' };
     case 'error': return { Icon: XCircle, text: 'Erreur', color: 'bg-red-500' };
     case 'inactive': return { Icon: AlertCircle, text: 'Inactive', color: 'bg-yellow-500' };
-    case 'loading': return { Icon: RefreshCw, text: 'Chargement...', color: 'bg-blue-500' };
+    case 'loading': return { Icon: RefreshCw, text: 'Chargement...', color: 'bg-blue-500 animate-spin' };
     default: return { Icon: AlertCircle, text: 'Inconnu', color: 'bg-gray-500' };
   }
 };
@@ -93,7 +92,7 @@ const PlaylistsPage: React.FC = () => {
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
-  const [torrentFileContent, setTorrentFileContent] = useState<File | null>(null); // Nouvel état pour le fichier torrent
+  const [torrentFileContent, setTorrentFileContent] = useState<File | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
 
   const form = useForm<PlaylistFormData>({
@@ -110,6 +109,18 @@ const PlaylistsPage: React.FC = () => {
   });
 
   const watchType = form.watch('type');
+  const watchUrl = form.watch('url');
+
+  // Met à jour la validation et le contenu du formulaire quand le type change
+  useEffect(() => {
+    form.clearErrors();
+    form.setValue('url', '');
+    form.setValue('xtreamServer', '');
+    form.setValue('xtreamUsername', '');
+    form.setValue('xtreamPassword', '');
+    setFileContent('');
+    setTorrentFileContent(null);
+  }, [watchType, form]);
 
   const resetFormAndState = useCallback(() => {
     form.reset({
@@ -123,7 +134,7 @@ const PlaylistsPage: React.FC = () => {
     });
     setEditingPlaylist(null);
     setFileContent('');
-    setTorrentFileContent(null); // Réinitialiser le fichier torrent
+    setTorrentFileContent(null);
     setIsDialogOpen(false);
   }, [form]);
 
@@ -139,6 +150,7 @@ const PlaylistsPage: React.FC = () => {
       if (data.type === PlaylistType.URL) {
         playlistData.url = data.url;
       } else if (data.type === PlaylistType.FILE) {
+        if (!fileContent) throw new Error("Veuillez charger un fichier M3U.");
         playlistData.content = fileContent;
       } else if (data.type === PlaylistType.XTREAM) {
         playlistData.xtreamConfig = {
@@ -147,12 +159,15 @@ const PlaylistsPage: React.FC = () => {
           password: data.xtreamPassword || '',
         };
       } else if (data.type === PlaylistType.TORRENT) {
-        // Gérer le torrent, que ce soit une URL ou un fichier local
-        if (data.url) {
+        if (torrentFileContent) {
+          // L'implémentation du parser de fichier torrent n'est pas encore complète
+          // mais le store est prêt à recevoir le contenu.
+          playlistData.content = await torrentFileContent.text();
+          playlistData.url = data.url; // Garde l'URL au cas où, pour une meilleure compatibilité
+        } else if (data.url) {
           playlistData.url = data.url;
-        } else if (torrentFileContent) {
-          // L'implémentation pour le fichier local viendra plus tard, mais le store est prêt pour la recevoir
-          playlistData.content = await torrentFileContent.text(); // On lit le fichier ici
+        } else {
+          throw new Error("Veuillez fournir une URL ou un fichier torrent.");
         }
       }
 
@@ -188,9 +203,7 @@ const PlaylistsPage: React.FC = () => {
       if (playlist.type === PlaylistType.FILE) {
         setFileContent(playlist.content);
       } else if (playlist.type === PlaylistType.TORRENT) {
-        // Pour les torrents, on ne peut pas réinjecter le contenu du fichier dans un input file
-        // On pourrait créer un faux fichier, mais ce n'est pas nécessaire pour l'UI
-        // L'URL du torrent est stockée dans `playlist.url`
+        // L'URL du torrent est dans playlist.url, le contenu du fichier peut être ignoré pour l'édition de l'UI
         setTorrentFileContent(null);
       }
     }
@@ -236,7 +249,7 @@ const PlaylistsPage: React.FC = () => {
     if (!form.getValues('name')) {
       form.setValue('name', file.name.replace(/\.[^/.]+$/, ''));
     }
-    // On met l'URL du formulaire à vide pour éviter une double validation
+    // Si un fichier est sélectionné, l'URL n'est plus pertinente. On la vide.
     form.setValue('url', '');
     event.target.value = '';
   }, [form]);
@@ -255,6 +268,12 @@ const PlaylistsPage: React.FC = () => {
     setIsRefreshingAll(false);
   }, [refreshPlaylists]);
 
+  // Si une URL est saisie, le fichier torrent n'est plus pertinent. On le vide.
+  useEffect(() => {
+    if (watchUrl && watchType === PlaylistType.TORRENT) {
+      setTorrentFileContent(null);
+    }
+  }, [watchUrl, watchType]);
 
   useEffect(() => {
     if (!isDialogOpen) resetFormAndState();
@@ -349,7 +368,14 @@ const PlaylistsPage: React.FC = () => {
                   {watchType === PlaylistType.TORRENT && (
                     <motion.div key="torrent-form" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="space-y-2">
                       <label htmlFor="url" className="text-sm font-medium">Lien Torrent (magnet: ou URL)</label>
-                      <Input id="url" {...form.register('url')} placeholder="magnet:?xt=urn:btih:..." type="text" className="mt-1" />
+                      <Input
+                        id="url"
+                        {...form.register('url')}
+                        placeholder="magnet:?xt=urn:btih:..."
+                        type="text"
+                        className="mt-1"
+                        disabled={!!torrentFileContent} // Désactive le champ si un fichier est déjà chargé
+                      />
                       {form.formState.errors.url && <p className="text-sm text-red-500 mt-1">{form.formState.errors.url.message}</p>}
                       <p className="text-sm text-muted-foreground mt-2">
                         Collez ici un lien "magnet" ou une URL directe vers un fichier `.torrent`.
@@ -360,7 +386,13 @@ const PlaylistsPage: React.FC = () => {
                         <Separator />
                       </div>
                       <label className="text-sm font-medium">Fichier Torrent local</label>
-                      <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById('torrent-file-upload')?.click()}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => document.getElementById('torrent-file-upload')?.click()}
+                        disabled={!!watchUrl} // Désactive le bouton si une URL est déjà saisie
+                      >
                         <CloudUpload className="mr-2 h-4 w-4" /> {torrentFileContent ? torrentFileContent.name : 'Choisir un fichier .torrent'}
                       </Button>
                       <input id="torrent-file-upload" type="file" accept=".torrent" onChange={handleTorrentFileUpload} className="hidden" />
@@ -415,7 +447,7 @@ const PlaylistsPage: React.FC = () => {
                   <CardContent className="flex-grow p-4 pt-0 text-sm text-muted-foreground space-y-2">
                     <p>{playlist.description || 'Aucune description fournie.'}</p>
                     <div className="flex justify-between items-center text-xs text-muted-foreground">
-                      <span>Chaînes: {playlist.channelCount}</span>
+                      <span>{playlist.type === PlaylistType.TORRENT ? `Ressources: ${playlist.channelCount}` : `Chaînes: ${playlist.channelCount}`}</span>
                       <span>Mise à jour: {playlist.lastUpdate ? new Date(playlist.lastUpdate).toLocaleDateString() : 'N/A'}</span>
                     </div>
                   </CardContent>
@@ -424,7 +456,7 @@ const PlaylistsPage: React.FC = () => {
                       {playlist.status === PlaylistStatus.ACTIVE ? 'Désactiver' : 'Activer'}
                     </Button>
                     <div className="flex items-center space-x-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleRefreshClick(playlist.id)} disabled={loading} title="Actualiser"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleRefreshClick(playlist.id)} disabled={loading} title="Actualiser"><RefreshCw className={`h-4 w-4 ${loading && playlist.id === (editingPlaylist?.id || '') ? 'animate-spin' : ''}`} /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(playlist)} title="Modifier"><Edit className="h-4 w-4" /></Button>
                       {playlist.isRemovable !== false && (
                         <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-500/10" onClick={() => setPlaylistToDelete(playlist)} title="Supprimer"><Trash2 className="h-4 w-4" /></Button>
