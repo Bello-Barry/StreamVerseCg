@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { toast } from 'sonner'; // Utilisation de sonner pour les notifications
+import { toast } from 'sonner';
 import {
   Playlist,
   Channel,
@@ -92,7 +92,8 @@ const fetchAndParsePlaylist = async (playlist: Playlist): Promise<M3UParseResult
     }
     const content = await response.text();
     return parseM3UContent(content, playlist.id);
-  } else if (playlist.type === 'content' && playlist.content) {
+  } else if (playlist.type === 'file' && playlist.content) {
+    // Correction : Utiliser 'file' au lieu de 'content' pour les fichiers locaux
     return parseM3UContent(playlist.content, playlist.id);
   } else {
     // TODO: Gérer le type 'torrent' ici, avec une fonction de parsing dédiée.
@@ -319,12 +320,9 @@ export const usePlaylistStore = create<PlaylistStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Si le store est réhydraté mais ne contient aucune playlist (c'est-à-dire
-          // c'est la première fois ou l'utilisateur a tout supprimé), on ajoute les playlists par défaut.
           if (!state.playlists || state.playlists.length === 0) {
               state.playlists = defaultPlaylists;
           } else {
-              // Ajout des playlists par défaut si elles ne sont pas déjà présentes.
               const existingDefaultIds = new Set(state.playlists.map(p => p.id));
               const mergedPlaylists = [
                   ...state.playlists,
@@ -332,8 +330,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
               ];
               state.playlists = mergedPlaylists;
           }
-          // On lance le rafraîchissement des playlists pour charger les chaînes
-          // directement après la réhydratation.
           state.refreshPlaylists();
         }
       }
