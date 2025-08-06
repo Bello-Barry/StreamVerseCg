@@ -5,6 +5,9 @@
      * Celles-ci sont essentielles pour la plupart des projets Next.js.
      */
     "target": "ES2022", // Cible une version de langage plus récente pour tirer parti des dernières fonctionnalités.
+    
+    "typeRoots": ["./types", "./node_modules/@types"], 
+    
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
