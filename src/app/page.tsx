@@ -14,7 +14,8 @@ import PlayerPage from '@/components/pages/PlayerPage';
 import PlaylistsPage from '@/components/pages/PlaylistsPage';
 import { AnalyticsPage } from '@/components/pages/AnalyticsPage';
 import { NotificationsPage } from '@/components/pages/NotificationsPage';
-import { ThemesPage } from '@/components/pages/ThemesPage';
+import ThemesPage from '@/components/pages/ThemesPage';
+
 import { AnalyticsProvider } from '@/components/AnalyticsProvider';
 import { NotificationProvider } from '@/components/NotificationProvider';
 import { useAppStore } from '@/stores/useAppStore';
