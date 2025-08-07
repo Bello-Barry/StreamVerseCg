@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Film, PlayCircle, Loader2, ListVideo, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useTorrentPlayer } from '@/hooks/useTorrentPlayer'; // Chemin corrigé pour pointer vers le hook
+import { useTorrentPlayer } from '@/stores/useTorrentPlayer'; // Chemin corrigé pour pointer vers le hook
 import { useEffect } from 'react';
 
 // Importez le composant de lecteur vidéo que nous avons créé
