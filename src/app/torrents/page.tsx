@@ -6,9 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Film, PlayCircle, Loader2, ListVideo, AlertCircle } from 'lucide-react'; // <-- J'ai ajouté AlertCircle ici
+import { Film, PlayCircle, Loader2, ListVideo, AlertCircle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useTorrentPlayer } from '@/stores/useTorrentPlayer'; // Nouveau hook à créer
+import { useTorrentPlayer } from '@/hooks/useTorrentPlayer'; // Chemin corrigé pour pointer vers le hook
+import { useEffect } from 'react';
+
+// Importez le composant de lecteur vidéo que nous avons créé
+import { Player } from '@/components/Player';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -29,7 +33,7 @@ const itemVariants = {
  * Composant de carte pour afficher un film ou une série.
  */
 function ResourceCard({ resource, onPlay }: { resource: Movie | Series; onPlay: (resource: Movie | Series) => void; }) {
-  const isMovie = (resource as Movie).magnetURI !== undefined; // Vérifie si c'est un film via sa propriété unique
+  const isMovie = (resource as Movie).magnetURI !== undefined;
   
   const handlePlayClick = () => {
     onPlay(resource);
@@ -71,20 +75,25 @@ function ResourceCard({ resource, onPlay }: { resource: Movie | Series; onPlay: 
  */
 export default function TorrentsPage() {
   const { playlists, torrents } = usePlaylistStore();
-  const { playTorrent, isLoading, error } = useTorrentPlayer();
+  const { playTorrent, isLoading, error, cleanup } = useTorrentPlayer();
 
   const torrentPlaylists: Playlist[] = playlists.filter(p => p.type === 'torrent');
 
   const handlePlay = (resource: Movie | Series) => {
-    // Si c'est une série, on affiche la liste des épisodes
     if ((resource as Series).episodes) {
-      // TODO: Implémenter la navigation vers une page d'épisodes ou une modale
       console.log(`Affichage des épisodes pour la série : ${resource.name}`);
+      // TODO: Implémenter la navigation vers une page d'épisodes ou une modale
       return;
     }
-    // Si c'est un film, on le joue directement
     playTorrent(resource as Movie);
   };
+  
+  // Utiliser useEffect pour nettoyer le client WebTorrent à la sortie de la page
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   if (torrentPlaylists.length === 0) {
     return (
@@ -102,6 +111,12 @@ export default function TorrentsPage() {
   return (
     <ScrollArea className="h-[calc(100vh-64px)] p-4 md:p-8">
       <h1 className="text-3xl font-bold mb-6">Films & Séries</h1>
+
+      {/* Le conteneur du lecteur vidéo */}
+      <div className="flex-1 w-full aspect-video bg-black rounded-lg overflow-hidden mb-4">
+        <Player /> {/* C'est ici que le lecteur est rendu */}
+      </div>
+
       {isLoading && (
         <div className="flex items-center text-blue-500 mb-4">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -114,13 +129,14 @@ export default function TorrentsPage() {
           <span>{error}</span>
         </div>
       )}
+
       <AnimatePresence>
         <motion.div
           key="torrent-list"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="space-y-8 mt-8"
         >
           {torrentPlaylists.map(playlist => (
             <section key={playlist.id}>
