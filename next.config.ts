@@ -30,6 +30,30 @@ const nextConfig: NextConfig = {
    eslint: {
      ignoreDuringBuilds: true,
   },
+  
+    // Ignorer les warnings des dépendances natives
+    config.ignoreWarnings = [
+      {
+        module: /fs-native-extensions/,
+      },
+      {
+        module: /require-addon/,
+      },
+      {
+        message: /Critical dependency/,
+      },
+    ];
+
+    return config;
+  },
+
+  // Configuration expérimentale pour les modules ES
+  experimental: {
+    esmExternals: 'loose',
+  },
+
+  // Transpiler les modules nécessaires
+  transpilePackages: ['webtorrent'],
 
   /*
    * Options de compilation SWC (Rust-based).

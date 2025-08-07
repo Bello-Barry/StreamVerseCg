@@ -4,7 +4,24 @@ import { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { Movie } from '@/types';
 import { toast } from 'sonner';
-import type { WebTorrent } from 'webtorrent'; // Importer le type seulement
+
+// Interface minimale pour éviter les erreurs de types
+interface TorrentFile {
+  name: string;
+  getBlobURL(callback: (err: Error | null, url?: string) => void): void;
+}
+
+interface TorrentInstance {
+  files: TorrentFile[];
+  destroy(): void;
+}
+
+interface WebTorrentClient {
+  torrents: TorrentInstance[];
+  add(torrentId: string, callback?: (torrent: TorrentInstance) => void): void;
+  on(event: string, callback: (error?: any) => void): void;
+  destroy(): void;
+}
 
 /**
  * Hook personnalisé pour gérer la lecture de contenu en P2P via WebTorrent.
@@ -14,40 +31,47 @@ export const useTorrentPlayer = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Le type de la référence est WebTorrent ou null.
-  const clientRef = useRef<WebTorrent | null>(null);
+  const clientRef = useRef<WebTorrentClient | null>(null);
   const setCurrentChannel = useAppStore(state => state.setCurrentChannel);
 
   /**
    * Initialise le client WebTorrent s'il n'existe pas.
    * Utilise un import dynamique pour éviter les problèmes de rendu côté serveur.
-   * @returns {Promise<WebTorrent>} Le client WebTorrent.
+   * @returns {Promise<WebTorrentClient>} Le client WebTorrent.
    */
-  const getClient = useCallback(async (): Promise<WebTorrent> => {
+  const getClient = useCallback(async (): Promise<WebTorrentClient> => {
     if (clientRef.current) {
       return clientRef.current;
     }
 
+    // Vérifier que nous sommes bien côté client
+    if (typeof window === 'undefined') {
+      throw new Error('WebTorrent ne peut être utilisé que côté client');
+    }
+
     console.log("Initialisation du client WebTorrent...");
     
-    // Import dynamique pour s'assurer que le code ne s'exécute que côté client
-    // et pour résoudre les warnings du build.
-    const { default: WebTorrentDefault } = await import('webtorrent');
-
-    // La solution du double "as" pour forcer TypeScript à accepter la conversion.
-    // L'erreur de build nous a donné la solution : d'abord convertir en 'unknown'.
-    const client: WebTorrent = new WebTorrentDefault() as unknown as WebTorrent;
-    
-    client.on('error', (err) => {
-      console.error('WebTorrent Client Error:', err);
-      setError('Erreur du client WebTorrent. Veuillez réessayer.');
-      toast.error('Erreur de lecture du torrent', {
-        description: "Le client de streaming a rencontré une erreur.",
+    try {
+      // Import dynamique pour s'assurer que le code ne s'exécute que côté client
+      const WebTorrent = (await import('webtorrent')).default;
+      
+      // Créer le client avec une assertion de type plus simple
+      const client = new WebTorrent() as unknown as WebTorrentClient;
+      
+      client.on('error', (err) => {
+        console.error('WebTorrent Client Error:', err);
+        setError('Erreur du client WebTorrent. Veuillez réessayer.');
+        toast.error('Erreur de lecture du torrent', {
+          description: "Le client de streaming a rencontré une erreur.",
+        });
       });
-    });
-    
-    clientRef.current = client;
-    return client;
+      
+      clientRef.current = client;
+      return client;
+    } catch (importError) {
+      console.error('Erreur lors de l\'import de WebTorrent:', importError);
+      throw new Error('Impossible de charger WebTorrent');
+    }
   }, []);
 
   /**
@@ -63,24 +87,27 @@ export const useTorrentPlayer = () => {
       
       // Si un torrent est déjà en cours, on le détruit pour en lancer un nouveau.
       if (client.torrents.length > 0) {
-          client.torrents.forEach(t => t.destroy());
+        client.torrents.forEach(t => t.destroy());
       }
   
       toast.info('Démarrage du torrent...', {
         description: `Préparation de la lecture de "${movie.name}".`,
       });
   
-      client.add(movie.magnetURI || movie.infoHash, (torrent: WebTorrent.Torrent) => {
+      client.add(movie.magnetURI || movie.infoHash, (torrent: TorrentInstance) => {
         console.log('Torrent ready!', torrent);
+        
         // Filtrer les fichiers vidéo pour trouver le bon
         const file = torrent.files.find(f => 
           f.name.endsWith('.mp4') || 
           f.name.endsWith('.mkv') || 
-          f.name.endsWith('.avi')
+          f.name.endsWith('.avi') ||
+          f.name.endsWith('.webm') ||
+          f.name.endsWith('.mov')
         );
         
         if (file) {
-          file.getBlobURL((err: Error | null, url: string) => {
+          file.getBlobURL((err: Error | null, url?: string) => {
             if (err || !url) {
               console.error('Erreur lors de la création de l\'URL blob:', err);
               setError('Impossible de créer l\'URL de lecture.');
@@ -94,14 +121,12 @@ export const useTorrentPlayer = () => {
             const fakeChannel = {
               id: movie.id,
               name: movie.name,
-              url: url, // L'URL du blob
+              url: url,
               tvgLogo: movie.poster,
               group: 'Torrents',
               playlistSource: movie.playlistSource,
-              // ... autres propriétés optionnelles
             };
             
-            // Mettre à jour le store pour que le Player puisse jouer ce "canal"
             setCurrentChannel(fakeChannel);
             setIsLoading(false);
             toast.success('Lecture en cours', {
@@ -127,5 +152,15 @@ export const useTorrentPlayer = () => {
     }
   }, [getClient, setCurrentChannel]);
 
-  return { playTorrent, isLoading, error };
+  /**
+   * Nettoie les ressources WebTorrent
+   */
+  const cleanup = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.destroy();
+      clientRef.current = null;
+    }
+  }, []);
+
+  return { playTorrent, isLoading, error, cleanup };
 };
