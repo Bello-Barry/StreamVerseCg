@@ -13,7 +13,9 @@ import { toast } from 'sonner';
 export const useTorrentPlayer = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  // Utiliser `WebTorrent.WebTorrent` pour le typage du client
+  
+  // Utiliser le type WebTorrent.WebTorrent pour le client, car c'est le type correct selon @types/webtorrent.
+  // useRef peut stocker null au début.
   const clientRef = useRef<WebTorrent.WebTorrent | null>(null);
   const setCurrentChannel = useAppStore(state => state.setCurrentChannel);
 
@@ -24,7 +26,10 @@ export const useTorrentPlayer = () => {
   const getClient = useCallback((): WebTorrent.WebTorrent => {
     if (!clientRef.current) {
       console.log("Initialisation du client WebTorrent...");
+      // Créer une nouvelle instance de WebTorrent
       const client = new WebTorrent();
+
+      // Attacher le gestionnaire d'erreurs
       client.on('error', (err) => {
         console.error('WebTorrent Client Error:', err);
         setError('Erreur du client WebTorrent. Veuillez réessayer.');
@@ -32,6 +37,8 @@ export const useTorrentPlayer = () => {
           description: "Le client de streaming a rencontré une erreur.",
         });
       });
+      
+      // Assigner le client initialisé à la référence
       clientRef.current = client;
     }
     // TypeScript sait maintenant que clientRef.current n'est pas null ici
@@ -57,12 +64,10 @@ export const useTorrentPlayer = () => {
     });
 
     try {
-      // J'utilise le type 'any' pour l'instant car le typage du callback de 'add' peut être complexe.
-      // Cela évite de bloquer le build tout en restant fonctionnel.
-      client.add(movie.magnetURI || movie.infoHash, (torrent: any) => {
+      client.add(movie.magnetURI || movie.infoHash, (torrent: WebTorrent.Torrent) => {
         console.log('Torrent ready!', torrent);
         // Filtrer les fichiers vidéo pour trouver le bon
-        const file = torrent.files.find((f: any) => 
+        const file = torrent.files.find(f => 
           f.name.endsWith('.mp4') || 
           f.name.endsWith('.mkv') || 
           f.name.endsWith('.avi')
