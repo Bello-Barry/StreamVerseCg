@@ -30,7 +30,25 @@ const nextConfig: NextConfig = {
    eslint: {
      ignoreDuringBuilds: true,
   },
-  
+
+  // Configuration Webpack pour WebTorrent et les dépendances natives
+  webpack: (config, { isServer }) => {
+    // Exclure WebTorrent du rendu côté serveur
+    if (isServer) {
+      config.externals.push('webtorrent');
+    } else {
+      // Configuration pour le côté client
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+        stream: false,
+        util: false,
+        buffer: require.resolve('buffer'),
+      };
+    }
+
     // Ignorer les warnings des dépendances natives
     config.ignoreWarnings = [
       {
