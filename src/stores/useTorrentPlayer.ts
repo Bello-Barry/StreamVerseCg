@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { Movie } from '@/types';
-import WebTorrent from 'webtorrent'; // L'import est correct, il fallait les types
+import WebTorrent from 'webtorrent';
 import { toast } from 'sonner';
 
 /**
@@ -24,17 +24,17 @@ export const useTorrentPlayer = () => {
   const getClient = useCallback((): WebTorrent.WebTorrent => {
     if (!clientRef.current) {
       console.log("Initialisation du client WebTorrent...");
-      // S'assurer que le constructeur est bien de type 'any' pour éviter les erreurs de typage avec le constructeur
-      const WebTorrentAny = WebTorrent as any;
-      clientRef.current = new WebTorrentAny();
-      clientRef.current.on('error', (err) => {
+      const client = new WebTorrent();
+      client.on('error', (err) => {
         console.error('WebTorrent Client Error:', err);
         setError('Erreur du client WebTorrent. Veuillez réessayer.');
         toast.error('Erreur de lecture du torrent', {
           description: "Le client de streaming a rencontré une erreur.",
         });
       });
+      clientRef.current = client;
     }
+    // TypeScript sait maintenant que clientRef.current n'est pas null ici
     return clientRef.current;
   }, []);
 
@@ -106,17 +106,6 @@ export const useTorrentPlayer = () => {
           setIsLoading(false);
           torrent.destroy();
         }
-      });
-
-      // Gérer les erreurs du torrent lui-même (ex: pas de seeders)
-      client.on('error', (err: Error) => {
-        console.error('Torrent error:', err);
-        setError('Erreur lors du téléchargement du torrent. Le fichier est peut-être indisponible.');
-        toast.error('Erreur de torrent', {
-          description: "Le torrent ne peut pas être téléchargé. Essayez-en un autre.",
-        });
-        setIsLoading(false);
-        // Le client ne doit pas être détruit ici, car il gère tous les torrents.
       });
       
     } catch (e) {
