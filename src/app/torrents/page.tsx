@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Film, PlayCircle, Loader2, ListVideo, AlertCircle } from 'lucide-react'; // <-- J'ai ajouté AlertCircle ici
 import { AnimatePresence, motion } from 'framer-motion';
-import { useTorrentPlayer } from '@/hooks/useTorrentPlayer'; // Nouveau hook à créer
+import { useTorrentPlayer } from '@/stores/useTorrentPlayer'; // Nouveau hook à créer
 
 const containerVariants = {
   hidden: { opacity: 0 },
