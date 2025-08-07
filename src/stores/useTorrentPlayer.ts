@@ -3,8 +3,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { Movie } from '@/types';
-// Nous n'importons plus WebTorrent directement ici, nous utiliserons un import dynamique.
-// import WebTorrent from 'webtorrent';
 import { toast } from 'sonner';
 import type { WebTorrent } from 'webtorrent'; // Importer le type seulement
 
@@ -16,7 +14,7 @@ export const useTorrentPlayer = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Le type peut maintenant être simplement WebTorrent car il sera initialisé côté client
+  // Le type de la référence est WebTorrent ou null.
   const clientRef = useRef<WebTorrent | null>(null);
   const setCurrentChannel = useAppStore(state => state.setCurrentChannel);
 
@@ -36,7 +34,9 @@ export const useTorrentPlayer = () => {
     // et pour résoudre les warnings du build.
     const { default: WebTorrentDefault } = await import('webtorrent');
 
-    const client: WebTorrent = new WebTorrentDefault() as WebTorrent;
+    // La solution du double "as" pour forcer TypeScript à accepter la conversion.
+    // L'erreur de build nous a donné la solution : d'abord convertir en 'unknown'.
+    const client: WebTorrent = new WebTorrentDefault() as unknown as WebTorrent;
     
     client.on('error', (err) => {
       console.error('WebTorrent Client Error:', err);
