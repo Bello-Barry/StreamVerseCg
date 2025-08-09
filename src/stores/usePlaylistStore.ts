@@ -34,6 +34,7 @@ const initialState: PlaylistManagerState = {
   playlists: [],
   channels: [],
   categories: [],
+  torrents: new Map(), // Correction : Ajout de la propriété 'torrents' pour correspondre à l'interface
   loading: false,
   error: null
 };
@@ -46,7 +47,8 @@ const defaultPlaylists: Playlist[] = [
     type: 'url',
     status: PlaylistStatus.ACTIVE,
     description: 'Playlist française de Schumijo avec chaînes françaises',
-    isRemovable: false
+    isRemovable: false,
+    channelCount: 0
   },
   {
     id: 'iptv-org-france',
@@ -55,7 +57,8 @@ const defaultPlaylists: Playlist[] = [
     type: 'url',
     status: PlaylistStatus.ACTIVE,
     description: 'Chaînes françaises de IPTV-Org',
-    isRemovable: false
+    isRemovable: false,
+    channelCount: 0
   }
 ];
 
@@ -64,13 +67,17 @@ export const usePlaylistStore = create<PlaylistStore>()(
     (set, get) => ({
       ...initialState,
 
+      // Initialisation avec les playlists par défaut si le store est vide
+      playlists: defaultPlaylists,
+      
       addPlaylist: async (playlistData) => {
         const newPlaylist: Playlist = {
           ...playlistData,
           id: `playlist-${Date.now()}`,
           lastUpdate: new Date(),
           status: PlaylistStatus.ACTIVE,
-          isRemovable: true
+          isRemovable: true,
+          channelCount: 0 // Assurer que le nombre de chaînes est initialisé
         };
 
         set((state) => ({
@@ -99,7 +106,10 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
         set((state) => ({
           playlists: state.playlists.filter((playlist) => playlist.id !== id),
-          channels: state.channels.filter((channel) => channel.playlistSource !== id)
+          channels: state.channels.filter((channel) => channel.playlistSource !== id),
+          torrents: new Map(
+            Array.from(state.torrents.entries()).filter(([key, _]) => key !== id)
+          )
         }));
       },
 
