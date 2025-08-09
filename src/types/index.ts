@@ -10,7 +10,7 @@ export enum ViewType {
   SETTINGS = 'settings',
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
-  THEMES = 'themes'
+  THEMES = 'themes', 
   TORRENTS='torrents'
 }
 
