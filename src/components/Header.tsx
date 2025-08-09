@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuList } from '@/components/ui/navigation-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { HeaderProps, ViewType } from '@/types';
 
@@ -29,14 +30,17 @@ const Header: React.FC<HeaderProps> = ({
     const value = e.target.value;
     setSearchValue(value);
     // Recherche en temps réel avec debounce
+    // Note: Utiliser un debounce (par ex. de lodash) serait plus performant
     setTimeout(() => onSearch(value), 300);
   };
 
+  // Ajout du nouvel item de navigation pour les torrents
   const navigationItems = [
-    { id: ViewType.HOME, label: 'Accueil', icon: Tv },
-    { id: ViewType.CATEGORIES, label: 'Catégories', icon: Grid3X3 },
-    { id: ViewType.FAVORITES, label: 'Favoris', icon: Heart },
-    { id: ViewType.HISTORY, label: 'Historique', icon: History },
+    { id: ViewType.HOME, label: 'Accueil', icon: Tv, href: '/' },
+    { id: ViewType.CATEGORIES, label: 'Catégories', icon: Grid3X3, href: '/categories' },
+    { id: ViewType.FAVORITES, label: 'Favoris', icon: Heart, href: '/favorites' },
+    { id: ViewType.HISTORY, label: 'Historique', icon: History, href: '/history' },
+    { id: ViewType.TORRENTS, label: 'Torrents', icon: Play, href: '/torrents' }, // Nouveau lien
   ];
 
   const toggleTheme = () => {
@@ -58,7 +62,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-                  StreamVerse
+                  TvStream-cg
                 </h1>
                 <p className="text-xs text-muted-foreground -mt-1">IPTV Player</p>
               </div>
@@ -84,20 +88,23 @@ const Header: React.FC<HeaderProps> = ({
           {/* Navigation - Desktop */}
           <NavigationMenu className="hidden lg:flex animate-fade-in">
             <NavigationMenuList className="flex space-x-1">
+              {/* Utilisation de Link pour naviguer vers les pages via les URLs */}
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentView === item.id;
                 return (
                   <NavigationMenuItem key={item.id}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => onViewChange(item.id)}
-                      className={`nav-item ${isActive ? 'active' : ''} flex items-center space-x-2`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="hidden xl:inline">{item.label}</span>
-                    </Button>
+                    <Link href={item.href} passHref>
+                      <Button
+                        variant={isActive ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => onViewChange(item.id)}
+                        className={`nav-item ${isActive ? 'active' : ''} flex items-center space-x-2`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span className="hidden xl:inline">{item.label}</span>
+                      </Button>
+                    </Link>
                   </NavigationMenuItem>
                 );
               })}
@@ -202,23 +209,25 @@ const Header: React.FC<HeaderProps> = ({
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-border/50 glass animate-slide-in">
             <div className="py-4 space-y-1">
+              {/* Utilisation de Link pour le menu mobile */}
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentView === item.id;
                 return (
-                  <Button
-                    key={item.id}
-                    variant={isActive ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => {
-                      onViewChange(item.id);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`nav-item ${isActive ? 'active' : ''} w-full justify-start flex items-center space-x-3`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Button>
+                  <Link key={item.id} href={item.href} passHref>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => {
+                        onViewChange(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`nav-item ${isActive ? 'active' : ''} w-full justify-start flex items-center space-x-3`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Button>
+                  </Link>
                 );
               })}
               
@@ -299,4 +308,3 @@ const Header: React.FC<HeaderProps> = ({
 };
 
 export default Header;
-

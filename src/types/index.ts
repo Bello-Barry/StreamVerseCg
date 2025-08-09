@@ -11,6 +11,7 @@ export enum ViewType {
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
   THEMES = 'themes'
+  TORRENTS='torrents'
 }
 
 export enum PlaylistStatus {
