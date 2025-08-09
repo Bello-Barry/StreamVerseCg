@@ -8,7 +8,8 @@ import {
   Category,
   PlaylistManagerState,
   M3UParseResult,
-  PlaylistStatus
+  PlaylistStatus,
+  PlaylistType
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
@@ -34,7 +35,7 @@ const initialState: PlaylistManagerState = {
   playlists: [],
   channels: [],
   categories: [],
-  torrents: new Map(), // Correction : Ajout de la propriété 'torrents' pour correspondre à l'interface
+  torrents: new Map(),
   loading: false,
   error: null
 };
@@ -48,7 +49,8 @@ const defaultPlaylists: Playlist[] = [
     status: PlaylistStatus.ACTIVE,
     description: 'Playlist française de Schumijo avec chaînes françaises',
     isRemovable: false,
-    channelCount: 0
+    channelCount: 0,
+    lastUpdate: new Date(),
   },
   {
     id: 'iptv-org-france',
@@ -58,7 +60,8 @@ const defaultPlaylists: Playlist[] = [
     status: PlaylistStatus.ACTIVE,
     description: 'Chaînes françaises de IPTV-Org',
     isRemovable: false,
-    channelCount: 0
+    channelCount: 0,
+    lastUpdate: new Date(),
   }
 ];
 
@@ -77,7 +80,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
           lastUpdate: new Date(),
           status: PlaylistStatus.ACTIVE,
           isRemovable: true,
-          channelCount: 0 // Assurer que le nombre de chaînes est initialisé
+          channelCount: 0
         };
 
         set((state) => ({
@@ -144,7 +147,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
               let parseResult: M3UParseResult;
 
               if (
-                playlist.type === 'xtream' &&
+                playlist.type === PlaylistType.XTREAM &&
                 playlist.xtreamConfig?.server &&
                 playlist.xtreamConfig?.username &&
                 playlist.xtreamConfig?.password
@@ -153,7 +156,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
                   playlist.xtreamConfig,
                   playlist.id
                 );
-              } else if (playlist.type === 'url' && playlist.url) {
+              } else if (playlist.type === PlaylistType.URL && playlist.url) {
                 const response = await fetch(playlist.url);
                 if (!response.ok)
                   throw new Error(
@@ -209,7 +212,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
           let parseResult: M3UParseResult;
 
           if (
-            playlist.type === 'xtream' &&
+            playlist.type === PlaylistType.XTREAM &&
             playlist.xtreamConfig?.server &&
             playlist.xtreamConfig?.username &&
             playlist.xtreamConfig?.password
@@ -218,7 +221,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
               playlist.xtreamConfig,
               playlist.id
             );
-          } else if (playlist.type === 'url' && playlist.url) {
+          } else if (playlist.type === PlaylistType.URL && playlist.url) {
             const response = await fetch(playlist.url);
             if (!response.ok)
               throw new Error(
