@@ -11,7 +11,7 @@ export enum ViewType {
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
   THEMES = 'themes', 
-  TORRENTS='torrents'
+  TORRENTS = 'torrents'
 }
 
 export enum PlaylistStatus {
@@ -63,23 +63,31 @@ export interface Channel {
   category?: string; // TODO: Vérifier la redondance avec 'group' et choisir un nom définitif.
 }
 
+// Interfaces pour les torrents - types étendus
+export interface MovieFile {
+  name: string;
+  url: string;
+  length: number;
+}
+
 export interface Movie {
   id: string;
   name: string;
   infoHash: string;
   magnetURI: string;
   poster?: string;
-  category?: string;
+  category: string; // Rendu obligatoire pour une meilleure classification
   playlistSource: string;
-  length?: number; // Durée en secondes
-  files?: Array<{ name: string; url: string; length: number }>;
+  length: number; // Durée en secondes - rendu obligatoire
+  files: MovieFile[]; // Rendu obligatoire - liste des fichiers vidéo
+  torrentFiles?: any[]; // Référence aux fichiers WebTorrent pour la lecture
 }
 
 export interface Series {
   id: string;
   name: string;
   poster?: string;
-  category?: string;
+  category: string; // Rendu obligatoire
   playlistSource: string;
   episodes: Episode[];
 }
@@ -91,7 +99,8 @@ export interface Episode {
   episode: number;
   infoHash: string;
   magnetURI: string;
-  length?: number;
+  length?: number; // Durée de l'épisode en secondes
+  torrentFile?: any; // Référence au fichier WebTorrent spécifique pour cet épisode
 }
 
 // Interface pour une playlist. J'ai rendu plusieurs propriétés obligatoires
@@ -153,7 +162,7 @@ export interface PlaylistManagerState {
   playlists: Playlist[];
   channels: Channel[];
   categories: Category[];
-  torrents: Map<string, (Movie | Series)[]>; // Ajout de la map pour les torrents
+  torrents: Map<string, (Movie | Series)[]>; // Map des torrents par playlist ID
   loading: boolean;
   error: string | null;
 }
@@ -235,7 +244,6 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-
 // Hooks
 export interface UseM3UParserReturn {
   channels: Channel[];
@@ -255,6 +263,17 @@ export interface UsePlayerReturn {
   stop: () => void;
   seek: (time: number) => void;
   setVolume: (volume: number) => void;
+}
+
+// Hook spécifique pour les torrents
+export interface UseTorrentPlayerReturn {
+  playTorrent: (movie: Movie) => Promise<void>;
+  playEpisode: (episode: Episode, seriesName: string) => Promise<void>;
+  stopTorrent: () => void;
+  cleanup: () => void;
+  isLoading: boolean;
+  error: string | null;
+  downloadProgress: number;
 }
 
 // Composants UI
@@ -286,4 +305,76 @@ export interface PlayerProps {
   channel: Channel | null;
   onClose: () => void;
   autoplay?: boolean;
+}
+
+// Nouveaux props pour les composants torrents
+export interface MovieCardProps {
+  movie: Movie;
+  onPlay: (movie: Movie) => void;
+  isLoading?: boolean;
+  showCategory?: boolean;
+}
+
+export interface SeriesCardProps {
+  series: Series;
+  onShowEpisodes: (series: Series) => void;
+  showCategory?: boolean;
+}
+
+export interface EpisodesModalProps {
+  series: Series | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onPlayEpisode: (episode: Episode, seriesName: string) => void;
+}
+
+// Interfaces pour les métadonnées de torrent (utilisées par WebTorrent)
+export interface TorrentFileMetadata {
+  name: string;
+  length: number;
+  offset: number;
+  getBlobURL: (callback: (err: Error | null, url?: string) => void) => void;
+  getBuffer: (callback: (err: Error | null, buffer?: Buffer) => void) => void;
+}
+
+export interface TorrentMetadata {
+  name: string;
+  infoHash: string;
+  magnetURI: string;
+  files: TorrentFileMetadata[];
+  length: number;
+  progress: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  numPeers: number;
+  ready: boolean;
+  destroy: () => void;
+  on: (event: string, callback: (data?: any) => void) => void;
+}
+
+// Types utilitaires pour les torrents
+export type TorrentContent = Movie | Series;
+export type VideoFileExtensions = '.mp4' | '.mkv' | '.avi' | '.webm' | '.mov' | '.m4v' | '.wmv';
+export type TorrentEventType = 'ready' | 'download' | 'upload' | 'error' | 'done' | 'warning';
+
+// Interface pour les statistiques de torrent
+export interface TorrentStats {
+  downloadSpeed: number;
+  uploadSpeed: number;
+  downloaded: number;
+  uploaded: number;
+  progress: number;
+  timeRemaining: number;
+  numPeers: number;
+  ratio: number;
+}
+
+// Interface pour les préférences de torrent
+export interface TorrentPreferences {
+  maxConnections: number;
+  downloadPath: string;
+  enableDHT: boolean;
+  enableWebSeeds: boolean;
+  blocklist: string[];
+  announceList: string[];
 }

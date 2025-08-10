@@ -2,68 +2,68 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
-import { Movie } from '@/types';
+import { Movie, Episode } from '@/types';
 import { toast } from 'sonner';
 
-// Interface minimale pour éviter les erreurs de types
 interface TorrentFile {
   name: string;
+  length: number;
   getBlobURL(callback: (err: Error | null, url?: string) => void): void;
 }
 
 interface TorrentInstance {
   files: TorrentFile[];
+  name: string;
+  infoHash: string;
+  magnetURI: string;
   destroy(): void;
+  on(event: string, callback: (data?: any) => void): void;
 }
 
 interface WebTorrentClient {
   torrents: TorrentInstance[];
-  add(torrentId: string, callback?: (torrent: TorrentInstance) => void): void;
+  add(torrentId: string, opts?: any, callback?: (torrent: TorrentInstance) => void): TorrentInstance;
   on(event: string, callback: (error?: any) => void): void;
   destroy(): void;
 }
 
 /**
- * Hook personnalisé pour gérer la lecture de contenu en P2P via WebTorrent.
- * @returns {object} Un objet contenant les fonctions de lecture et l'état du lecteur.
+ * Hook pour gérer la lecture de torrents avec WebTorrent
  */
 export const useTorrentPlayer = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
   
   const clientRef = useRef<WebTorrentClient | null>(null);
+  const currentTorrentRef = useRef<TorrentInstance | null>(null);
   const setCurrentChannel = useAppStore(state => state.setCurrentChannel);
 
   /**
-   * Initialise le client WebTorrent s'il n'existe pas.
-   * Utilise un import dynamique pour éviter les problèmes de rendu côté serveur.
-   * @returns {Promise<WebTorrentClient>} Le client WebTorrent.
+   * Initialise le client WebTorrent
    */
   const getClient = useCallback(async (): Promise<WebTorrentClient> => {
     if (clientRef.current) {
       return clientRef.current;
     }
 
-    // Vérifier que nous sommes bien côté client
     if (typeof window === 'undefined') {
       throw new Error('WebTorrent ne peut être utilisé que côté client');
     }
 
-    console.log("Initialisation du client WebTorrent...");
-    
     try {
-      // Import dynamique pour s'assurer que le code ne s'exécute que côté client
       const WebTorrent = (await import('webtorrent')).default;
-      
-      // Créer le client avec une assertion de type plus simple
-      const client = new WebTorrent() as unknown as WebTorrentClient;
+      const client = new WebTorrent({
+        // Configuration optimisée pour le streaming
+        maxConns: 100,
+        dht: true,
+        webSeeds: true
+      }) as unknown as WebTorrentClient;
       
       client.on('error', (err) => {
         console.error('WebTorrent Client Error:', err);
-        setError('Erreur du client WebTorrent. Veuillez réessayer.');
-        toast.error('Erreur de lecture du torrent', {
-          description: "Le client de streaming a rencontré une erreur.",
-        });
+        setError('Erreur du client WebTorrent');
+        setIsLoading(false);
       });
       
       clientRef.current = client;
@@ -75,79 +75,236 @@ export const useTorrentPlayer = () => {
   }, []);
 
   /**
-   * Commence la lecture d'un torrent.
-   * @param {Movie} movie Le film à lire.
+   * Lance la lecture d'un film depuis un torrent
    */
   const playTorrent = useCallback(async (movie: Movie) => {
     setIsLoading(true);
     setError(null);
+    setDownloadProgress(0);
     
     try {
       const client = await getClient();
       
-      // Si un torrent est déjà en cours, on le détruit pour en lancer un nouveau.
-      if (client.torrents.length > 0) {
-        client.torrents.forEach(t => t.destroy());
+      // Nettoyer le torrent précédent si il existe
+      if (currentTorrentRef.current) {
+        currentTorrentRef.current.destroy();
+        currentTorrentRef.current = null;
       }
-  
-      toast.info('Démarrage du torrent...', {
-        description: `Préparation de la lecture de "${movie.name}".`,
+
+      // Vérifier si le torrent est déjà ajouté au client
+      const existingTorrent = client.torrents.find(t => 
+        t.infoHash === movie.infoHash || t.magnetURI === movie.magnetURI
+      );
+
+      if (existingTorrent) {
+        console.log('Torrent déjà chargé, utilisation directe');
+        handleTorrentReady(existingTorrent, movie);
+        return;
+      }
+
+      toast.info('Connexion au torrent...', {
+        description: `Préparation de "${movie.name}"`,
       });
-  
-      client.add(movie.magnetURI || movie.infoHash, (torrent: TorrentInstance) => {
-        console.log('Torrent ready!', torrent);
-        
-        // Filtrer les fichiers vidéo pour trouver le bon
-        const file = torrent.files.find(f => 
-          f.name.endsWith('.mp4') || 
-          f.name.endsWith('.mkv') || 
-          f.name.endsWith('.avi') ||
-          f.name.endsWith('.webm') ||
-          f.name.endsWith('.mov')
-        );
-        
-        if (file) {
-          file.getBlobURL((err: Error | null, url?: string) => {
+
+      // Ajouter le nouveau torrent
+      const torrent = client.add(movie.magnetURI || movie.infoHash, {
+        path: '/tmp/webtorrent/' // Chemin temporaire
+      });
+
+      currentTorrentRef.current = torrent;
+
+      // Gestion des événements du torrent
+      torrent.on('ready', () => {
+        console.log('Torrent ready:', torrent.name);
+        handleTorrentReady(torrent, movie);
+      });
+
+      torrent.on('download', () => {
+        setDownloadProgress(Math.round((torrent as any).progress * 100));
+      });
+
+      torrent.on('error', (err) => {
+        console.error('Torrent Error:', err);
+        setError(`Erreur du torrent: ${err.message}`);
+        setIsLoading(false);
+        toast.error('Erreur de torrent', {
+          description: err.message,
+        });
+      });
+
+      // Timeout de sécurité
+      setTimeout(() => {
+        if (isLoading) {
+          setError('Timeout lors du chargement du torrent');
+          setIsLoading(false);
+          torrent.destroy();
+        }
+      }, 60000); // 1 minute
+
+    } catch (e) {
+      console.error('Erreur lors de la lecture du torrent:', e);
+      const errorMessage = e instanceof Error ? e.message : 'Erreur inconnue';
+      setError(errorMessage);
+      setIsLoading(false);
+      toast.error('Erreur de lecture', {
+        description: errorMessage,
+      });
+    }
+  }, [getClient]);
+
+  /**
+   * Traite un torrent prêt et trouve le fichier vidéo principal
+   */
+  const handleTorrentReady = useCallback((torrent: TorrentInstance, movie: Movie) => {
+    console.log('Fichiers disponibles:', torrent.files.map(f => f.name));
+    
+    // Trouver le plus gros fichier vidéo (généralement le film principal)
+    const videoFiles = torrent.files.filter(file => {
+      const name = file.name.toLowerCase();
+      return name.endsWith('.mp4') || 
+             name.endsWith('.mkv') || 
+             name.endsWith('.avi') || 
+             name.endsWith('.webm') || 
+             name.endsWith('.mov') ||
+             name.endsWith('.m4v');
+    });
+
+    if (videoFiles.length === 0) {
+      setError('Aucun fichier vidéo trouvé dans ce torrent');
+      setIsLoading(false);
+      return;
+    }
+
+    // Trier par taille pour prendre le plus gros fichier
+    const mainVideoFile = videoFiles.sort((a, b) => b.length - a.length)[0];
+    
+    console.log('Fichier vidéo sélectionné:', mainVideoFile.name);
+    
+    // Créer l'URL blob pour la lecture
+    mainVideoFile.getBlobURL((err: Error | null, url?: string) => {
+      if (err || !url) {
+        console.error('Erreur lors de la création de l\'URL blob:', err);
+        setError('Impossible de créer l\'URL de lecture');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Créer un faux channel pour le lecteur
+      const fakeChannel = {
+        id: movie.id,
+        name: movie.name,
+        url: url,
+        tvgLogo: movie.poster,
+        group: 'Films Torrent',
+        playlistSource: movie.playlistSource,
+        country: '',
+        language: ''
+      };
+      
+      setCurrentChannel(fakeChannel);
+      setIsLoading(false);
+      setDownloadProgress(100);
+      
+      toast.success('Lecture prête!', {
+        description: `"${movie.name}" est prêt à être lu.`,
+      });
+    });
+  }, [setCurrentChannel]);
+
+  /**
+   * Lance la lecture d'un épisode de série
+   */
+  const playEpisode = useCallback(async (episode: Episode, seriesName: string) => {
+    setIsLoading(true);
+    setError(null);
+    setDownloadProgress(0);
+    
+    try {
+      const client = await getClient();
+      
+      // Nettoyer le torrent précédent si il existe
+      if (currentTorrentRef.current) {
+        currentTorrentRef.current.destroy();
+        currentTorrentRef.current = null;
+      }
+
+      toast.info('Chargement de l\'épisode...', {
+        description: `${seriesName} - ${episode.name}`,
+      });
+
+      const torrent = client.add(episode.magnetURI || episode.infoHash);
+      currentTorrentRef.current = torrent;
+
+      torrent.on('ready', () => {
+        if (episode.torrentFile) {
+          // Si on a déjà une référence au fichier spécifique
+          episode.torrentFile.getBlobURL((err: Error | null, url?: string) => {
             if (err || !url) {
-              console.error('Erreur lors de la création de l\'URL blob:', err);
-              setError('Impossible de créer l\'URL de lecture.');
-              toast.error('Erreur de lecture', {
-                description: "Impossible de créer l'URL pour la vidéo.",
-              });
+              setError('Impossible de créer l\'URL de lecture pour l\'épisode');
               setIsLoading(false);
               return;
             }
             
             const fakeChannel = {
-              id: movie.id,
-              name: movie.name,
+              id: episode.id,
+              name: `${seriesName} - ${episode.name}`,
               url: url,
-              tvgLogo: movie.poster,
-              group: 'Torrents',
-              playlistSource: movie.playlistSource,
+              tvgLogo: '', // Pas de poster pour les épisodes
+              group: 'Séries Torrent',
+              playlistSource: episode.infoHash,
+              country: '',
+              language: ''
             };
             
             setCurrentChannel(fakeChannel);
             setIsLoading(false);
-            toast.success('Lecture en cours', {
-              description: `Démarrage de la lecture de "${movie.name}".`,
-            });
           });
         } else {
-          setError('Aucun fichier vidéo trouvé dans ce torrent.');
-          toast.error('Aucun fichier vidéo', {
-            description: "Le torrent ne contient pas de fichier vidéo lisible.",
+          // Chercher le fichier vidéo dans le torrent
+          const videoFile = torrent.files.find(f => {
+            const name = f.name.toLowerCase();
+            return name.includes(`s${episode.season.toString().padStart(2, '0')}e${episode.episode.toString().padStart(2, '0')}`) ||
+                   name.includes(`${episode.season}x${episode.episode.toString().padStart(2, '0')}`);
           });
-          setIsLoading(false);
-          torrent.destroy();
+
+          if (!videoFile) {
+            setError('Fichier d\'épisode non trouvé');
+            setIsLoading(false);
+            return;
+          }
+
+          videoFile.getBlobURL((err: Error | null, url?: string) => {
+            if (err || !url) {
+              setError('Impossible de créer l\'URL de lecture pour l\'épisode');
+              setIsLoading(false);
+              return;
+            }
+            
+            const fakeChannel = {
+              id: episode.id,
+              name: `${seriesName} - ${episode.name}`,
+              url: url,
+              tvgLogo: '',
+              group: 'Séries Torrent',
+              playlistSource: episode.infoHash,
+              country: '',
+              language: ''
+            };
+            
+            setCurrentChannel(fakeChannel);
+            setIsLoading(false);
+          });
         }
       });
-    } catch (e) {
-      console.error('Failed to get client or add torrent:', e);
-      setError('Impossible d\'ajouter le torrent.');
-      toast.error('Erreur', {
-        description: "Impossible de démarrer le torrent.",
+
+      torrent.on('error', (err) => {
+        setError(`Erreur lors du chargement de l'épisode: ${err.message}`);
+        setIsLoading(false);
       });
+
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Erreur inconnue';
+      setError(errorMessage);
       setIsLoading(false);
     }
   }, [getClient, setCurrentChannel]);
@@ -156,11 +313,39 @@ export const useTorrentPlayer = () => {
    * Nettoie les ressources WebTorrent
    */
   const cleanup = useCallback(() => {
+    if (currentTorrentRef.current) {
+      currentTorrentRef.current.destroy();
+      currentTorrentRef.current = null;
+    }
     if (clientRef.current) {
       clientRef.current.destroy();
       clientRef.current = null;
     }
+    setIsLoading(false);
+    setError(null);
+    setDownloadProgress(0);
   }, []);
 
-  return { playTorrent, isLoading, error, cleanup };
+  /**
+   * Arrête le torrent actuel
+   */
+  const stopTorrent = useCallback(() => {
+    if (currentTorrentRef.current) {
+      currentTorrentRef.current.destroy();
+      currentTorrentRef.current = null;
+    }
+    setIsLoading(false);
+    setDownloadProgress(0);
+    toast.info('Lecture arrêtée');
+  }, []);
+
+  return { 
+    playTorrent, 
+    playEpisode, 
+    stopTorrent, 
+    cleanup, 
+    isLoading, 
+    error, 
+    downloadProgress 
+  };
 };

@@ -9,10 +9,13 @@ import {
   PlaylistManagerState,
   M3UParseResult,
   PlaylistStatus,
-  PlaylistType
+  PlaylistType,
+  Movie,
+  Series
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
+import { parseTorrentContent } from '@/lib/torrentParser'; // Import du parser corrigé
 
 interface PlaylistStore extends PlaylistManagerState {
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
@@ -29,6 +32,9 @@ interface PlaylistStore extends PlaylistManagerState {
   setError: (error: string | null) => void;
   clearError: () => void;
   resetStore: () => void;
+  // Nouvelles méthodes pour les torrents
+  getTorrentsByPlaylist: (playlistId: string) => (Movie | Series)[];
+  getAllTorrents: () => (Movie | Series)[];
 }
 
 const initialState: PlaylistManagerState = {
@@ -69,8 +75,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
   persist(
     (set, get) => ({
       ...initialState,
-
-      // Initialisation avec les playlists par défaut si le store est vide
       playlists: defaultPlaylists,
       
       addPlaylist: async (playlistData) => {
@@ -144,39 +148,45 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
           for (const playlist of activePlaylists) {
             try {
-              let parseResult: M3UParseResult;
-
-              if (
-                playlist.type === PlaylistType.XTREAM &&
-                playlist.xtreamConfig?.server &&
-                playlist.xtreamConfig?.username &&
-                playlist.xtreamConfig?.password
-              ) {
-                parseResult = await parseXtreamContent(
-                  playlist.xtreamConfig,
-                  playlist.id
-                );
-              } else if (playlist.type === PlaylistType.URL && playlist.url) {
-                const response = await fetch(playlist.url);
-                if (!response.ok)
-                  throw new Error(
-                    `HTTP ${response.status}: ${response.statusText}`
-                  );
-                const content = await response.text();
-                parseResult = parseM3UContent(content, playlist.id);
-              } else if (playlist.content) {
-                parseResult = parseM3UContent(playlist.content, playlist.id);
+              if (playlist.type === PlaylistType.TORRENT) {
+                // Traitement spécial pour les torrents
+                await get().refreshPlaylist(playlist.id);
               } else {
-                continue;
-              }
+                // Traitement normal pour les autres types
+                let parseResult: M3UParseResult;
 
-              if (parseResult.channels.length > 0) {
-                allChannels.push(...parseResult.channels);
+                if (
+                  playlist.type === PlaylistType.XTREAM &&
+                  playlist.xtreamConfig?.server &&
+                  playlist.xtreamConfig?.username &&
+                  playlist.xtreamConfig?.password
+                ) {
+                  parseResult = await parseXtreamContent(
+                    playlist.xtreamConfig,
+                    playlist.id
+                  );
+                } else if (playlist.type === PlaylistType.URL && playlist.url) {
+                  const response = await fetch(playlist.url);
+                  if (!response.ok)
+                    throw new Error(
+                      `HTTP ${response.status}: ${response.statusText}`
+                    );
+                  const content = await response.text();
+                  parseResult = parseM3UContent(content, playlist.id);
+                } else if (playlist.content) {
+                  parseResult = parseM3UContent(playlist.content, playlist.id);
+                } else {
+                  continue;
+                }
 
-                get().updatePlaylist(playlist.id, {
-                  channelCount: parseResult.channels.length,
-                  status: PlaylistStatus.ACTIVE
-                });
+                if (parseResult.channels.length > 0) {
+                  allChannels.push(...parseResult.channels);
+
+                  get().updatePlaylist(playlist.id, {
+                    channelCount: parseResult.channels.length,
+                    status: PlaylistStatus.ACTIVE
+                  });
+                }
               }
             } catch (error) {
               console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
@@ -209,50 +219,81 @@ export const usePlaylistStore = create<PlaylistStore>()(
         set({ loading: true });
 
         try {
-          let parseResult: M3UParseResult;
+          if (playlist.type === PlaylistType.TORRENT) {
+            // Traitement spécial pour les torrents
+            const source = playlist.url || playlist.content;
+            if (!source) {
+              throw new Error('Aucune source torrent configurée');
+            }
 
-          if (
-            playlist.type === PlaylistType.XTREAM &&
-            playlist.xtreamConfig?.server &&
-            playlist.xtreamConfig?.username &&
-            playlist.xtreamConfig?.password
-          ) {
-            parseResult = await parseXtreamContent(
-              playlist.xtreamConfig,
-              playlist.id
-            );
-          } else if (playlist.type === PlaylistType.URL && playlist.url) {
-            const response = await fetch(playlist.url);
-            if (!response.ok)
-              throw new Error(
-                `HTTP ${response.status}: ${response.statusText}`
-              );
-            const content = await response.text();
-            parseResult = parseM3UContent(content, playlist.id);
-          } else if (playlist.content) {
-            parseResult = parseM3UContent(playlist.content, playlist.id);
-          } else {
-            throw new Error('Configuration de playlist invalide');
-          }
+            const torrentResult = await parseTorrentContent(source, playlist.id);
+            
+            if (torrentResult.errors.length > 0) {
+              console.error('Erreurs lors du parsing du torrent:', torrentResult.errors);
+              throw new Error(torrentResult.errors[0]);
+            }
 
-          if (parseResult.channels.length > 0) {
-            set((state) => ({
-              channels: [
-                ...state.channels.filter(
-                  (c) => c.playlistSource !== playlist.id
-                ),
-                ...parseResult.channels
-              ],
-              loading: false
-            }));
+            // Stocker les torrents dans la Map
+            const allTorrents = [...torrentResult.movies, ...torrentResult.series];
+            set((state) => {
+              const newTorrents = new Map(state.torrents);
+              newTorrents.set(playlist.id, allTorrents);
+              return { torrents: newTorrents };
+            });
 
             get().updatePlaylist(id, {
-              channelCount: parseResult.channels.length,
+              channelCount: allTorrents.length,
               status: PlaylistStatus.ACTIVE
             });
+
           } else {
-            throw new Error('Aucune chaîne trouvée dans la playlist');
+            // Traitement normal pour les autres types
+            let parseResult: M3UParseResult;
+
+            if (
+              playlist.type === PlaylistType.XTREAM &&
+              playlist.xtreamConfig?.server &&
+              playlist.xtreamConfig?.username &&
+              playlist.xtreamConfig?.password
+            ) {
+              parseResult = await parseXtreamContent(
+                playlist.xtreamConfig,
+                playlist.id
+              );
+            } else if (playlist.type === PlaylistType.URL && playlist.url) {
+              const response = await fetch(playlist.url);
+              if (!response.ok)
+                throw new Error(
+                  `HTTP ${response.status}: ${response.statusText}`
+                );
+              const content = await response.text();
+              parseResult = parseM3UContent(content, playlist.id);
+            } else if (playlist.content) {
+              parseResult = parseM3UContent(playlist.content, playlist.id);
+            } else {
+              throw new Error('Configuration de playlist invalide');
+            }
+
+            if (parseResult.channels.length > 0) {
+              set((state) => ({
+                channels: [
+                  ...state.channels.filter(
+                    (c) => c.playlistSource !== playlist.id
+                  ),
+                  ...parseResult.channels
+                ],
+              }));
+
+              get().updatePlaylist(id, {
+                channelCount: parseResult.channels.length,
+                status: PlaylistStatus.ACTIVE
+              });
+            } else {
+              throw new Error('Aucune chaîne trouvée dans la playlist');
+            }
           }
+
+          set({ loading: false });
         } catch (error) {
           console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
           get().updatePlaylist(id, { status: PlaylistStatus.ERROR });
@@ -307,6 +348,21 @@ export const usePlaylistStore = create<PlaylistStore>()(
         ).length;
       },
 
+      // Nouvelles méthodes pour les torrents
+      getTorrentsByPlaylist: (playlistId) => {
+        const { torrents } = get();
+        return torrents.get(playlistId) || [];
+      },
+
+      getAllTorrents: () => {
+        const { torrents } = get();
+        const allTorrents: (Movie | Series)[] = [];
+        torrents.forEach(playlistTorrents => {
+          allTorrents.push(...playlistTorrents);
+        });
+        return allTorrents;
+      },
+
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
@@ -321,13 +377,19 @@ export const usePlaylistStore = create<PlaylistStore>()(
       name: 'streamverse-playlist-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        playlists: state.playlists
+        playlists: state.playlists,
+        torrents: Array.from(state.torrents.entries()) // Sérialiser la Map
       }),
       onRehydrateStorage: () => (state) => {
-        if (state && state.playlists.length === 0) {
-          state.playlists = defaultPlaylists;
-        }
         if (state) {
+          // Restaurer la Map depuis le stockage
+          if (Array.isArray((state as any).torrents)) {
+            state.torrents = new Map((state as any).torrents);
+          }
+          
+          if (state.playlists.length === 0) {
+            state.playlists = defaultPlaylists;
+          }
           setTimeout(() => state.refreshPlaylists(), 100);
         }
       }
