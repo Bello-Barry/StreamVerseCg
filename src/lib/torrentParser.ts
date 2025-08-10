@@ -1,5 +1,33 @@
 import { Movie, Series, TorrentParserResult, Episode } from '@/types';
 
+// Interface pour les fichiers WebTorrent
+interface WebTorrentFile {
+  name: string;
+  length: number;
+  getBlobURL(callback: (err: Error | null, url?: string) => void): void;
+}
+
+// Interface pour les données de torrent groupées
+interface GroupedMovieData {
+  name: string;
+  files: WebTorrentFile[];
+}
+
+interface GroupedSeriesData {
+  name: string;
+  episodes: Array<{
+    name: string;
+    season: number;
+    episode: number;
+    file: WebTorrentFile;
+  }>;
+}
+
+interface GroupedContent {
+  movies: GroupedMovieData[];
+  series: GroupedSeriesData[];
+}
+
 /**
  * Parser pour les fichiers torrent utilisant WebTorrent
  */
@@ -56,7 +84,7 @@ export const parseTorrentContent = async (
     });
 
     // Analyser les fichiers du torrent
-    const videoFiles = torrentData.files.filter((file: any) => {
+    const videoFiles: WebTorrentFile[] = torrentData.files.filter((file: any) => {
       const name = file.name.toLowerCase();
       return name.endsWith('.mp4') || 
              name.endsWith('.mkv') || 
@@ -87,7 +115,7 @@ export const parseTorrentContent = async (
         category: detectCategory(movieData.name),
         playlistSource: sourceName,
         length: movieData.files[0]?.length || 0,
-        files: movieData.files.map(file => ({
+        files: movieData.files.map((file: any) => ({
           name: file.name,
           url: '', // L'URL sera générée à la lecture
           length: file.length
@@ -110,7 +138,7 @@ export const parseTorrentContent = async (
         torrentFile: ep.file // Référence au fichier du torrent
       }));
 
-      const series: Series = {
+      const seriesItem: Series = {
         id: `${sourceName}-series-${index + 1}`,
         name: seriesData.name,
         poster: generatePosterUrl(seriesData.name),
@@ -118,7 +146,7 @@ export const parseTorrentContent = async (
         playlistSource: sourceName,
         episodes
       };
-      series.push(series);
+      series.push(seriesItem);
     });
 
     // Ne pas détruire le client ici, on en aura besoin pour la lecture
@@ -136,12 +164,12 @@ export const parseTorrentContent = async (
 /**
  * Groupe les fichiers vidéo en films et séries
  */
-function groupVideoFiles(files: any[], sourceName: string) {
-  const movies: any[] = [];
-  const series: any[] = [];
-  const seriesMap = new Map<string, any>();
+function groupVideoFiles(files: WebTorrentFile[], sourceName: string): GroupedContent {
+  const movies: GroupedMovieData[] = [];
+  const series: GroupedSeriesData[] = [];
+  const seriesMap = new Map<string, GroupedSeriesData>();
 
-  files.forEach((file: any) => {
+  files.forEach((file: WebTorrentFile) => {
     const fileName = file.name;
     const episodeMatch = detectEpisode(fileName);
 
@@ -172,13 +200,13 @@ function groupVideoFiles(files: any[], sourceName: string) {
   });
 
   // Convertir la Map en array
-  seriesMap.forEach(series => {
+  seriesMap.forEach((seriesData) => {
     // Trier les épisodes
-    series.episodes.sort((a: any, b: any) => {
+    seriesData.episodes.sort((a, b) => {
       if (a.season !== b.season) return a.season - b.season;
       return a.episode - b.episode;
     });
-    series.push(series);
+    series.push(seriesData);
   });
 
   return { movies, series };
