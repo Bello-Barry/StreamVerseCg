@@ -1,3 +1,4 @@
+// src/types/index.ts 
 // Enums : Utilisation d'énums pour des valeurs strictes et lisibles.
 export enum ViewType {
   HOME = 'home',
@@ -102,6 +103,7 @@ export interface Episode {
   magnetURI: string;
   length?: number; // Durée de l'épisode en secondes
   torrentFile?: any; // Référence au fichier WebTorrent spécifique pour cet épisode
+  quality?: string; 
 }
 
 // Interface pour une playlist. J'ai rendu plusieurs propriétés obligatoires
