@@ -103,6 +103,7 @@ export interface Episode {
   magnetURI: string;
   length?: number; // Durée de l'épisode en secondes
   torrentFile?: any; // Référence au fichier WebTorrent spécifique pour cet épisode
+  duration?: number; 
   quality?: string; 
 }
 
