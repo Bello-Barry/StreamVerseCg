@@ -15,7 +15,7 @@ import {
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
-import { parseTorrentContent } from '@/lib/torrentParser'; // Import du parser corrigé
+import { parseTorrentContentImproved } from '@/lib/torrentService'; // Import du service amélioré
 
 interface PlaylistStore extends PlaylistManagerState {
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
@@ -222,11 +222,21 @@ export const usePlaylistStore = create<PlaylistStore>()(
           if (playlist.type === PlaylistType.TORRENT) {
             // Traitement spécial pour les torrents
             const source = playlist.url || playlist.content;
-            if (!source) {
-              throw new Error('Aucune source torrent configurée');
+            let torrentSource: string | File;
+
+            if (playlist.url && playlist.url.startsWith('magnet:')) {
+              torrentSource = playlist.url;
+            } else if (playlist.content) {
+              // Si le contenu est un fichier, on le traite comme tel
+              // Pour l'instant, on suppose que playlist.content contient le nom du fichier
+              // Il faudrait un mécanisme pour récupérer le fichier réel si c'est un upload
+              // Pour cette version, nous allons simuler un fichier pour le parser
+              torrentSource = new File([playlist.content], playlist.url || 'torrent_file.torrent', { type: 'application/x-bittorrent' });
+            } else {
+              throw new Error('Aucune source torrent valide configurée (magnet URI ou fichier)');
             }
 
-            const torrentResult = await parseTorrentContent(source, playlist.id);
+            const torrentResult = await parseTorrentContentImproved(torrentSource, playlist.id);
             
             if (torrentResult.errors.length > 0) {
               console.error('Erreurs lors du parsing du torrent:', torrentResult.errors);
