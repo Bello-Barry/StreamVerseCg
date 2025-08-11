@@ -89,6 +89,7 @@ export interface Series {
   poster?: string;
   category: string; // Rendu obligatoire
   playlistSource: string;
+  quality?: string;
   episodes: Episode[];
 }
 
