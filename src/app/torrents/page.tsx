@@ -233,13 +233,30 @@ export default function TorrentsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-          >
-            <TorrentGrid
-              movies={movies}
-              series={series}
-              onPlayMovie={handlePlayMovie}
-              onPlaySeries={handleShowEpisodes}
-            />
+          ><TorrentGrid
+  torrents={[
+    // Films avec type 'movie'
+    ...movies.map(movie => ({
+      ...movie,
+      type: 'movie' as const
+    })),
+    // Séries avec type 'series'
+    ...series.map(serie => ({
+      ...serie,
+      type: 'series' as const
+    }))
+  ]}
+  onTorrentPlay={(torrent) => {
+    if (torrent.type === 'movie') {
+      handlePlayMovie(torrent);
+    } else if (torrent.type === 'series') {
+      handleShowEpisodes(torrent);
+    }
+  }}
+  onTorrentDownload={handleDownload}
+  onTorrentFavorite={handleFavorite}
+/>
+         
           </motion.div>
         ) : (
           <motion.div
