@@ -1,43 +1,62 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Grid, List } from 'lucide-react';
+import { Search, Grid, List } from 'lucide-react';
 import { TorrentCard } from './TorrentCard';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+interface Movie extends TorrentInfo {
+  type: 'movie';
+  playlistName: string;
+}
+
+interface Series extends TorrentInfo {
+  type: 'series';
+  playlistName: string;
+}
+
 interface TorrentGridProps {
-  torrents: TorrentInfo[];
-  onTorrentPlay: (torrent: TorrentInfo) => void;
+  movies: Movie[];
+  series: Series[];
+  onPlayMovie: (movie: Movie) => void;
+  onPlaySeries: (series: Series) => void;
   onTorrentDownload: (torrent: TorrentInfo) => void;
   onTorrentFavorite: (torrent: TorrentInfo) => void;
 }
 
 export const TorrentGrid: React.FC<TorrentGridProps> = ({
-  torrents,
-  onTorrentPlay,
+  movies,
+  series,
+  onPlayMovie,
+  onPlaySeries,
   onTorrentDownload,
   onTorrentFavorite
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterQuality, setFilterQuality] = useState('all');
+  const [filterType, setFilterType] = useState<'all' | 'movie' | 'series'>('all');
+  const [filterQuality, setFilterQuality] = useState<'all' | '4K' | '1080p' | '720p'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+  // Fusionne et filtre les torrents
   const filteredTorrents = useMemo(() => {
-    return torrents.filter(torrent => {
+    const allTorrents = [
+      ...movies.map(m => ({ ...m, type: 'movie' as const })),
+      ...series.map(s => ({ ...s, type: 'series' as const }))
+    ];
+
+    return allTorrents.filter(torrent => {
       const matchesSearch = torrent.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterType === 'all' || torrent.type === filterType;
       const matchesQuality = filterQuality === 'all' || torrent.quality === filterQuality;
-      
       return matchesSearch && matchesType && matchesQuality;
     });
-  }, [torrents, searchTerm, filterType, filterQuality]);
+  }, [movies, series, searchTerm, filterType, filterQuality]);
 
   return (
     <div className="space-y-6">
       {/* Barre de recherche et filtres */}
       <div className="flex flex-col md:flex-row gap-4 items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input
             placeholder="Rechercher des films, séries..."
             value={searchTerm}
@@ -47,7 +66,7 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
         </div>
         
         <div className="flex gap-2">
-          <Select value={filterType} onValueChange={setFilterType}>
+          <Select value={filterType} onValueChange={(v: 'all' | 'movie' | 'series') => setFilterType(v)}>
             <SelectTrigger className="w-32 bg-slate-800 border-slate-700">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
@@ -58,7 +77,7 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
             </SelectContent>
           </Select>
 
-          <Select value={filterQuality} onValueChange={setFilterQuality}>
+          <Select value={filterQuality} onValueChange={(v: 'all' | '4K' | '1080p' | '720p') => setFilterQuality(v)}>
             <SelectTrigger className="w-32 bg-slate-800 border-slate-700">
               <SelectValue placeholder="Qualité" />
             </SelectTrigger>
@@ -88,16 +107,20 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
       </div>
 
       {/* Grille de contenu */}
-      <div className={`grid gap-6 ${
-        viewMode === 'grid' 
-          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
-          : 'grid-cols-1'
-      }`}>
+      <div
+        className={`grid gap-6 ${
+          viewMode === 'grid'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            : 'grid-cols-1'
+        }`}
+      >
         {filteredTorrents.map((torrent) => (
           <TorrentCard
             key={torrent.infoHash}
             torrent={torrent}
-            onPlay={() => onTorrentPlay(torrent)}
+            onPlay={() =>
+              torrent.type === 'movie' ? onPlayMovie(torrent) : onPlaySeries(torrent)
+            }
             onDownload={() => onTorrentDownload(torrent)}
             onFavorite={() => onTorrentFavorite(torrent)}
           />
