@@ -1,140 +1,141 @@
-import React, { useState, useMemo } from 'react';
-import { Search, Grid, List } from 'lucide-react';
-import { TorrentCard } from './TorrentCard';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Play, Download, Star, Clock } from 'lucide-react';
 
-interface Movie extends TorrentInfo {
-  type: 'movie';
+// Définition du type pour les torrents
+export interface TorrentInfo {
+  id: string;
+  name: string;
+  infoHash: string;
+  magnetURI: string;
+  poster?: string;
+  category: string;
+  playlistSource: string;
+  length: number;
+  files: MovieFile[];
+  torrentFiles?: any[];
   playlistName: string;
+  duration?: string;
+  quality?: string;
+  progress?: number;
+  downloadSpeed?: number;
+  type: 'movie' | 'serie';
 }
 
-interface Series extends TorrentInfo {
-  type: 'series';
-  playlistName: string;
+interface MovieFile {
+  name: string;
+  length: number;
 }
 
-interface TorrentGridProps {
-  movies: Movie[];
-  series: Series[];
-  onPlayMovie: (movie: Movie) => void;
-  onPlaySeries: (series: Series) => void;
-  onTorrentDownload: (torrent: TorrentInfo) => void;
-  onTorrentFavorite: (torrent: TorrentInfo) => void;
+interface TorrentCardProps {
+  torrent: TorrentInfo;
+  onPlay: () => void;
+  onDownload: () => void;
+  onFavorite: () => void;
 }
 
-export const TorrentGrid: React.FC<TorrentGridProps> = ({
-  movies,
-  series,
-  onPlayMovie,
-  onPlaySeries,
-  onTorrentDownload,
-  onTorrentFavorite
+export const TorrentCard: React.FC<TorrentCardProps> = ({
+  torrent,
+  onPlay,
+  onDownload,
+  onFavorite
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'movie' | 'series'>('all');
-  const [filterQuality, setFilterQuality] = useState<'all' | '4K' | '1080p' | '720p'>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  // Fusionne et filtre les torrents
-  const filteredTorrents = useMemo(() => {
-    const allTorrents = [
-      ...movies.map(m => ({ ...m, type: 'movie' as const })),
-      ...series.map(s => ({ ...s, type: 'series' as const }))
-    ];
-
-    return allTorrents.filter(torrent => {
-      const matchesSearch = torrent.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType = filterType === 'all' || torrent.type === filterType;
-      const matchesQuality = filterQuality === 'all' || torrent.quality === filterQuality;
-      return matchesSearch && matchesType && matchesQuality;
-    });
-  }, [movies, series, searchTerm, filterType, filterQuality]);
-
   return (
-    <div className="space-y-6">
-      {/* Barre de recherche et filtres */}
-      <div className="flex flex-col md:flex-row gap-4 items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input
-            placeholder="Rechercher des films, séries..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-slate-800 border-slate-700 text-white"
-          />
-        </div>
+    <motion.div
+      className="relative group bg-slate-800 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      {/* Image d'aperçu */}
+      <div className="aspect-video bg-gradient-to-br from-slate-700 to-slate-900 relative">
+        <img
+          src={torrent.poster || '/placeholder-movie.jpg'}
+          alt={torrent.name}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/placeholder-movie.jpg';
+          }}
+        />
         
-        <div className="flex gap-2">
-          <Select value={filterType} onValueChange={(v: 'all' | 'movie' | 'series') => setFilterType(v)}>
-            <SelectTrigger className="w-32 bg-slate-800 border-slate-700">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              <SelectItem value="movie">Films</SelectItem>
-              <SelectItem value="series">Séries</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={filterQuality} onValueChange={(v: 'all' | '4K' | '1080p' | '720p') => setFilterQuality(v)}>
-            <SelectTrigger className="w-32 bg-slate-800 border-slate-700">
-              <SelectValue placeholder="Qualité" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes</SelectItem>
-              <SelectItem value="4K">4K</SelectItem>
-              <SelectItem value="1080p">1080p</SelectItem>
-              <SelectItem value="720p">720p</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <div className="flex bg-slate-800 rounded-lg p-1">
+        {/* Overlay avec actions */}
+        <motion.div
+          className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+        >
+          <div className="flex space-x-4">
             <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay();
+              }}
+              className="p-3 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
+              aria-label="Jouer le torrent"
             >
-              <Grid className="w-4 h-4" />
+              <Play className="w-6 h-6 text-white" />
             </button>
             <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload();
+              }}
+              className="p-3 bg-green-600 rounded-full hover:bg-green-700 transition-colors"
+              aria-label="Télécharger le torrent"
             >
-              <List className="w-4 h-4" />
+              <Download className="w-6 h-6 text-white" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavorite();
+              }}
+              className="p-3 bg-yellow-600 rounded-full hover:bg-yellow-700 transition-colors"
+              aria-label="Ajouter aux favoris"
+            >
+              <Star className="w-6 h-6 text-white" />
             </button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* Grille de contenu */}
-      <div
-        className={`grid gap-6 ${
-          viewMode === 'grid'
-            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-            : 'grid-cols-1'
-        }`}
-      >
-        {filteredTorrents.map((torrent) => (
-          <TorrentCard
-            key={torrent.infoHash}
-            torrent={torrent}
-            onPlay={() =>
-              torrent.type === 'movie' ? onPlayMovie(torrent) : onPlaySeries(torrent)
-            }
-            onDownload={() => onTorrentDownload(torrent)}
-            onFavorite={() => onTorrentFavorite(torrent)}
-          />
-        ))}
-      </div>
-
-      {filteredTorrents.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-slate-400 text-lg">Aucun contenu trouvé</p>
-          <p className="text-slate-500 text-sm mt-2">
-            Essayez de modifier vos critères de recherche
-          </p>
+      {/* Informations */}
+      <div className="p-4">
+        <h3 className="font-semibold text-white text-lg mb-2 line-clamp-2">
+          {torrent.name}
+        </h3>
+        
+        <div className="flex items-center justify-between text-sm text-slate-400">
+          <span className="flex items-center">
+            <Clock className="w-4 h-4 mr-1" />
+            {torrent.duration || 'N/A'}
+          </span>
+          <span className="bg-blue-600 px-2 py-1 rounded text-white text-xs">
+            {torrent.quality || 'HD'}
+          </span>
         </div>
-      )}
-    </div>
+
+        {/* Barre de progression */}
+        {torrent.progress && torrent.progress > 0 ? (
+          <div className="mt-3">
+            <div className="w-full bg-slate-700 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${torrent.progress * 100}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-slate-400 mt-1">
+              <span>{Math.round(torrent.progress * 100)}%</span>
+              <span>{torrent.downloadSpeed || 0} MB/s</span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 text-center">
+            <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">
+              Non téléchargé
+            </span>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 };
