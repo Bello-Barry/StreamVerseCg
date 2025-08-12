@@ -2,6 +2,31 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, Download, Star, Clock } from 'lucide-react';
 
+// Définition du type pour les torrents
+export interface TorrentInfo {
+  id: string;
+  name: string;
+  infoHash: string;
+  magnetURI: string;
+  poster?: string;
+  category: string;
+  playlistSource: string;
+  length: number;
+  files: MovieFile[];
+  torrentFiles?: any[];
+  playlistName: string;
+  duration?: string;
+  quality?: string;
+  progress?: number;
+  downloadSpeed?: number;
+  type: 'movie' | 'serie';
+}
+
+interface MovieFile {
+  name: string;
+  length: number;
+}
+
 interface TorrentCardProps {
   torrent: TorrentInfo;
   onPlay: () => void;
@@ -27,6 +52,9 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
           src={torrent.poster || '/placeholder-movie.jpg'}
           alt={torrent.name}
           className="w-full h-full object-cover"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/placeholder-movie.jpg';
+          }}
         />
         
         {/* Overlay avec actions */}
@@ -37,20 +65,32 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
         >
           <div className="flex space-x-4">
             <button
-              onClick={onPlay}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlay();
+              }}
               className="p-3 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
+              aria-label="Jouer le torrent"
             >
               <Play className="w-6 h-6 text-white" />
             </button>
             <button
-              onClick={onDownload}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload();
+              }}
               className="p-3 bg-green-600 rounded-full hover:bg-green-700 transition-colors"
+              aria-label="Télécharger le torrent"
             >
               <Download className="w-6 h-6 text-white" />
             </button>
             <button
-              onClick={onFavorite}
+              onClick={(e) => {
+                e.stopPropagation();
+                onFavorite();
+              }}
               className="p-3 bg-yellow-600 rounded-full hover:bg-yellow-700 transition-colors"
+              aria-label="Ajouter aux favoris"
             >
               <Star className="w-6 h-6 text-white" />
             </button>
@@ -75,7 +115,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
         </div>
 
         {/* Barre de progression */}
-        {torrent.progress > 0 && (
+        {torrent.progress && torrent.progress > 0 ? (
           <div className="mt-3">
             <div className="w-full bg-slate-700 rounded-full h-2">
               <div
@@ -87,6 +127,12 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
               <span>{Math.round(torrent.progress * 100)}%</span>
               <span>{torrent.downloadSpeed || 0} MB/s</span>
             </div>
+          </div>
+        ) : (
+          <div className="mt-3 text-center">
+            <span className="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">
+              Non téléchargé
+            </span>
           </div>
         )}
       </div>
