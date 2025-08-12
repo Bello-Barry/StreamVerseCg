@@ -2,7 +2,15 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface TorrentPlayerProps {
+interface TorrentInfo {
+  name: string;
+  numPeers: number;
+  downloadSpeed: number; // en MB/s
+  uploadSpeed: number;   // en MB/s
+  progress: number;      // entre 0 et 1
+}
+
+interface TorrentPlayerProps extends React.HTMLAttributes<HTMLDivElement> {
   torrent: TorrentInfo | null;
   isPlaying: boolean;
   currentTime: number;
@@ -23,7 +31,9 @@ export const TorrentPlayer: React.FC<TorrentPlayerProps> = ({
   onPlay,
   onPause,
   onSeek,
-  onVolumeChange
+  onVolumeChange,
+  className,
+  ...rest
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showControls, setShowControls] = useState(true);
@@ -33,7 +43,6 @@ export const TorrentPlayer: React.FC<TorrentPlayerProps> = ({
     const timer = setTimeout(() => {
       if (isPlaying) setShowControls(false);
     }, 3000);
-
     return () => clearTimeout(timer);
   }, [isPlaying, showControls]);
 
@@ -54,16 +63,17 @@ export const TorrentPlayer: React.FC<TorrentPlayerProps> = ({
   };
 
   return (
-    <div 
-      className="relative bg-black rounded-lg overflow-hidden aspect-video group"
+    <div
+      className={`relative bg-black rounded-lg overflow-hidden aspect-video group ${className ?? ''}`}
       onMouseMove={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
+      {...rest}
     >
       {/* Lecteur vidéo */}
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
-        onClick={() => isPlaying ? onPause() : onPlay()}
+        onClick={() => (isPlaying ? onPause() : onPlay())}
       />
 
       {/* Placeholder quand pas de contenu */}
