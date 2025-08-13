@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Grid, List } from 'lucide-react';
-import { TorrentCard, TorrentInfo } from './TorrentCard'; // Import ajouté
+import { TorrentCard, TorrentInfo } from './TorrentCard';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -26,11 +26,11 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
     return torrents.filter(torrent => {
       const matchesSearch = torrent.name.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // Correction du type 'series' -> 'serie'
+      // CORRECTION : Utiliser 'series' au lieu de 'serie'
       const typeMatch = 
         filterType === 'all' || 
         (filterType === 'movie' && torrent.type === 'movie') || 
-        (filterType === 'series' && torrent.type === 'serie');
+        (filterType === 'series' && torrent.type === 'series'); // Modifié ici
       
       const matchesQuality = filterQuality === 'all' || torrent.quality === filterQuality;
       
@@ -103,7 +103,7 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
       }`}>
         {filteredTorrents.map((torrent) => (
           <TorrentCard
-            key={`${torrent.id}-${torrent.type}`} // Clé plus unique
+            key={`${torrent.id}-${torrent.type}`}
             torrent={torrent}
             onPlay={() => onTorrentPlay(torrent)}
             onDownload={() => onTorrentDownload(torrent)}
