@@ -26,11 +26,11 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
     return torrents.filter(torrent => {
       const matchesSearch = torrent.name.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // CORRECTION : Utiliser 'serie' au lieu de 'series'
+      // CORRECTION : Utiliser 'series' comme dans le type
       const typeMatch = 
         filterType === 'all' || 
         (filterType === 'movie' && torrent.type === 'movie') || 
-        (filterType === 'series' && torrent.type === 'serie'); // Modifié ici
+        (filterType === 'series' && torrent.type === 'series'); // Modifié ici
       
       const matchesQuality = filterQuality === 'all' || torrent.quality === filterQuality;
       

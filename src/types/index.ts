@@ -373,6 +373,14 @@ export interface TorrentStats {
   ratio: number;
 }
 
+// Ajoutez ceci à la fin du fichier, avant la dernière accolade
+
+// Type unifié pour les torrents
+export type TorrentInfo = (Movie | Series) & {
+  playlistName: string;
+  type: 'movie' | 'series';
+};
+
 // Interface pour les préférences de torrent
 export interface TorrentPreferences {
   maxConnections: number;

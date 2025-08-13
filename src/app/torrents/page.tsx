@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { Movie, Series, Playlist, PlaylistType } from '@/types';
+import { Movie, Series, Playlist, PlaylistType, TorrentInfo } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,25 +23,6 @@ import { motion } from 'framer-motion';
 import { useTorrentPlayerImproved } from '@/stores/useTorrentPlayerImproved';
 import { TorrentPlayer } from '@/components/TorrentPlayer';
 import { TorrentGrid } from '@/components/TorrentGrid';
-
-// Définition du type unifié pour les torrents
-type TorrentInfo = {
-  id: string;
-  name: string;
-  poster?: string;
-  category: string;
-  playlistSource: string;
-  playlistName: string;
-  type: 'movie' | 'series';
-  // Propriétés optionnelles pour les films
-  infoHash?: string;
-  magnetURI?: string;
-  length?: number;
-  files?: any[];
-  // Propriétés optionnelles pour les séries
-  quality?: string;
-  episodes?: any[];
-};
 
 /**
  * Modal pour afficher les épisodes d'une série
@@ -269,17 +250,14 @@ export default function TorrentsPage() {
                 // Films avec type 'movie'
                 ...movies.map(movie => ({
                   ...movie,
-                  type: 'movie' as const
+                  type: 'movie' as const,
+                  playlistName: movie.playlistName
                 })),
                 // Séries avec type 'series'
                 ...series.map(serie => ({
                   ...serie,
                   type: 'series' as const,
-                  // Ajouter les propriétés manquantes pour les séries
-                  infoHash: serie.infoHash || '',
-                  magnetURI: serie.magnetURI || '',
-                  length: serie.length || 0,
-                  files: serie.files || [],
+                  playlistName: serie.playlistName
                 }))
               ]}
               onTorrentPlay={(torrent) => {
