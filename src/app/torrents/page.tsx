@@ -24,6 +24,25 @@ import { useTorrentPlayerImproved } from '@/stores/useTorrentPlayerImproved';
 import { TorrentPlayer } from '@/components/TorrentPlayer';
 import { TorrentGrid } from '@/components/TorrentGrid';
 
+// Définition du type unifié pour les torrents
+type TorrentInfo = {
+  id: string;
+  name: string;
+  poster?: string;
+  category: string;
+  playlistSource: string;
+  playlistName: string;
+  type: 'movie' | 'series';
+  // Propriétés optionnelles pour les films
+  infoHash?: string;
+  magnetURI?: string;
+  length?: number;
+  files?: any[];
+  // Propriétés optionnelles pour les séries
+  quality?: string;
+  episodes?: any[];
+};
+
 /**
  * Modal pour afficher les épisodes d'une série
  */
@@ -148,6 +167,17 @@ export default function TorrentsPage() {
   const movies = allTorrents.filter(t => (t as Movie).magnetURI !== undefined) as (Movie & { playlistName: string })[];
   const series = allTorrents.filter(t => (t as Series).episodes !== undefined) as (Series & { playlistName: string })[];
 
+  // Fonctions manquantes pour les actions
+  const handleDownload = (torrent: TorrentInfo) => {
+    console.log('Téléchargement du torrent:', torrent.name);
+    // Implémentez la logique de téléchargement ici
+  };
+
+  const handleFavorite = (torrent: TorrentInfo) => {
+    console.log('Ajout aux favoris:', torrent.name);
+    // Implémentez la logique des favoris ici
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-gradient-to-br from-slate-900 to-slate-800">
@@ -233,30 +263,35 @@ export default function TorrentsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-          ><TorrentGrid
-  torrents={[
-    // Films avec type 'movie'
-    ...movies.map(movie => ({
-      ...movie,
-      type: 'movie' as const
-    })),
-    // Séries avec type 'series'
-    ...series.map(serie => ({
-      ...serie,
-      type: 'series' as const
-    }))
-  ]}
-  onTorrentPlay={(torrent) => {
-    if (torrent.type === 'movie') {
-      handlePlayMovie(torrent);
-    } else if (torrent.type === 'series') {
-      handleShowEpisodes(torrent);
-    }
-  }}
-  onTorrentDownload={handleDownload}
-  onTorrentFavorite={handleFavorite}
-/>
-         
+          >
+            <TorrentGrid
+              torrents={[
+                // Films avec type 'movie'
+                ...movies.map(movie => ({
+                  ...movie,
+                  type: 'movie' as const
+                })),
+                // Séries avec type 'series'
+                ...series.map(serie => ({
+                  ...serie,
+                  type: 'series' as const,
+                  // Ajouter les propriétés manquantes pour les séries
+                  infoHash: serie.infoHash || '',
+                  magnetURI: serie.magnetURI || '',
+                  length: serie.length || 0,
+                  files: serie.files || [],
+                }))
+              ]}
+              onTorrentPlay={(torrent) => {
+                if (torrent.type === 'movie') {
+                  handlePlayMovie(torrent as Movie);
+                } else if (torrent.type === 'series') {
+                  handleShowEpisodes(torrent as Series);
+                }
+              }}
+              onTorrentDownload={handleDownload}
+              onTorrentFavorite={handleFavorite}
+            />
           </motion.div>
         ) : (
           <motion.div
