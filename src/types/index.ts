@@ -10,7 +10,7 @@ export enum ViewType {
   SETTINGS = 'settings',
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
-  THEMES = 'themes', 
+  THEMES = 'themes',
   TORRENTS = 'torrents'
 }
 
@@ -63,12 +63,6 @@ export interface Channel {
 }
 
 // Interfaces pour les torrents - types de base
-export interface MovieFile {
-  name: string;
-  url: string;
-  length: number;
-}
-
 export interface Movie {
   id: string;
   name: string;
@@ -80,6 +74,11 @@ export interface Movie {
   length: number;
   files: MovieFile[];
   torrentFiles?: any[];
+}
+
+export interface MovieFile {
+  name: string;
+  length: number;
 }
 
 export interface Series {
@@ -105,7 +104,7 @@ export interface Episode {
   quality?: string;
 }
 
-// Interfaces pour une playlist
+// Interface pour une playlist
 export interface Playlist {
   id: string;
   name: string;
@@ -370,11 +369,12 @@ export interface TorrentStats {
   ratio: number;
 }
 
-// NOUVEAU TYPE UNIFIÉ POUR LES TORRENTS
 // Crée un type pour les films avec des informations de playlist
+// Ajout de la propriété `duration` pour correspondre à l'utilisation dans TorrentCard.tsx
 export type MovieInfo = Movie & {
   type: 'movie';
   playlistName: string;
+  duration?: string; // Correction ici : la durée peut exister sur un film
 };
 
 // Crée un type pour les séries avec des informations de playlist
