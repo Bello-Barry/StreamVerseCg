@@ -373,15 +373,15 @@ export interface TorrentStats {
 export type MovieInfo = Movie & {
   type: 'movie';
   playlistName: string;
-  duration?: string; // Correction ici : la durée peut exister sur un film
+  duration?: string;
+  quality?: string; // Correction ici: un film peut aussi avoir une qualité
 };
 
 // Crée un type pour les séries avec des informations de playlist
-// Ajout de la propriété `duration` pour correspondre à l'utilisation dans TorrentCard.tsx
 export type SeriesInfo = Series & {
   type: 'series';
   playlistName: string;
-  duration?: string; // Correction ici : la durée peut aussi exister sur une série
+  duration?: string; // Correction ici: une série peut aussi avoir une durée totale
 };
 
 // Type unifié pour le composant TorrentGrid, utilisant des types distincts
