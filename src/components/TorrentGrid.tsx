@@ -32,8 +32,10 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
         (filterType === 'movie' && torrent.type === 'movie') || 
         (filterType === 'series' && torrent.type === 'series');
       
-      const qualityMatch = filterQuality === 'all' || 
-        (torrent.type === 'movie' && (torrent as MovieInfo).quality === filterQuality) ||
+      // Correction de l'erreur de typage : la qualité n'est pas une propriété des films.
+      // On ne filtre par qualité que si le torrent est une série.
+      const qualityMatch = 
+        filterQuality === 'all' || 
         (torrent.type === 'series' && (torrent as SeriesInfo).quality === filterQuality);
 
       return matchesSearch && typeMatch && qualityMatch;
