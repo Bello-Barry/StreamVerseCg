@@ -1,5 +1,4 @@
-// src/types/index.ts 
-// Enums : Utilisation d'énums pour des valeurs strictes et lisibles.
+// Enums
 export enum ViewType {
   HOME = 'home',
   CATEGORIES = 'categories',
@@ -35,7 +34,6 @@ export enum Quality {
   LOW = 'low'
 }
 
-// Ajout du type 'torrent' pour la gestion future des films/séries
 export enum PlaylistType {
   URL = 'url',
   FILE = 'file',
@@ -57,14 +55,14 @@ export interface Channel {
   tvgId?: string;
   tvgName?: string;
   tvgLogo?: string;
-  group?: string; // Catégorie du groupe
+  group?: string;
   playlistSource: string;
   language?: string;
   country?: string;
-  category?: string; // TODO: Vérifier la redondance avec 'group' et choisir un nom définitif.
+  category?: string;
 }
 
-// Interfaces pour les torrents - types étendus
+// Interfaces pour les torrents - types de base
 export interface MovieFile {
   name: string;
   url: string;
@@ -77,18 +75,18 @@ export interface Movie {
   infoHash: string;
   magnetURI: string;
   poster?: string;
-  category: string; // Rendu obligatoire pour une meilleure classification
+  category: string;
   playlistSource: string;
-  length: number; // Durée en secondes - rendu obligatoire
-  files: MovieFile[]; // Rendu obligatoire - liste des fichiers vidéo
-  torrentFiles?: any[]; // Référence aux fichiers WebTorrent pour la lecture
+  length: number;
+  files: MovieFile[];
+  torrentFiles?: any[];
 }
 
 export interface Series {
   id: string;
   name: string;
   poster?: string;
-  category: string; // Rendu obligatoire
+  category: string;
   playlistSource: string;
   quality?: string;
   episodes: Episode[];
@@ -101,22 +99,21 @@ export interface Episode {
   episode: number;
   infoHash: string;
   magnetURI: string;
-  length?: number; // Durée de l'épisode en secondes
-  torrentFile?: any; // Référence au fichier WebTorrent spécifique pour cet épisode
-  duration?: number; 
-  quality?: string; 
+  length?: number;
+  torrentFile?: any;
+  duration?: number;
+  quality?: string;
 }
 
-// Interface pour une playlist. J'ai rendu plusieurs propriétés obligatoires
-// pour une meilleure robustesse du typage et pour correspondre à la logique actuelle.
+// Interfaces pour une playlist
 export interface Playlist {
   id: string;
   name: string;
-  type: PlaylistType; // Utilisation de l'enum pour la cohérence
+  type: PlaylistType;
   status: PlaylistStatus;
-  lastUpdate: Date; // Rendu obligatoire car toujours créé avec new Date()
-  channelCount: number; // Rendu obligatoire pour éviter les `undefined`
-  isRemovable: boolean; // Rendu obligatoire pour la logique de suppression
+  lastUpdate: Date;
+  channelCount: number;
+  isRemovable: boolean;
   url?: string;
   content?: string;
   description?: string;
@@ -166,7 +163,7 @@ export interface PlaylistManagerState {
   playlists: Playlist[];
   channels: Channel[];
   categories: Category[];
-  torrents: Map<string, (Movie | Series)[]>; // Map des torrents par playlist ID
+  torrents: Map<string, (Movie | Series)[]>;
   loading: boolean;
   error: string | null;
 }
@@ -213,7 +210,7 @@ export interface TorrentParserResult {
 export interface PlaylistFormData {
   name: string;
   url?: string;
-  type: PlaylistType; // Utilisation de l'enum
+  type: PlaylistType;
   description?: string;
   xtreamServer?: string;
   xtreamUsername?: string;
@@ -373,13 +370,21 @@ export interface TorrentStats {
   ratio: number;
 }
 
-// Ajoutez ceci à la fin du fichier, avant la dernière accolade
-
-// Type unifié pour les torrents
-export type TorrentInfo = (Movie | Series) & {
+// NOUVEAU TYPE UNIFIÉ POUR LES TORRENTS
+// Crée un type pour les films avec des informations de playlist
+export type MovieInfo = Movie & {
+  type: 'movie';
   playlistName: string;
-  type: 'movie' | 'series';
 };
+
+// Crée un type pour les séries avec des informations de playlist
+export type SeriesInfo = Series & {
+  type: 'series';
+  playlistName: string;
+};
+
+// Type unifié pour le composant TorrentGrid, utilisant des types distincts
+export type TorrentInfo = MovieInfo | SeriesInfo;
 
 // Interface pour les préférences de torrent
 export interface TorrentPreferences {

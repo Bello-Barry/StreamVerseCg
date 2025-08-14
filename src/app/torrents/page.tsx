@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { usePlaylistStore } from '@/stores/usePlaylistStore';
-import { Movie, Series, Playlist, PlaylistType, TorrentInfo } from '@/types';
+import { Movie, Series, Playlist, PlaylistType, TorrentInfo, Episode } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -36,7 +36,7 @@ function EpisodesModal({
   series: Series | null; 
   isOpen: boolean; 
   onClose: () => void; 
-  onPlayEpisode: (episode: any, seriesName: string) => void;
+  onPlayEpisode: (episode: Episode, seriesName: string) => void;
 }) {
   if (!series) return null;
 
@@ -46,7 +46,7 @@ function EpisodesModal({
     if (!acc[season]) acc[season] = [];
     acc[season].push(episode);
     return acc;
-  }, {} as Record<number, typeof series.episodes>);
+  }, {} as Record<number, Episode[]>);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -119,7 +119,6 @@ export default function TorrentsPage() {
   const torrentPlaylists: Playlist[] = playlists.filter(p => p.type === PlaylistType.TORRENT);
 
   const handlePlayMovie = (movie: Movie) => {
-    console.log('Lecture du film:', movie.name);
     playTorrent(movie);
   };
 
@@ -128,8 +127,7 @@ export default function TorrentsPage() {
     setIsEpisodesModalOpen(true);
   };
 
-  const handlePlayEpisode = (episode: any, seriesName: string) => {
-    console.log('Lecture de l\'épisode:', episode.name);
+  const handlePlayEpisode = (episode: Episode, seriesName: string) => {
     playEpisode(episode, seriesName);
     setIsEpisodesModalOpen(false);
   };
@@ -139,24 +137,32 @@ export default function TorrentsPage() {
     setSelectedSeries(null);
   };
 
-  // Récupérer tous les torrents de toutes les playlists actives
+  // Création d'un tableau unifié de tous les torrents
   const allTorrents = torrentPlaylists.reduce((acc, playlist) => {
     const playlistTorrents = getTorrentsByPlaylist(playlist.id);
-    return [...acc, ...playlistTorrents.map(t => ({ ...t, playlistName: playlist.name }))];
-  }, [] as (Movie | Series & { playlistName: string })[]);
+    const mappedTorrents = playlistTorrents.map(t => {
+      // Vérifier si l'objet est un film (Movie) ou une série (Series)
+      if ((t as Movie).infoHash) {
+        return { ...t, type: 'movie', playlistName: playlist.name } as TorrentInfo;
+      } else {
+        return { ...t, type: 'series', playlistName: playlist.name } as TorrentInfo;
+      }
+    });
+    return [...acc, ...mappedTorrents];
+  }, [] as TorrentInfo[]);
 
-  const movies = allTorrents.filter(t => (t as Movie).magnetURI !== undefined) as (Movie & { playlistName: string })[];
-  const series = allTorrents.filter(t => (t as Series).episodes !== undefined) as (Series & { playlistName: string })[];
+  const movies = allTorrents.filter(t => t.type === 'movie');
+  const series = allTorrents.filter(t => t.type === 'series');
 
   // Fonctions manquantes pour les actions
   const handleDownload = (torrent: TorrentInfo) => {
-    console.log('Téléchargement du torrent:', torrent.name);
     // Implémentez la logique de téléchargement ici
+    alert(`Fonctionnalité non implémentée: Téléchargement de ${torrent.name}`);
   };
 
   const handleFavorite = (torrent: TorrentInfo) => {
-    console.log('Ajout aux favoris:', torrent.name);
     // Implémentez la logique des favoris ici
+    alert(`Fonctionnalité non implémentée: Ajout de ${torrent.name} aux favoris`);
   };
 
   if (loading) {
@@ -246,25 +252,12 @@ export default function TorrentsPage() {
             transition={{ delay: 0.2 }}
           >
             <TorrentGrid
-              torrents={[
-                // Films avec type 'movie'
-                ...movies.map(movie => ({
-                  ...movie,
-                  type: 'movie' as const,
-                  playlistName: movie.playlistName
-                })),
-                // Séries avec type 'series'
-                ...series.map(serie => ({
-                  ...serie,
-                  type: 'series' as const,
-                  playlistName: serie.playlistName
-                }))
-              ]}
+              torrents={allTorrents}
               onTorrentPlay={(torrent) => {
                 if (torrent.type === 'movie') {
-                  handlePlayMovie(torrent as Movie);
+                  handlePlayMovie(torrent);
                 } else if (torrent.type === 'series') {
-                  handleShowEpisodes(torrent as Series);
+                  handleShowEpisodes(torrent);
                 }
               }}
               onTorrentDownload={handleDownload}

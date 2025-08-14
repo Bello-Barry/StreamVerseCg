@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Grid, List } from 'lucide-react';
-import { TorrentCard, TorrentInfo } from './TorrentCard';
+import { TorrentCard } from './TorrentCard';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TorrentInfo, SeriesInfo, MovieInfo } from '@/types';
 
 interface TorrentGridProps {
   torrents: TorrentInfo[];
@@ -26,15 +27,16 @@ export const TorrentGrid: React.FC<TorrentGridProps> = ({
     return torrents.filter(torrent => {
       const matchesSearch = torrent.name.toLowerCase().includes(searchTerm.toLowerCase());
       
-      // CORRECTION : Utiliser 'series' comme dans le type
       const typeMatch = 
         filterType === 'all' || 
         (filterType === 'movie' && torrent.type === 'movie') || 
-        (filterType === 'series' && torrent.type === 'series'); // Modifié ici
+        (filterType === 'series' && torrent.type === 'series');
       
-      const matchesQuality = filterQuality === 'all' || torrent.quality === filterQuality;
-      
-      return matchesSearch && typeMatch && matchesQuality;
+      const qualityMatch = filterQuality === 'all' || 
+        (torrent.type === 'movie' && (torrent as MovieInfo).quality === filterQuality) ||
+        (torrent.type === 'series' && (torrent as SeriesInfo).quality === filterQuality);
+
+      return matchesSearch && typeMatch && qualityMatch;
     });
   }, [torrents, searchTerm, filterType, filterQuality]);
 
