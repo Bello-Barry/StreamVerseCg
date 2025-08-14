@@ -374,14 +374,19 @@ export type MovieInfo = Movie & {
   type: 'movie';
   playlistName: string;
   duration?: string;
-  quality?: string; // Correction ici: un film peut aussi avoir une qualité
+  quality?: string;
+  progress?: number;
+  downloadSpeed?: number;
 };
 
 // Crée un type pour les séries avec des informations de playlist
 export type SeriesInfo = Series & {
   type: 'series';
   playlistName: string;
-  duration?: string; // Correction ici: une série peut aussi avoir une durée totale
+  duration?: string;
+  quality?: string;
+  progress?: number;
+  downloadSpeed?: number;
 };
 
 // Type unifié pour le composant TorrentGrid, utilisant des types distincts
