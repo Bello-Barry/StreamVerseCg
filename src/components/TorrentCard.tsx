@@ -1,31 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, Download, Star, Clock } from 'lucide-react';
-
-// Définition du type pour les torrents
-export interface TorrentInfo {
-  id: string;
-  name: string;
-  infoHash: string;
-  magnetURI: string;
-  poster?: string;
-  category: string;
-  playlistSource: string;
-  length: number;
-  files: MovieFile[];
-  torrentFiles?: any[];
-  playlistName: string;
-  duration?: string;
-  quality?: string;
-  progress?: number;
-  downloadSpeed?: number;
-  type: 'movie' | 'serie';
-}
-
-interface MovieFile {
-  name: string;
-  length: number;
-}
+import { TorrentInfo, MovieFile } from '@/types'; // Importation du type centralisé
 
 interface TorrentCardProps {
   torrent: TorrentInfo;
@@ -42,7 +18,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
 }) => {
   return (
     <motion.div
-      className="relative group bg-slate-800 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300"
+      className="relative group bg-slate-800 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer"
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
     >
@@ -53,7 +29,8 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
           alt={torrent.name}
           className="w-full h-full object-cover"
           onError={(e) => {
-            (e.target as HTMLImageElement).src = '/placeholder-movie.jpg';
+            // Gérer les erreurs d'image en affichant un placeholder
+            e.currentTarget.src = '/placeholder-movie.jpg';
           }}
         />
         
@@ -69,7 +46,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
                 e.stopPropagation();
                 onPlay();
               }}
-              className="p-3 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
+              className="p-3 bg-blue-600 rounded-full hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               aria-label="Jouer le torrent"
             >
               <Play className="w-6 h-6 text-white" />
@@ -79,7 +56,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
                 e.stopPropagation();
                 onDownload();
               }}
-              className="p-3 bg-green-600 rounded-full hover:bg-green-700 transition-colors"
+              className="p-3 bg-green-600 rounded-full hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
               aria-label="Télécharger le torrent"
             >
               <Download className="w-6 h-6 text-white" />
@@ -89,7 +66,7 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
                 e.stopPropagation();
                 onFavorite();
               }}
-              className="p-3 bg-yellow-600 rounded-full hover:bg-yellow-700 transition-colors"
+              className="p-3 bg-yellow-600 rounded-full hover:bg-yellow-700 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
               aria-label="Ajouter aux favoris"
             >
               <Star className="w-6 h-6 text-white" />
@@ -107,15 +84,17 @@ export const TorrentCard: React.FC<TorrentCardProps> = ({
         <div className="flex items-center justify-between text-sm text-slate-400">
           <span className="flex items-center">
             <Clock className="w-4 h-4 mr-1" />
+            {/* Affiche la durée si disponible, sinon "N/A" */}
             {torrent.duration || 'N/A'}
           </span>
           <span className="bg-blue-600 px-2 py-1 rounded text-white text-xs">
+            {/* Affiche la qualité si disponible, sinon "HD" par défaut */}
             {torrent.quality || 'HD'}
           </span>
         </div>
 
-        {/* Barre de progression */}
-        {torrent.progress && torrent.progress > 0 ? (
+        {/* Barre de progression du téléchargement */}
+        {torrent.progress !== undefined && torrent.progress >= 0 ? (
           <div className="mt-3">
             <div className="w-full bg-slate-700 rounded-full h-2">
               <div
