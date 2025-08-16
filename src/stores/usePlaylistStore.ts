@@ -10,6 +10,9 @@ import {
   M3UParseResult,
   PlaylistStatus,
   TorrentContent,
+  Movie,
+  Series,
+  PlaylistType,
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
@@ -31,6 +34,7 @@ interface PlaylistStore extends PlaylistManagerState {
   clearError: () => void;
   resetStore: () => void;
   getTorrents: () => Map<string, (TorrentContent)[]>;
+  getTorrentsByPlaylist: (playlistId: string) => (Movie | Series)[];
 }
 
 const initialState: PlaylistManagerState = {
@@ -62,7 +66,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
       ...initialState,
       playlists: defaultPlaylists,
 
-      // Ajoute une nouvelle playlist.
       addPlaylist: async (playlist) => {
         const newPlaylist: Playlist = {
           ...playlist,
@@ -79,7 +82,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
         await get().refreshPlaylist(newPlaylist.id);
       },
 
-      // Met à jour une playlist existante.
       updatePlaylist: (id, updates) => {
         set((state) => {
           const playlists = state.playlists.map((p) =>
@@ -89,7 +91,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
         });
       },
 
-      // Supprime une playlist.
       removePlaylist: (id) => {
         set((state) => {
           const playlists = state.playlists.filter((p) => p.id !== id);
@@ -104,7 +105,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
         });
       },
 
-      // Change le statut d'une playlist (active/inactive).
       togglePlaylistStatus: async (id) => {
         const playlist = get().playlists.find((p) => p.id === id);
         if (!playlist) return;
@@ -125,7 +125,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
         }
       },
 
-      // Rafraîchit toutes les playlists actives.
       refreshPlaylists: async () => {
         const { playlists } = get();
         get().setLoading(true);
@@ -154,7 +153,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
                     playlist.url!,
                     playlist.id
                   );
-                  // Fusionner les torrents
                   if (result) {
                     allTorrents.set(playlist.id, [...result.movies, ...result.series]);
                   }
@@ -208,7 +206,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
         });
       },
 
-      // Rafraîchit une seule playlist.
       refreshPlaylist: async (id) => {
         const playlist = get().playlists.find((p) => p.id === id);
         if (!playlist) return;
@@ -289,14 +286,12 @@ export const usePlaylistStore = create<PlaylistStore>()(
         }
       },
 
-      // Filtre les chaînes par catégorie.
       getChannelsByCategory: (category) => {
         return get().channels.filter(
           (channel) => (channel.category || channel.group || 'Undefined') === category
         );
       },
 
-      // Recherche des chaînes par nom.
       searchChannels: (query) => {
         if (!query) {
           return get().channels;
@@ -307,7 +302,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
         );
       },
 
-      // Récupère toutes les catégories uniques et leurs chaînes.
       getCategories: () => {
         const { channels } = get();
         const categoryMap = new Map<string, Channel[]>();
@@ -327,7 +321,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
           .sort((a, b) => b.count - a.count);
       },
 
-      // Récupère le nombre de chaînes pour une catégorie.
       getCategoryCount: (category) => {
         const { channels } = get();
         return channels.filter(
@@ -335,17 +328,16 @@ export const usePlaylistStore = create<PlaylistStore>()(
         ).length;
       },
 
-      // Gère l'état de chargement.
       setLoading: (loading) => set({ loading }),
-      // Gère les erreurs.
       setError: (error) => set({ error }),
-      // Efface les erreurs.
       clearError: () => set({ error: null }),
-
-      // Récupère les torrents
+      
       getTorrents: () => get().torrents,
 
-      // Réinitialise le store à son état initial.
+      getTorrentsByPlaylist: (playlistId) => {
+        return get().torrents.get(playlistId) || [];
+      },
+
       resetStore: () =>
         set({
           ...initialState,
@@ -364,7 +356,6 @@ export const usePlaylistStore = create<PlaylistStore>()(
           state.playlists = defaultPlaylists;
         }
         if (state) {
-          // Recharger les playlists après un court délai pour éviter les problèmes de rendu
           timeoutId = setTimeout(() => {
             if (state.refreshPlaylists) {
               state.refreshPlaylists();
