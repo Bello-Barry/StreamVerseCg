@@ -86,7 +86,9 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
           maxBufferLength: 30,
           maxMaxBufferLength: 60,
           lowLatencyMode: true,
-          capLevelOnPlay: true,
+          // La propriété 'capLevelOnPlay' a été dépréciée ou retirée
+          // des versions récentes de hls.js. Elle est gérée automatiquement
+          // par les algorithmes d'ABR plus récents.
         });
 
         // NOTE: L'URL de la source HLS doit être générée par votre service backend.
