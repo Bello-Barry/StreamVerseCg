@@ -5,12 +5,17 @@ import Hls from 'hls.js';
 import { useAppStore } from '@/stores/useAppStore';
 import { TorrentInfo } from '@/types';
 import { cn } from '@/lib/utils';
-import { PlayerControls } from '@/components/PlayerControls'; // Chemin d'importation corrigé
+import { PlayerControls } from '@/components/PlayerControls';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Définition des props pour le lecteur de torrent
+// Utilisation de `Omit` pour exclure les propriétés qui pourraient causer des conflits de typage
+// avec les attributs HTML natifs, tout en gardant une interface propre.
 interface TorrentPlayerProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onPlay' | 'onPause' | 'onVolumeChange'> {
+  extends Omit<
+    React.HTMLAttributes<HTMLDivElement>,
+    'onPlay' | 'onPause' | 'onVolumeChange' | 'onLoadedMetadata' | 'onTimeUpdate' | 'onEnded'
+  > {
   torrent?: TorrentInfo | null;
   isPlaying?: boolean;
   currentTime?: number;
@@ -23,7 +28,6 @@ interface TorrentPlayerProps
   onLoadedMetadata?: (duration: number) => void;
   onEnded?: () => void;
   isLoading?: boolean;
-  // Ajout des props pour l'affichage du progrès de téléchargement
   progress?: number;
   downloadSpeed?: number;
 }
@@ -174,7 +178,6 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
       if (videoRef.current) {
         videoRef.current.volume = volume;
       }
-      // On met à jour le store Zustand pour persister le volume
       setAppVolume(volume);
       onVolumeChange?.(volume);
     };
@@ -223,7 +226,7 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
           autoPlay={userPreferences.autoplay}
         />
         <AnimatePresence>
-          {isPlayerReady && (isHovering || !isPlaying) && (
+          {(isPlayerReady && (isHovering || !isPlaying)) || isLoading && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
