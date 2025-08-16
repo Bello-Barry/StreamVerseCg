@@ -137,24 +137,28 @@ export const usePlaylistStore = create<PlaylistStore>()(
         for (const playlist of playlists) {
           if (playlist.status === PlaylistStatus.ACTIVE) {
             try {
-              let result: M3UParseResult | TorrentParserResult | undefined;
               let channelCount = 0;
+              let errors: string[] = [];
+              let newTorrents: (Movie | Series)[] = [];
 
               switch (playlist.type) {
                 case PlaylistType.URL:
-                case PlaylistType.XTREAM:
-                  const response = playlist.type === PlaylistType.URL ?
-                    await fetch(playlist.url!) :
-                    null;
-                  const content = response ? await response.text() : '';
-                  
-                  const channelResult = playlist.type === PlaylistType.URL ?
-                    parseM3UContent(content, playlist.id) :
-                    await parseXtreamContent(playlist.xtreamConfig!, playlist.id);
+                  const urlResponse = await fetch(playlist.url!);
+                  const urlContent = await urlResponse.text();
+                  const urlResult = parseM3UContent(urlContent, playlist.id);
+                  allChannels.push(...(urlResult.channels || []));
+                  channelCount = urlResult.channels.length;
+                  errors = urlResult.errors;
+                  break;
 
-                  result = channelResult;
-                  allChannels.push(...(channelResult.channels || []));
-                  channelCount = channelResult.channels?.length || 0;
+                case PlaylistType.XTREAM:
+                  const xtreamResult = await parseXtreamContent(
+                    playlist.xtreamConfig!,
+                    playlist.id
+                  );
+                  allChannels.push(...(xtreamResult.channels || []));
+                  channelCount = xtreamResult.channels.length;
+                  errors = xtreamResult.errors;
                   break;
 
                 case PlaylistType.TORRENT:
@@ -162,9 +166,10 @@ export const usePlaylistStore = create<PlaylistStore>()(
                     playlist.url!,
                     playlist.id
                   );
-                  result = torrentResult;
                   if (torrentResult) {
-                    allTorrents.set(playlist.id, [...torrentResult.movies, ...torrentResult.series]);
+                    newTorrents = [...torrentResult.movies, ...torrentResult.series];
+                    allTorrents.set(playlist.id, newTorrents);
+                    errors = torrentResult.errors;
                   }
                   break;
 
@@ -172,8 +177,8 @@ export const usePlaylistStore = create<PlaylistStore>()(
                   throw new Error(`Type de playlist non supporté: ${playlist.type}`);
               }
               
-              if (result && result.errors && result.errors.length > 0) {
-                result.errors.forEach((err) => get().setError(err));
+              if (errors.length > 0) {
+                errors.forEach((err) => get().setError(err));
               }
 
               set((state) => ({
@@ -183,7 +188,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
                       ...p,
                       status: PlaylistStatus.ACTIVE,
                       channelCount: channelCount,
-                      error: null,
+                      error: undefined, // Correction : utiliser 'undefined' au lieu de 'null'
                     }
                     : p
                 ),
@@ -226,26 +231,29 @@ export const usePlaylistStore = create<PlaylistStore>()(
         }));
 
         try {
-          let result: M3UParseResult | TorrentParserResult | undefined;
           let newChannels: Channel[] = [];
           let updatedTorrents: Map<string, (TorrentContent)[]> = new Map(get().torrents);
           let channelCount = 0;
+          let errors: string[] = [];
 
           switch (playlist.type) {
             case PlaylistType.URL:
-            case PlaylistType.XTREAM:
-              const response = playlist.type === PlaylistType.URL ?
-                await fetch(playlist.url!) :
-                null;
-              const content = response ? await response.text() : '';
-              
-              const channelResult = playlist.type === PlaylistType.URL ?
-                parseM3UContent(content, playlist.id) :
-                await parseXtreamContent(playlist.xtreamConfig!, playlist.id);
-
-              result = channelResult;
-              newChannels = channelResult.channels || [];
+              const urlResponse = await fetch(playlist.url!);
+              const urlContent = await urlResponse.text();
+              const urlResult = parseM3UContent(urlContent, playlist.id);
+              newChannels = urlResult.channels || [];
               channelCount = newChannels.length;
+              errors = urlResult.errors;
+              break;
+
+            case PlaylistType.XTREAM:
+              const xtreamResult = await parseXtreamContent(
+                playlist.xtreamConfig!,
+                playlist.id
+              );
+              newChannels = xtreamResult.channels || [];
+              channelCount = newChannels.length;
+              errors = xtreamResult.errors;
               break;
 
             case PlaylistType.TORRENT:
@@ -253,9 +261,9 @@ export const usePlaylistStore = create<PlaylistStore>()(
                 playlist.url!,
                 playlist.id
               );
-              result = torrentResult;
               if (torrentResult) {
                 updatedTorrents.set(id, [...torrentResult.movies, ...torrentResult.series]);
+                errors = torrentResult.errors;
               }
               break;
               
@@ -263,8 +271,8 @@ export const usePlaylistStore = create<PlaylistStore>()(
               throw new Error(`Type de playlist non supporté: ${playlist.type}`);
           }
           
-          if (result && result.errors && result.errors.length > 0) {
-            result.errors.forEach((err) => get().setError(err));
+          if (errors.length > 0) {
+            errors.forEach((err) => get().setError(err));
           }
 
           set((state) => {
@@ -278,7 +286,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
                     ...p,
                     status: PlaylistStatus.ACTIVE,
                     channelCount: channelCount,
-                    error: null,
+                    error: undefined, // Correction : utiliser 'undefined' au lieu de 'null'
                     lastUpdate: new Date(),
                   }
                   : p
