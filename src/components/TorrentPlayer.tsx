@@ -3,14 +3,12 @@
 import React, { useRef, useEffect, useState, forwardRef } from 'react';
 import Hls from 'hls.js';
 import { useAppStore } from '@/stores/useAppStore';
-import { TorrentInfo, Quality } from '@/types';
+import { TorrentInfo } from '@/types';
 import { cn } from '@/lib/utils';
-import { PlayerControls } from './PlayerControls'; // Assurez-vous que ce composant existe
+import { PlayerControls } from '@/components/PlayerControls'; // Chemin d'importation corrigé
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Définition des props pour le lecteur de torrent
-// J'utilise `Omit` pour exclure les propriétés qui pourraient causer des conflits de typage
-// avec les attributs HTML natifs, tout en gardant une interface propre.
 interface TorrentPlayerProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onPlay' | 'onPause' | 'onVolumeChange'> {
   torrent?: TorrentInfo | null;
@@ -25,6 +23,9 @@ interface TorrentPlayerProps
   onLoadedMetadata?: (duration: number) => void;
   onEnded?: () => void;
   isLoading?: boolean;
+  // Ajout des props pour l'affichage du progrès de téléchargement
+  progress?: number;
+  downloadSpeed?: number;
 }
 
 /**
@@ -41,18 +42,21 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
       duration = 0,
       onPlay,
       onPause,
+      onSeek,
       onVolumeChange,
       onTimeUpdate,
       onLoadedMetadata,
       onEnded,
       isLoading = false,
+      progress,
+      downloadSpeed,
       className,
       ...props
     },
     ref
   ) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const { userPreferences } = useAppStore();
+    const { userPreferences, setVolume: setAppVolume } = useAppStore();
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [isHovering, setIsHovering] = useState(false);
     const [localDuration, setLocalDuration] = useState(0);
@@ -61,6 +65,8 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
     useEffect(() => {
       const videoElement = videoRef.current;
       if (!videoElement || !torrent?.magnetURI) {
+        // Nettoyer si le torrent est retiré
+        setIsPlayerReady(false);
         return;
       }
 
@@ -74,8 +80,8 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
           capLevelOnPlay: true,
         });
 
-        // NOTE: Ici, l'URL de la source HLS doit être générée par votre service backend.
-        // Le backend est responsable de prendre la magnet URI et de la streamer
+        // NOTE: L'URL de la source HLS doit être générée par votre service backend.
+        // C'est le backend qui est responsable de prendre la magnet URI et de la streamer
         // sous forme de HLS (m3u8). La ligne ci-dessous est un exemple.
         const url = `http://votre-backend.com/stream/${torrent.infoHash}/playlist.m3u8`;
 
@@ -90,7 +96,6 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
         hls.on(Hls.Events.ERROR, (event, data) => {
           console.error('HLS.js error:', data.details);
           if (data.fatal) {
-            // Logique de récupération en cas d'erreur fatale
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 console.error('Erreur réseau fatale, tentative de récupération...');
@@ -114,7 +119,6 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
         };
       } else {
         // Fallback pour les navigateurs non compatibles (non-HLS)
-        // Ceci est une solution de secours et ne gère pas les torrents.
         videoElement.src = `http://votre-backend.com/stream/${torrent.infoHash}/video`;
         setIsPlayerReady(true);
         videoElement.play().catch(console.error);
@@ -151,12 +155,12 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
         onEnded?.();
       };
 
+      // Met à jour le volume initial
+      videoElement.volume = userPreferences.volume;
+
       videoElement.addEventListener('timeupdate', handleTimeUpdate);
       videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
       videoElement.addEventListener('ended', handleEnded);
-
-      // Met à jour le volume initial
-      videoElement.volume = userPreferences.volume;
 
       return () => {
         videoElement.removeEventListener('timeupdate', handleTimeUpdate);
@@ -170,7 +174,18 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
       if (videoRef.current) {
         videoRef.current.volume = volume;
       }
+      // On met à jour le store Zustand pour persister le volume
+      setAppVolume(volume);
       onVolumeChange?.(volume);
+    };
+
+    const handleToggleFullscreen = () => {
+      const element = ref?.current;
+      if (!document.fullscreenElement) {
+        element?.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
     };
 
     const handleMouseMove = () => {
@@ -184,7 +199,10 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
     return (
       <div
         ref={ref}
-        className={cn('relative w-full h-full bg-black flex items-center justify-center', className)}
+        className={cn(
+          'relative w-full h-full bg-black flex items-center justify-center group',
+          className
+        )}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         {...props}
@@ -193,7 +211,7 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black bg-opacity-70">
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               className="w-16 h-16 border-4 border-white border-t-transparent rounded-full"
             />
           </div>
@@ -205,7 +223,7 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
           autoPlay={userPreferences.autoplay}
         />
         <AnimatePresence>
-          {isPlayerReady && (isHovering || !isPlaying || isLoading) && (
+          {isPlayerReady && (isHovering || !isPlaying) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -214,7 +232,7 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
               className="absolute inset-0 z-10"
             >
               <PlayerControls
-                torrent={torrent} // J'ai ajouté cette prop pour que le titre s'affiche dans les contrôles
+                torrent={torrent}
                 isPlaying={isPlaying || false}
                 currentTime={currentTime}
                 duration={duration || localDuration}
@@ -226,9 +244,12 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
                   if (videoRef.current) {
                     videoRef.current.currentTime = time;
                   }
-                  onSeek?.(time); // Appelle la prop onSeek passée par le parent
+                  onSeek?.(time);
                 }}
-                className="absolute bottom-4 left-4 right-4"
+                onToggleFullscreen={handleToggleFullscreen}
+                progress={progress}
+                downloadSpeed={downloadSpeed}
+                className="absolute inset-0"
               />
             </motion.div>
           )}
