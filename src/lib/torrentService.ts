@@ -192,7 +192,8 @@ class TorrentService {
           torrentFiles: movieData.files,
           // Métadonnées supplémentaires
           quality: this.detectQuality(movieData.name),
-          year: this.detectYear(movieData.name),
+          // Convertit `null` en `undefined` pour être compatible avec le type `year?: number`
+          year: this.detectYear(movieData.name) ?? undefined,
         };
         movies.push(movie);
       });
@@ -220,7 +221,8 @@ class TorrentService {
           episodes,
           // Métadonnées supplémentaires
           totalSeasons: Math.max(...episodes.map((ep) => ep.season)),
-          year: this.detectYear(seriesData.name),
+          // Convertit `null` en `undefined` pour être compatible avec le type `year?: number`
+          year: this.detectYear(seriesData.name) ?? undefined,
         };
         series.push(seriesItem);
       });
