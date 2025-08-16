@@ -9,8 +9,6 @@ import { PlayerControls } from '@/components/PlayerControls';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Définition des props pour le lecteur de torrent
-// Utilisation de `Omit` pour exclure les propriétés qui pourraient causer des conflits de typage
-// avec les attributs HTML natifs, tout en gardant une interface propre.
 interface TorrentPlayerProps
   extends Omit<
     React.HTMLAttributes<HTMLDivElement>,
@@ -30,6 +28,13 @@ interface TorrentPlayerProps
   isLoading?: boolean;
   progress?: number;
   downloadSpeed?: number;
+}
+
+// Garde de type pour vérifier si un objet est une TorrentInfo avec une magnetURI
+function isTorrentInfoWithMagnet(
+  torrent: TorrentInfo | null | undefined
+): torrent is TorrentInfo & { magnetURI: string } {
+  return torrent !== null && typeof torrent === 'object' && 'magnetURI' in torrent && typeof torrent.magnetURI === 'string';
 }
 
 /**
@@ -68,8 +73,8 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
     // Effet pour gérer le chargement de la vidéo via HLS.js
     useEffect(() => {
       const videoElement = videoRef.current;
-      if (!videoElement || !torrent?.magnetURI) {
-        // Nettoyer si le torrent est retiré
+      if (!videoElement || !isTorrentInfoWithMagnet(torrent)) {
+        // Nettoyer si le torrent est retiré ou si la magnetURI est absente
         setIsPlayerReady(false);
         return;
       }
@@ -127,7 +132,7 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
         setIsPlayerReady(true);
         videoElement.play().catch(console.error);
       }
-    }, [torrent?.magnetURI, torrent?.infoHash, currentTime]);
+    }, [torrent, currentTime]);
 
     // Effet pour synchroniser l'état de lecture avec les props
     useEffect(() => {
