@@ -30,11 +30,18 @@ interface TorrentPlayerProps
   downloadSpeed?: number;
 }
 
-// Garde de type pour vérifier si un objet est une TorrentInfo avec une magnetURI
-function isTorrentInfoWithMagnet(
+// Garde de type améliorée pour vérifier si un objet a les propriétés nécessaires pour le streaming
+function isValidTorrentForStreaming(
   torrent: TorrentInfo | null | undefined
-): torrent is TorrentInfo & { magnetURI: string } {
-  return torrent !== null && typeof torrent === 'object' && 'magnetURI' in torrent && typeof torrent.magnetURI === 'string';
+): torrent is TorrentInfo & { magnetURI: string; infoHash: string } {
+  return (
+    torrent !== null &&
+    typeof torrent === 'object' &&
+    'magnetURI' in torrent &&
+    typeof torrent.magnetURI === 'string' &&
+    'infoHash' in torrent &&
+    typeof torrent.infoHash === 'string'
+  );
 }
 
 /**
@@ -73,8 +80,8 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
     // Effet pour gérer le chargement de la vidéo via HLS.js
     useEffect(() => {
       const videoElement = videoRef.current;
-      if (!videoElement || !isTorrentInfoWithMagnet(torrent)) {
-        // Nettoyer si le torrent est retiré ou si la magnetURI est absente
+      if (!videoElement || !isValidTorrentForStreaming(torrent)) {
+        // Nettoyer si le torrent est retiré ou si les propriétés requises sont absentes
         setIsPlayerReady(false);
         return;
       }
