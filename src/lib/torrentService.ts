@@ -146,9 +146,12 @@ class TorrentService {
           console.log('Torrent prêt:', torrent.name, 'Files:', torrent.files.length);
           resolve(torrent);
         });
-
-        torrent.on('error', (err: Error) => {
+        
+        // Caster en 'any' car la déclaration de type de webtorrent ne supporte pas 'error'
+        (torrent as any).on('error', (err: Error) => {
           clearTimeout(timeout);
+          // Important: détruire le torrent en cas d'erreur
+          torrent.destroy();
           reject(new Error(`Erreur WebTorrent: ${err.message}`));
         });
       });
