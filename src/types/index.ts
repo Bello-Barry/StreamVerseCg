@@ -92,6 +92,7 @@ export interface Series {
   quality?: string;
   episodes: Episode[];
   year?: number;
+  totalSeasons?: number;
 }
 
 export interface Episode {
