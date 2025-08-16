@@ -74,6 +74,8 @@ export interface Movie {
   length: number;
   files: MovieFile[];
   torrentFiles?: any[];
+  quality?: string;
+  year?: number;
 }
 
 export interface MovieFile {
@@ -89,6 +91,7 @@ export interface Series {
   playlistSource: string;
   quality?: string;
   episodes: Episode[];
+  year?: number;
 }
 
 export interface Episode {
