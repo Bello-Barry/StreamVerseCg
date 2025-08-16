@@ -7,6 +7,7 @@
 
 import { Movie, Series, TorrentParserResult, Episode } from '@/types';
 import { Torrent, TorrentFile as WebtorrentFile, Instance } from 'webtorrent';
+import { Buffer } from 'buffer';
 
 // Type pour le client WebTorrent.
 // Utilisation de `Instance` du module `webtorrent` pour un typage précis.
@@ -103,15 +104,17 @@ class TorrentService {
         currentTorrentInstance = null;
       }
       
-      let torrentToAdd: string | File | ArrayBuffer;
+      let torrentToAdd: string | File | Buffer;
       
       if (source instanceof File) {
-        torrentToAdd = await new Promise<ArrayBuffer>((resolve, reject) => {
+        const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as ArrayBuffer);
           reader.onerror = () => reject(new Error('Erreur lors de la lecture du fichier'));
           reader.readAsArrayBuffer(source);
         });
+        // Conversion de l'ArrayBuffer en Buffer pour le client webtorrent
+        torrentToAdd = Buffer.from(arrayBuffer);
       } else if (typeof source === 'string') {
         if (!this.validateMagnetURI(source)) {
           throw new Error('Lien magnet invalide');

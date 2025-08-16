@@ -11,11 +11,11 @@ import {
   PlaylistStatus,
   PlaylistType,
   Movie,
-  Series
+  Series,
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
-import { parseTorrentContentImproved } from '@/lib/torrentService'; // Import du service amélioré
+import { torrentService } from '@/lib/torrentService';
 
 interface PlaylistStore extends PlaylistManagerState {
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
@@ -43,7 +43,7 @@ const initialState: PlaylistManagerState = {
   categories: [],
   torrents: new Map(),
   loading: false,
-  error: null
+  error: null,
 };
 
 const defaultPlaylists: Playlist[] = [
@@ -68,7 +68,7 @@ const defaultPlaylists: Playlist[] = [
     isRemovable: false,
     channelCount: 0,
     lastUpdate: new Date(),
-  }
+  },
 ];
 
 export const usePlaylistStore = create<PlaylistStore>()(
@@ -84,11 +84,11 @@ export const usePlaylistStore = create<PlaylistStore>()(
           lastUpdate: new Date(),
           status: PlaylistStatus.ACTIVE,
           isRemovable: true,
-          channelCount: 0
+          channelCount: 0,
         };
 
         set((state) => ({
-          playlists: [...state.playlists, newPlaylist]
+          playlists: [...state.playlists, newPlaylist],
         }));
 
         await get().refreshPlaylist(newPlaylist.id);
@@ -100,7 +100,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
             playlist.id === id
               ? { ...playlist, ...updates, lastUpdate: new Date() }
               : playlist
-          )
+          ),
         })),
 
       removePlaylist: (id) => {
@@ -111,13 +111,17 @@ export const usePlaylistStore = create<PlaylistStore>()(
           return;
         }
 
-        set((state) => ({
-          playlists: state.playlists.filter((playlist) => playlist.id !== id),
-          channels: state.channels.filter((channel) => channel.playlistSource !== id),
-          torrents: new Map(
+        set((state) => {
+          const newTorrents = new Map(
             Array.from(state.torrents.entries()).filter(([key, _]) => key !== id)
-          )
-        }));
+          );
+          
+          return {
+            playlists: state.playlists.filter((playlist) => playlist.id !== id),
+            channels: state.channels.filter((channel) => channel.playlistSource !== id),
+            torrents: newTorrents,
+          };
+        });
       },
 
       togglePlaylistStatus: (id) =>
@@ -130,10 +134,10 @@ export const usePlaylistStore = create<PlaylistStore>()(
                     playlist.status === PlaylistStatus.ACTIVE
                       ? PlaylistStatus.INACTIVE
                       : PlaylistStatus.ACTIVE,
-                  lastUpdate: new Date()
+                  lastUpdate: new Date(),
                 }
               : playlist
-          )
+          ),
         })),
 
       refreshPlaylists: async () => {
@@ -141,18 +145,41 @@ export const usePlaylistStore = create<PlaylistStore>()(
         set({ loading: true, error: null });
 
         try {
-          const activePlaylists = playlists.filter(
-            (p) => p.status === PlaylistStatus.ACTIVE
-          );
           const allChannels: Channel[] = [];
+          const torrentsMap: Map<string, (Movie | Series)[]> = new Map();
 
-          for (const playlist of activePlaylists) {
+          for (const playlist of playlists) {
+            if (playlist.status !== PlaylistStatus.ACTIVE) continue;
+
             try {
               if (playlist.type === PlaylistType.TORRENT) {
-                // Traitement spécial pour les torrents
-                await get().refreshPlaylist(playlist.id);
+                const source = playlist.url || playlist.content;
+                let torrentSource: string | File;
+
+                if (playlist.url && playlist.url.startsWith('magnet:')) {
+                  torrentSource = playlist.url;
+                } else if (playlist.content) {
+                  torrentSource = new File([playlist.content], playlist.url || 'torrent_file.torrent', { type: 'application/x-bittorrent' });
+                } else {
+                  throw new Error('Aucune source torrent valide configurée (magnet URI ou fichier)');
+                }
+
+                const torrentResult = await torrentService.parseTorrentContent(torrentSource, playlist.id);
+                
+                if (torrentResult.errors.length > 0) {
+                  console.error('Erreurs lors du parsing du torrent:', torrentResult.errors);
+                  throw new Error(torrentResult.errors[0]);
+                }
+
+                const allTorrents = [...torrentResult.movies, ...torrentResult.series];
+                torrentsMap.set(playlist.id, allTorrents);
+
+                get().updatePlaylist(playlist.id, {
+                  channelCount: allTorrents.length,
+                  status: PlaylistStatus.ACTIVE,
+                });
+
               } else {
-                // Traitement normal pour les autres types
                 let parseResult: M3UParseResult;
 
                 if (
@@ -181,17 +208,16 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
                 if (parseResult.channels.length > 0) {
                   allChannels.push(...parseResult.channels);
-
                   get().updatePlaylist(playlist.id, {
                     channelCount: parseResult.channels.length,
-                    status: PlaylistStatus.ACTIVE
+                    status: PlaylistStatus.ACTIVE,
                   });
                 }
               }
             } catch (error) {
               console.error(`Erreur lors du chargement de la playlist ${playlist.name}:`, error);
               get().updatePlaylist(playlist.id, {
-                status: PlaylistStatus.ERROR
+                status: PlaylistStatus.ERROR,
               });
             }
           }
@@ -199,13 +225,13 @@ export const usePlaylistStore = create<PlaylistStore>()(
           set({
             channels: allChannels,
             categories: get().getCategories(),
-            loading: false
+            torrents: torrentsMap,
+            loading: false,
           });
         } catch (error) {
           set({
-            error:
-              error instanceof Error ? error.message : 'Erreur inconnue',
-            loading: false
+            error: error instanceof Error ? error.message : 'Erreur inconnue',
+            loading: false,
           });
         }
       },
@@ -227,16 +253,12 @@ export const usePlaylistStore = create<PlaylistStore>()(
             if (playlist.url && playlist.url.startsWith('magnet:')) {
               torrentSource = playlist.url;
             } else if (playlist.content) {
-              // Si le contenu est un fichier, on le traite comme tel
-              // Pour l'instant, on suppose que playlist.content contient le nom du fichier
-              // Il faudrait un mécanisme pour récupérer le fichier réel si c'est un upload
-              // Pour cette version, nous allons simuler un fichier pour le parser
               torrentSource = new File([playlist.content], playlist.url || 'torrent_file.torrent', { type: 'application/x-bittorrent' });
             } else {
               throw new Error('Aucune source torrent valide configurée (magnet URI ou fichier)');
             }
 
-            const torrentResult = await parseTorrentContentImproved(torrentSource, playlist.id);
+            const torrentResult = await torrentService.parseTorrentContent(torrentSource, playlist.id);
             
             if (torrentResult.errors.length > 0) {
               console.error('Erreurs lors du parsing du torrent:', torrentResult.errors);
@@ -253,7 +275,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
 
             get().updatePlaylist(id, {
               channelCount: allTorrents.length,
-              status: PlaylistStatus.ACTIVE
+              status: PlaylistStatus.ACTIVE,
             });
 
           } else {
@@ -290,13 +312,13 @@ export const usePlaylistStore = create<PlaylistStore>()(
                   ...state.channels.filter(
                     (c) => c.playlistSource !== playlist.id
                   ),
-                  ...parseResult.channels
+                  ...parseResult.channels,
                 ],
               }));
 
               get().updatePlaylist(id, {
                 channelCount: parseResult.channels.length,
-                status: PlaylistStatus.ACTIVE
+                status: PlaylistStatus.ACTIVE,
               });
             } else {
               throw new Error('Aucune chaîne trouvée dans la playlist');
@@ -346,7 +368,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
           .map(([name, channels]) => ({
             name,
             channels,
-            count: channels.length
+            count: channels.length,
           }))
           .sort((a, b) => b.count - a.count);
       },
@@ -367,7 +389,7 @@ export const usePlaylistStore = create<PlaylistStore>()(
       getAllTorrents: () => {
         const { torrents } = get();
         const allTorrents: (Movie | Series)[] = [];
-        torrents.forEach(playlistTorrents => {
+        torrents.forEach((playlistTorrents) => {
           allTorrents.push(...playlistTorrents);
         });
         return allTorrents;
@@ -380,29 +402,42 @@ export const usePlaylistStore = create<PlaylistStore>()(
       resetStore: () =>
         set({
           ...initialState,
-          playlists: defaultPlaylists
-        })
+          playlists: defaultPlaylists,
+        }),
     }),
     {
       name: 'streamverse-playlist-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         playlists: state.playlists,
-        torrents: Array.from(state.torrents.entries()) // Sérialiser la Map
+        torrents: Array.from(state.torrents.entries()),
       }),
       onRehydrateStorage: () => (state) => {
+        let timeoutId: NodeJS.Timeout;
+
         if (state) {
-          // Restaurer la Map depuis le stockage
+          console.log("Rehydrating playlist store...", state);
+          
+          // Restaurer la Map `torrents`
           if (Array.isArray((state as any).torrents)) {
             state.torrents = new Map((state as any).torrents);
+          } else {
+            state.torrents = new Map();
           }
-          
+
+          // Initialiser les playlists par défaut si aucune n'est présente
           if (state.playlists.length === 0) {
             state.playlists = defaultPlaylists;
           }
-          setTimeout(() => state.refreshPlaylists(), 100);
+
+          // Recharger les playlists après un court délai pour éviter les problèmes de rendu
+          timeoutId = setTimeout(() => {
+            get().refreshPlaylists();
+          }, 100);
         }
-      }
+        
+        return () => clearTimeout(timeoutId);
+      },
     }
   )
 );
