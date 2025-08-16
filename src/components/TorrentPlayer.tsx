@@ -197,10 +197,20 @@ export const TorrentPlayer = forwardRef<HTMLDivElement, TorrentPlayerProps>(
     };
 
     const handleToggleFullscreen = () => {
-      const element = ref?.current;
-      if (!document.fullscreenElement) {
+      // Vérifier si la référence est un objet avant d'accéder à `current`
+      let element: HTMLDivElement | null = null;
+      if (ref && typeof ref === 'object') {
+        element = ref.current;
+      } else if (ref && typeof ref === 'function') {
+        // Pour les ref callbacks, on n'a pas d'accès direct au DOM
+        // C'est pourquoi on utilise toujours un useRef localement.
+        // On peut s'assurer que `videoRef.current` est bien un parent.
+        element = videoRef.current?.parentElement as HTMLDivElement | null;
+      }
+
+      if (element && !document.fullscreenElement) {
         element?.requestFullscreen();
-      } else {
+      } else if (document.exitFullscreen) {
         document.exitFullscreen();
       }
     };
