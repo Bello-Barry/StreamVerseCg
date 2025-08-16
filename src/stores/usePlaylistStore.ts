@@ -13,11 +13,13 @@ import {
   Movie,
   Series,
   PlaylistType,
+  TorrentParserResult,
 } from '@/types';
 import { parseM3UContent } from '@/lib/m3uParser';
 import { parseXtreamContent } from '@/lib/xtreamParser';
 import { torrentService } from '@/lib/torrentService';
 
+// Définition de l'interface du store
 interface PlaylistStore extends PlaylistManagerState {
   addPlaylist: (playlist: Omit<Playlist, 'id'>) => Promise<void>;
   updatePlaylist: (id: string, updates: Partial<Playlist>) => void;
@@ -135,36 +137,42 @@ export const usePlaylistStore = create<PlaylistStore>()(
         for (const playlist of playlists) {
           if (playlist.status === PlaylistStatus.ACTIVE) {
             try {
-              let result;
+              let result: M3UParseResult | TorrentParserResult | undefined;
+              let channelCount = 0;
+
               switch (playlist.type) {
                 case PlaylistType.URL:
-                  const response = await fetch(playlist.url!);
-                  const content = await response.text();
-                  result = parseM3UContent(content, playlist.id);
-                  break;
                 case PlaylistType.XTREAM:
-                  result = await parseXtreamContent(
-                    playlist.xtreamConfig!,
-                    playlist.id
-                  );
+                  const response = playlist.type === PlaylistType.URL ?
+                    await fetch(playlist.url!) :
+                    null;
+                  const content = response ? await response.text() : '';
+                  
+                  const channelResult = playlist.type === PlaylistType.URL ?
+                    parseM3UContent(content, playlist.id) :
+                    await parseXtreamContent(playlist.xtreamConfig!, playlist.id);
+
+                  result = channelResult;
+                  allChannels.push(...(channelResult.channels || []));
+                  channelCount = channelResult.channels?.length || 0;
                   break;
+
                 case PlaylistType.TORRENT:
-                  result = await torrentService.parseTorrentContent(
+                  const torrentResult = await torrentService.parseTorrentContent(
                     playlist.url!,
                     playlist.id
                   );
-                  if (result) {
-                    allTorrents.set(playlist.id, [...result.movies, ...result.series]);
+                  result = torrentResult;
+                  if (torrentResult) {
+                    allTorrents.set(playlist.id, [...torrentResult.movies, ...torrentResult.series]);
                   }
                   break;
+
                 default:
                   throw new Error(`Type de playlist non supporté: ${playlist.type}`);
               }
-
-              if (result && result.channels) {
-                allChannels.push(...result.channels);
-              }
-              if (result && result.errors.length > 0) {
+              
+              if (result && result.errors && result.errors.length > 0) {
                 result.errors.forEach((err) => get().setError(err));
               }
 
@@ -174,12 +182,13 @@ export const usePlaylistStore = create<PlaylistStore>()(
                     ? {
                       ...p,
                       status: PlaylistStatus.ACTIVE,
-                      channelCount: result.channels?.length || 0,
+                      channelCount: channelCount,
                       error: null,
                     }
                     : p
                 ),
               }));
+
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
               set((state) => ({
@@ -217,48 +226,58 @@ export const usePlaylistStore = create<PlaylistStore>()(
         }));
 
         try {
-          let result;
+          let result: M3UParseResult | TorrentParserResult | undefined;
+          let newChannels: Channel[] = [];
+          let updatedTorrents: Map<string, (TorrentContent)[]> = new Map(get().torrents);
+          let channelCount = 0;
+
           switch (playlist.type) {
             case PlaylistType.URL:
-              const response = await fetch(playlist.url!);
-              const content = await response.text();
-              result = parseM3UContent(content, playlist.id);
-              break;
             case PlaylistType.XTREAM:
-              result = await parseXtreamContent(
-                playlist.xtreamConfig!,
-                playlist.id
-              );
+              const response = playlist.type === PlaylistType.URL ?
+                await fetch(playlist.url!) :
+                null;
+              const content = response ? await response.text() : '';
+              
+              const channelResult = playlist.type === PlaylistType.URL ?
+                parseM3UContent(content, playlist.id) :
+                await parseXtreamContent(playlist.xtreamConfig!, playlist.id);
+
+              result = channelResult;
+              newChannels = channelResult.channels || [];
+              channelCount = newChannels.length;
               break;
+
             case PlaylistType.TORRENT:
-              result = await torrentService.parseTorrentContent(
+              const torrentResult = await torrentService.parseTorrentContent(
                 playlist.url!,
                 playlist.id
               );
+              result = torrentResult;
+              if (torrentResult) {
+                updatedTorrents.set(id, [...torrentResult.movies, ...torrentResult.series]);
+              }
               break;
+              
             default:
               throw new Error(`Type de playlist non supporté: ${playlist.type}`);
           }
           
-          if (result && result.errors.length > 0) {
+          if (result && result.errors && result.errors.length > 0) {
             result.errors.forEach((err) => get().setError(err));
           }
 
           set((state) => {
             const otherChannels = state.channels.filter(c => c.playlistSource !== id);
-            const otherTorrents = new Map(state.torrents);
-            otherTorrents.delete(id);
-
-            const updatedTorrents = result.movies || result.series ? otherTorrents.set(id, [...(result.movies || []), ...(result.series || [])]) : otherTorrents;
             
             return {
-              channels: [...otherChannels, ...(result.channels || [])],
+              channels: [...otherChannels, ...newChannels],
               playlists: state.playlists.map((p) =>
                 p.id === id
                   ? {
                     ...p,
                     status: PlaylistStatus.ACTIVE,
-                    channelCount: result.channels?.length || 0,
+                    channelCount: channelCount,
                     error: null,
                     lastUpdate: new Date(),
                   }
