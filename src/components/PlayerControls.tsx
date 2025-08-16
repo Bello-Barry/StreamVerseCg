@@ -14,7 +14,9 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { TorrentInfo } from '@/types';
 
-interface PlayerControlsProps extends React.HTMLAttributes<HTMLDivElement> {
+// Utilisation de `Omit` pour éviter les conflits de types avec HTMLAttributes
+interface PlayerControlsProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onPlay' | 'onPause' | 'onVolumeChange'> {
   torrent?: TorrentInfo | null;
   isPlaying: boolean;
   currentTime: number;
@@ -53,7 +55,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   ...props
 }) => {
   const formatTime = (time: number) => {
-    if (isNaN(time)) return '0:00';
+    if (isNaN(time) || time < 0) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -150,12 +152,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 )}
               </button>
               {/* Barre de volume */}
-              <div className="w-20 h-2 bg-white/30 rounded-full cursor-pointer relative group">
+              <div
+                className="w-20 h-2 bg-white/30 rounded-full cursor-pointer relative group"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const newVolume = Math.min(Math.max(x / rect.width, 0), 1);
+                  onVolumeChange?.(newVolume);
+                }}
+              >
                 <div
                   className="h-full bg-white rounded-full"
                   style={{ width: `${volume * 100}%` }}
                 ></div>
-                {/* La poignée du volume peut être ajoutée ici si vous avez un composant Slider */}
               </div>
             </div>
 
