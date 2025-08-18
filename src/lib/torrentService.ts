@@ -445,3 +445,13 @@ class TorrentService {
 // Instance singleton
 export const torrentService = new TorrentService();
 
+// Fonction helper pour correspondre à l'import du store
+export const parseTorrentContentImproved = (
+  source: string | File,
+  sourceName: string
+): Promise<TorrentParserResult> => {
+  return torrentService.parseTorrentContent(source, sourceName);
+};
+
+// Export par défaut de l'instance
+export default torrentService;
