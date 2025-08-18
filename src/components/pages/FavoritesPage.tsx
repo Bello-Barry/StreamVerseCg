@@ -1,10 +1,12 @@
 'use client'
 
-import React, { useMemo, useState, useCallback, useRef } from 'react'
-import { Heart, Trash2, Download, Upload } from 'lucide-react'
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { Heart, Trash2, Download, Upload, TrendingUp, Clock, Users, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import ChannelCard from '@/components/ChannelCard'
 import { usePlaylistStore } from '@/stores/usePlaylistStore'
 import { useFavoritesStore } from '@/stores/useFavoritesStore'
@@ -20,35 +22,39 @@ const FavoritesHeader = React.memo(function FavoritesHeader({
   onExport,
   onImportClick,
   onClearAll,
+  loading
 }: {
   count: number
   onExport: () => void
   onImportClick: () => void
   onClearAll: () => void
+  loading: boolean
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 className="text-3xl font-bold flex items-center space-x-2">
           <Heart className="h-8 w-8 text-red-500" />
-          <span>Mes Favoris</span>
+          <span>Favoris Communautaires</span>
+          {loading && <Loader2 className="h-5 w-5 animate-spin" />}
         </h1>
-        <p className="text-muted-foreground">
-          {count} chaîne{count !== 1 ? 's' : ''} favorite{count !== 1 ? 's' : ''}
+        <p className="text-muted-foreground flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          {count} chaîne{count !== 1 ? 's' : ''} favorite{count !== 1 ? 's' : ''} par la communauté
         </p>
       </div>
       <div className="flex items-center space-x-2">
-        <Button variant="outline" size="sm" onClick={onExport} disabled={count === 0}>
+        <Button variant="outline" size="sm" onClick={onExport} disabled={count === 0 || loading}>
           <Download className="h-4 w-4 mr-2" />
           Exporter
         </Button>
-        <Button variant="outline" size="sm" onClick={onImportClick}>
+        <Button variant="outline" size="sm" onClick={onImportClick} disabled={loading}>
           <Upload className="h-4 w-4 mr-2" />
           Importer
         </Button>
-        <Button variant="destructive" size="sm" onClick={onClearAll} disabled={count === 0}>
+        <Button variant="destructive" size="sm" onClick={onClearAll} disabled={count === 0 || loading}>
           <Trash2 className="h-4 w-4 mr-2" />
-          Tout supprimer
+          Réinitialiser
         </Button>
       </div>
     </div>
@@ -73,7 +79,7 @@ const FilterControls = React.memo(function FilterControls({
   return (
     <div className="space-y-4">
       <Input
-        placeholder="Rechercher dans vos favoris..."
+        placeholder="Rechercher dans les favoris communautaires..."
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
       />
@@ -109,25 +115,42 @@ const FavoritesGrid = React.memo(function FavoritesGrid({
   onToggleFavorite,
   isFavorite,
   showCategory,
+  favoriteRecords,
+  showVoteCount = false
 }: {
   channels: Channel[]
   onPlay: (channel: Channel) => void
   onToggleFavorite: (channel: Channel) => void
   isFavorite: (id: string) => boolean
   showCategory: boolean
+  favoriteRecords: any[]
+  showVoteCount?: boolean
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {channels.map((channel) => (
-        <ChannelCard
-          key={channel.id}
-          channel={channel}
-          onPlay={onPlay}
-          onToggleFavorite={onToggleFavorite}
-          isFavorite={isFavorite(channel.id)}
-          showCategory={showCategory}
-        />
-      ))}
+      {channels.map((channel) => {
+        const favoriteRecord = favoriteRecords.find(f => f.channel_id === channel.id);
+        return (
+          <div key={channel.id} className="relative">
+            <ChannelCard
+              channel={channel}
+              onPlay={onPlay}
+              onToggleFavorite={onToggleFavorite}
+              isFavorite={isFavorite(channel.id)}
+              showCategory={showCategory}
+            />
+            {showVoteCount && favoriteRecord && (
+              <Badge 
+                variant="secondary" 
+                className="absolute top-2 right-2 bg-primary text-primary-foreground"
+              >
+                <Heart className="h-3 w-3 mr-1" />
+                {favoriteRecord.vote_count}
+              </Badge>
+            )}
+          </div>
+        );
+      })}
     </div>
   )
 })
@@ -136,9 +159,19 @@ const EmptyState = React.memo(function EmptyState({
   reason,
   query,
 }: {
-  reason: 'no-favorites' | 'no-results'
+  reason: 'no-favorites' | 'no-results' | 'loading'
   query?: string
 }) {
+  if (reason === 'loading') {
+    return (
+      <div className="text-center py-12">
+        <Loader2 className="h-16 w-16 text-muted-foreground mx-auto mb-4 animate-spin" />
+        <h3 className="text-xl font-semibold mb-2">Chargement des favoris...</h3>
+        <p className="text-muted-foreground">Récupération des favoris de la communauté.</p>
+      </div>
+    )
+  }
+
   const isNoResults = reason === 'no-results'
   return (
     <div className="text-center py-12">
@@ -149,7 +182,7 @@ const EmptyState = React.memo(function EmptyState({
       <p className="text-muted-foreground">
         {isNoResults
           ? `Aucun favori trouvé pour "${query}".`
-          : 'Ajoutez des chaînes à vos favoris en cliquant sur le cœur.'}
+          : 'Soyez le premier à ajouter des chaînes aux favoris communautaires !'}
       </p>
     </div>
   )
@@ -161,20 +194,31 @@ export default function FavoritesPage() {
   const { channels } = usePlaylistStore()
   const {
     favorites,
+    loading,
+    error,
+    fetchFavorites,
     toggleFavorite,
     isFavorite,
     clearAllFavorites,
     getFavoriteChannels,
     getFavoritesByCategory,
     exportFavorites,
-    importFavorites
+    importFavorites,
+    getMostPopularFavorites,
+    getRecentFavorites
   } = useFavoritesStore()
   const { addToHistory } = useWatchHistoryStore()
   const { setCurrentChannel } = useAppStore()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState('all')
   const importInputRef = useRef<HTMLInputElement>(null)
+
+  // Charger les favoris au montage du composant
+  useEffect(() => {
+    fetchFavorites()
+  }, [fetchFavorites])
 
   const favoriteChannels = useMemo(
     () => getFavoriteChannels(channels),
@@ -186,10 +230,34 @@ export default function FavoritesPage() {
     [channels, getFavoritesByCategory]
   )
 
+  const popularFavorites = useMemo(() => {
+    const popularRecords = getMostPopularFavorites(20);
+    const popularIds = popularRecords.map(r => r.channel_id);
+    return channels.filter(ch => popularIds.includes(ch.id));
+  }, [channels, getMostPopularFavorites])
+
+  const recentFavorites = useMemo(() => {
+    const recentRecords = getRecentFavorites(20);
+    const recentIds = recentRecords.map(r => r.channel_id);
+    return channels.filter(ch => recentIds.includes(ch.id));
+  }, [channels, getRecentFavorites])
+
+  const getChannelsForTab = (tab: string) => {
+    switch (tab) {
+      case 'popular':
+        return popularFavorites;
+      case 'recent':
+        return recentFavorites;
+      default:
+        return favoriteChannels;
+    }
+  }
+
   const filteredChannels = useMemo(() => {
     let filtered = selectedCategory
       ? favoritesByCategory[selectedCategory] || []
-      : favoriteChannels
+      : getChannelsForTab(activeTab)
+    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -199,7 +267,7 @@ export default function FavoritesPage() {
       )
     }
     return filtered
-  }, [favoriteChannels, favoritesByCategory, selectedCategory, searchQuery])
+  }, [favoriteChannels, favoritesByCategory, popularFavorites, recentFavorites, selectedCategory, searchQuery, activeTab])
 
   const handlePlayChannel = useCallback(
     (channel: Channel) => {
@@ -210,22 +278,31 @@ export default function FavoritesPage() {
   )
 
   const handleToggleFavorite = useCallback(
-    (channel: Channel) => {
-      toggleFavorite(channel.id)
-      toast.success(`${channel.name} retiré des favoris`)
+    async (channel: Channel) => {
+      try {
+        await toggleFavorite(channel)
+        const action = isFavorite(channel.id) ? 'retiré des' : 'ajouté aux'
+        toast.success(`${channel.name} ${action} favoris communautaires`)
+      } catch (error) {
+        toast.error('Erreur lors de la modification des favoris')
+      }
     },
-    [toggleFavorite]
+    [toggleFavorite, isFavorite]
   )
 
-  const handleClearAllFavorites = useCallback(() => {
+  const handleClearAllFavorites = useCallback(async () => {
     if (
       favorites.length > 0 &&
       window.confirm(
-        `Êtes-vous sûr de vouloir supprimer tous vos ${favorites.length} favoris ?`
+        `Êtes-vous sûr de vouloir réinitialiser tous les favoris communautaires ? Cette action ne peut pas être annulée.`
       )
     ) {
-      clearAllFavorites()
-      toast.success('Tous les favoris ont été supprimés')
+      try {
+        await clearAllFavorites()
+        toast.success('Tous les favoris communautaires ont été réinitialisés')
+      } catch (error) {
+        toast.error('Erreur lors de la réinitialisation des favoris')
+      }
     }
   }, [favorites.length, clearAllFavorites])
 
@@ -235,7 +312,7 @@ export default function FavoritesPage() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `streamverse-favoris-${new Date()
+    link.download = `streamverse-favoris-communautaires-${new Date()
       .toISOString()
       .split('T')[0]}.json`
     document.body.appendChild(link)
@@ -248,19 +325,19 @@ export default function FavoritesPage() {
   const handleImportClick = useCallback(() => importInputRef.current?.click(), [])
 
   const handleImportFileSelected = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (!file) return
 
       const reader = new FileReader()
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const favoriteIds = JSON.parse(e.target?.result as string)
           if (
             Array.isArray(favoriteIds) &&
             favoriteIds.every((id) => typeof id === 'string')
           ) {
-            importFavorites(favoriteIds)
+            await importFavorites(favoriteIds, channels)
             toast.success(`${favoriteIds.length} favoris importés avec succès`)
           } else {
             toast.error(
@@ -275,8 +352,23 @@ export default function FavoritesPage() {
       reader.readAsText(file)
       event.target.value = '' // Permet de ré-importer le même fichier
     },
-    [importFavorites]
+    [importFavorites, channels]
   )
+
+  if (loading && favorites.length === 0) {
+    return (
+      <div className="space-y-6">
+        <FavoritesHeader
+          count={0}
+          onExport={handleExportFavorites}
+          onImportClick={handleImportClick}
+          onClearAll={handleClearAllFavorites}
+          loading={loading}
+        />
+        <EmptyState reason="loading" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -285,7 +377,16 @@ export default function FavoritesPage() {
         onExport={handleExportFavorites}
         onImportClick={handleImportClick}
         onClearAll={handleClearAllFavorites}
+        loading={loading}
       />
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Erreur lors du chargement des favoris: {error}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <input
         id="import-favorites"
@@ -298,29 +399,50 @@ export default function FavoritesPage() {
 
       {favoriteChannels.length > 0 ? (
         <>
-          <FilterControls
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            categories={favoritesByCategory}
-            selectedCategory={selectedCategory}
-            onCategorySelect={setSelectedCategory}
-            totalFavorites={favoriteChannels.length}
-          />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <Heart className="h-4 w-4" />
+                Tous ({favoriteChannels.length})
+              </TabsTrigger>
+              <TabsTrigger value="popular" className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Populaires ({popularFavorites.length})
+              </TabsTrigger>
+              <TabsTrigger value="recent" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Récents ({recentFavorites.length})
+              </TabsTrigger>
+            </TabsList>
 
-          {filteredChannels.length > 0 ? (
-            <FavoritesGrid
-              channels={filteredChannels}
-              onPlay={handlePlayChannel}
-              onToggleFavorite={handleToggleFavorite}
-              isFavorite={isFavorite}
-              showCategory={!selectedCategory}
-            />
-          ) : (
-            <EmptyState
-              reason="no-results"
-              query={searchQuery || selectedCategory || ''}
-            />
-          )}
+            <TabsContent value={activeTab} className="mt-6">
+              <FilterControls
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                categories={favoritesByCategory}
+                selectedCategory={selectedCategory}
+                onCategorySelect={setSelectedCategory}
+                totalFavorites={getChannelsForTab(activeTab).length}
+              />
+
+              {filteredChannels.length > 0 ? (
+                <FavoritesGrid
+                  channels={filteredChannels}
+                  onPlay={handlePlayChannel}
+                  onToggleFavorite={handleToggleFavorite}
+                  isFavorite={isFavorite}
+                  showCategory={!selectedCategory}
+                  favoriteRecords={favorites}
+                  showVoteCount={activeTab === 'popular'}
+                />
+              ) : (
+                <EmptyState
+                  reason="no-results"
+                  query={searchQuery || selectedCategory || ''}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
         </>
       ) : (
         <EmptyState reason="no-favorites" />
