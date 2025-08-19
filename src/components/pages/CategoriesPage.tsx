@@ -59,8 +59,12 @@ const CategoriesPage: React.FC = () => {
     addToHistory(channel, 0)
   }
 
+  // CORRECTION URGENTE:
+  // L'action `toggleFavorite` dans votre store `useFavoritesStore`
+  // a été modifiée pour accepter un objet `Channel` complet, non plus un `string`.
+  // On passe donc l'objet `channel` entier ici.
   const handleToggleFavorite = (channel: Channel) => {
-    toggleFavorite(channel.id)
+    toggleFavorite(channel)
   }
 
   if (loading) {
