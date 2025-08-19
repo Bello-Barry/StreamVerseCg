@@ -29,7 +29,7 @@ import { useChannelValidator } from '@/lib/channelValidator'
 import { useSmartRecommendation } from '@/lib/smartChannelRecommendation'
 import { usePlaylistStore } from '@/stores/usePlaylistStore'
 import { useFavoritesStore } from '@/stores/useFavoritesStore'
-import { toast } from 'sonner' // Ajout de sonner pour les notifications
+import { toast } from 'sonner' 
 
 interface SmartChannelGridProps {
   channels: Channel[]
@@ -69,7 +69,7 @@ export function SmartChannelGrid({
     getPopularChannels 
   } = useSmartRecommendation()
   // Utiliser le hook directement pour la réactivité
-  const { favorites, toggleFavorite, isFavorite } = useFavoritesStore()
+  const { toggleFavorite, isFavorite } = useFavoritesStore()
   const allChannels = usePlaylistStore(state => state.channels);
 
   // Obtenir les catégories uniques
@@ -108,11 +108,8 @@ export function SmartChannelGrid({
           case 'reliable':
             return status && status.reliability >= 70
           case 'favorites':
-            // BUG FIX: L'erreur de compilation est ici. `channel.id` est bien de type 'string',
-            // et la méthode `includes` attend une `string`. L'erreur vient probablement 
-            // d'une configuration de `tsconfig` ou d'un conflit de type dans les définitions.
-            // Le type `favorites` doit être `string[]`. On s'assure que c'est le cas ici.
-            return favorites.includes(channel.id)
+            // CORRECTION: Remplacer l'ancienne logique par la méthode isFavorite du store
+            return isFavorite(channel.id)
           default:
             return true
         }
@@ -175,7 +172,7 @@ export function SmartChannelGrid({
     filterBy, 
     showOnlyReliable, 
     getChannelStatus, 
-    favorites
+    isFavorite
   ])
 
   // Pagination
@@ -415,7 +412,7 @@ export function SmartChannelGrid({
                     <ChannelCard
                       channel={channel}
                       onPlay={() => handleChannelSelect(channel)}
-                      onToggleFavorite={() => toggleFavorite(channel.id)}
+                      onToggleFavorite={() => toggleFavorite(channel)} // Passer l'objet channel complet
                       isFavorite={isFavorite(channel.id)}
                       showReliabilityIndicator={true}
                       compact={viewMode === 'list'}
@@ -455,7 +452,7 @@ export function SmartChannelGrid({
                       <ChannelCard
                         channel={channel}
                         onPlay={() => handleChannelSelect(channel)}
-                        onToggleFavorite={() => toggleFavorite(channel.id)}
+                        onToggleFavorite={() => toggleFavorite(channel)} // Passer l'objet channel complet
                         isFavorite={isFavorite(channel.id)}
                         showReliabilityIndicator={true}
                         compact={viewMode === 'list'}
@@ -493,7 +490,7 @@ export function SmartChannelGrid({
                       <ChannelCard
                         channel={channel}
                         onPlay={() => handleChannelSelect(channel)}
-                        onToggleFavorite={() => toggleFavorite(channel.id)}
+                        onToggleFavorite={() => toggleFavorite(channel)} // Passer l'objet channel complet
                         isFavorite={isFavorite(channel.id)}
                         showReliabilityIndicator={true}
                         compact={viewMode === 'list'}
@@ -537,7 +534,7 @@ export function SmartChannelGrid({
                         <ChannelCard
                           channel={channel}
                           onPlay={() => handleChannelSelect(channel)}
-                          onToggleFavorite={() => toggleFavorite(channel.id)}
+                          onToggleFavorite={() => toggleFavorite(channel)} // Passer l'objet channel complet
                           isFavorite={isFavorite(channel.id)}
                           showReliabilityIndicator={true}
                           compact={viewMode === 'list'}
