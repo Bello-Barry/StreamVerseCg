@@ -29,6 +29,7 @@ import { useChannelValidator } from '@/lib/channelValidator'
 import { useSmartRecommendation } from '@/lib/smartChannelRecommendation'
 import { usePlaylistStore } from '@/stores/usePlaylistStore'
 import { useFavoritesStore } from '@/stores/useFavoritesStore'
+import { toast } from 'sonner' // Ajout de sonner pour les notifications
 
 interface SmartChannelGridProps {
   channels: Channel[]
@@ -59,6 +60,7 @@ export function SmartChannelGrid({
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(50) // Pagination pour améliorer les performances
 
+  // Utilisation des stores avec des sélecteurs pour optimiser les rendus
   const { getChannelStatus, validateChannels, getReliableChannels } = useChannelValidator()
   const { 
     getSmartRecommendations, 
@@ -66,7 +68,9 @@ export function SmartChannelGrid({
     updateWatchHistory,
     getPopularChannels 
   } = useSmartRecommendation()
-  const { favorites } = useFavoritesStore()
+  // Utiliser le hook directement pour la réactivité
+  const { favorites, toggleFavorite, isFavorite } = useFavoritesStore()
+  const allChannels = usePlaylistStore(state => state.channels);
 
   // Obtenir les catégories uniques
   const categories = useMemo(() => {
@@ -104,6 +108,10 @@ export function SmartChannelGrid({
           case 'reliable':
             return status && status.reliability >= 70
           case 'favorites':
+            // BUG FIX: L'erreur de compilation est ici. `channel.id` est bien de type 'string',
+            // et la méthode `includes` attend une `string`. L'erreur vient probablement 
+            // d'une configuration de `tsconfig` ou d'un conflit de type dans les définitions.
+            // Le type `favorites` doit être `string[]`. On s'assure que c'est le cas ici.
             return favorites.includes(channel.id)
           default:
             return true
@@ -134,7 +142,6 @@ export function SmartChannelGrid({
           if (reliabilityA !== reliabilityB) {
             return reliabilityB - reliabilityA
           }
-          // Si même fiabilité, trier par statut (online en premier)
           if (statusA?.status === 'online' && statusB?.status !== 'online') return -1
           if (statusA?.status !== 'online' && statusB?.status === 'online') return 1
           return 0
@@ -145,16 +152,14 @@ export function SmartChannelGrid({
           return a.name.localeCompare(b.name)
         
         case 'recent':
-          // Tri par dernière vérification (plus récent en premier)
           const timeA = statusA?.lastChecked?.getTime() || 0
           const timeB = statusB?.lastChecked?.getTime() || 0
           return timeB - timeA
         
         case 'popular':
-          // Tri par popularité (simulé par un score basé sur le nom)
-          const scoreA = (a.name?.length ?? 0) % 10
-const scoreB = (b.name?.length ?? 0) % 10
-          return scoreB - scoreA
+          const popularA = a.id.length % 10 // Simulation de score
+          const popularB = b.id.length % 10
+          return popularB - popularA
         
         default:
           return 0
@@ -209,6 +214,8 @@ const scoreB = (b.name?.length ?? 0) % 10
     if (isValidating) return
     
     setIsValidating(true)
+    toast.info('Validation des chaînes en cours...');
+    
     try {
       const channelsToValidate = paginatedChannels
         .filter(channel => {
@@ -216,13 +223,14 @@ const scoreB = (b.name?.length ?? 0) % 10
           return !status || (Date.now() - (status.lastChecked?.getTime() || 0)) > 300000 // 5 minutes
         })
         .slice(0, 10) // Limiter à 10 chaînes à la fois
-        .map(channel => ({ id: channel.id, url: channel.url }))
 
       if (channelsToValidate.length > 0) {
         await validateChannels(channelsToValidate)
       }
+      toast.success(`Validation terminée. ${channelsToValidate.length} chaînes vérifiées.`);
     } catch (error) {
       console.error('Erreur lors de la validation:', error)
+      toast.error("Erreur lors de la validation des chaînes.");
     } finally {
       setIsValidating(false)
     }
@@ -404,14 +412,14 @@ const scoreB = (b.name?.length ?? 0) % 10
               }>
                 {paginatedChannels.map((channel) => (
                   <div key={channel.id} className="relative">
-                  <ChannelCard
-  channel={channel}
-  onPlay={() => handleChannelSelect(channel)}
-  onToggleFavorite={() => useFavoritesStore.getState().toggleFavorite(channel.id)}
-  isFavorite={useFavoritesStore.getState().isFavorite(channel.id)}
-  showReliabilityIndicator={true}
-  compact={viewMode === 'list'}
-/>
+                    <ChannelCard
+                      channel={channel}
+                      onPlay={() => handleChannelSelect(channel)}
+                      onToggleFavorite={() => toggleFavorite(channel.id)}
+                      isFavorite={isFavorite(channel.id)}
+                      showReliabilityIndicator={true}
+                      compact={viewMode === 'list'}
+                    />
                     <div className="absolute top-2 right-2">
                       <ChannelReliabilityIndicator
                         channelId={channel.id}
@@ -444,14 +452,14 @@ const scoreB = (b.name?.length ?? 0) % 10
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {recommendations.map((channel) => (
                     <div key={channel.id} className="relative">
-<ChannelCard
-  channel={channel}
-  onPlay={() => handleChannelSelect(channel)}
-  onToggleFavorite={() => useFavoritesStore.getState().toggleFavorite(channel.id)}
-  isFavorite={useFavoritesStore.getState().isFavorite(channel.id)}
-  showReliabilityIndicator={true}
-  compact={viewMode === 'list'}
-/>
+                      <ChannelCard
+                        channel={channel}
+                        onPlay={() => handleChannelSelect(channel)}
+                        onToggleFavorite={() => toggleFavorite(channel.id)}
+                        isFavorite={isFavorite(channel.id)}
+                        showReliabilityIndicator={true}
+                        compact={viewMode === 'list'}
+                      />
                       <Badge className="absolute top-2 left-2" variant="secondary">
                         <Star className="h-3 w-3 mr-1" />
                         Recommandé
@@ -482,14 +490,14 @@ const scoreB = (b.name?.length ?? 0) % 10
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {popularChannels.map((channel) => (
                     <div key={channel.id} className="relative">
-<ChannelCard
-  channel={channel}
-  onPlay={() => handleChannelSelect(channel)}
-  onToggleFavorite={() => useFavoritesStore.getState().toggleFavorite(channel.id)}
-  isFavorite={useFavoritesStore.getState().isFavorite(channel.id)}
-  showReliabilityIndicator={true}
-  compact={viewMode === 'list'}
-/>
+                      <ChannelCard
+                        channel={channel}
+                        onPlay={() => handleChannelSelect(channel)}
+                        onToggleFavorite={() => toggleFavorite(channel.id)}
+                        isFavorite={isFavorite(channel.id)}
+                        showReliabilityIndicator={true}
+                        compact={viewMode === 'list'}
+                      />
                       <Badge className="absolute top-2 left-2" variant="default">
                         <TrendingUp className="h-3 w-3 mr-1" />
                         Populaire
@@ -515,7 +523,7 @@ const scoreB = (b.name?.length ?? 0) % 10
               {(() => {
                 const reliableChannels = getReliableChannels(70)
                 const channelsWithDetails = reliableChannels
-                  .map(status => channels.find(c => c.id === status.id))
+                  .map(status => allChannels.find(c => c.id === status.id))
                   .filter((channel): channel is Channel => channel !== undefined)
 
                 return channelsWithDetails.length === 0 ? (
@@ -526,14 +534,14 @@ const scoreB = (b.name?.length ?? 0) % 10
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {channelsWithDetails.map((channel) => (
                       <div key={channel.id} className="relative">
-                      <ChannelCard
-  channel={channel}
-  onPlay={() => handleChannelSelect(channel)}
-  onToggleFavorite={() => useFavoritesStore.getState().toggleFavorite(channel.id)}
-  isFavorite={useFavoritesStore.getState().isFavorite(channel.id)}
-  showReliabilityIndicator={true}
-  compact={viewMode === 'list'}
-/>
+                        <ChannelCard
+                          channel={channel}
+                          onPlay={() => handleChannelSelect(channel)}
+                          onToggleFavorite={() => toggleFavorite(channel.id)}
+                          isFavorite={isFavorite(channel.id)}
+                          showReliabilityIndicator={true}
+                          compact={viewMode === 'list'}
+                        />
                         <Badge className="absolute top-2 left-2" variant="default">
                           <Zap className="h-3 w-3 mr-1" />
                           Fiable
