@@ -30,6 +30,7 @@ interface HlsErrorData {
   details: string;
   fatal: boolean;
 }
+
 type PlayerPageProps = {
   onPlaybackError?: (channel: Channel) => void;
 };
@@ -41,7 +42,7 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
     setCurrentView,
     userPreferences,
   } = useAppStore();
-  const { toggleFavorite, isFavorite } = useFavoritesStore();
+  const { toggleFavorite, isFavorite, fetchFavorites } = useFavoritesStore();
   const { addToHistory } = useWatchHistoryStore();
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -60,6 +61,11 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
   const [availableQualities, setAvailableQualities] = useState<string[]>([]);
   const [currentQualityIndex, setCurrentQualityIndex] = useState<number | null>(null);
 
+  // Charger les favoris pour le composant
+  useEffect(() => {
+    fetchFavorites();
+  }, [fetchFavorites]);
+
   const initializePlayer = useCallback(async () => {
     if (!currentChannel || !videoRef.current) return;
 
@@ -67,14 +73,21 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
     setIsLoading(true);
     setError(null);
 
+    // Détruire l'instance HLS précédente si elle existe
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    // Réinitialiser les qualités disponibles
+    setAvailableQualities([]);
+    setCurrentQualityIndex(null);
+
     try {
       const Hls = (await import('hls.js')).default;
+      const url = currentChannel.url;
 
-      if (Hls.isSupported()) {
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
-        }
-
+      if (Hls.isSupported() && url.endsWith('.m3u8')) {
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
@@ -83,42 +96,53 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
         hlsRef.current = hls;
 
         hls.attachMedia(video);
-        hls.loadSource(currentChannel.url);
+        hls.loadSource(url);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
           setIsLoading(false);
-          const qualities = hls.levels.map((level, i) => {
-            return `${level.height}p`;
-          });
-          setAvailableQualities(qualities);
-          setCurrentQualityIndex(hls.currentLevel);
+          if (data.levels.length > 1) {
+            const qualities = hls.levels.map((level, i) =>
+              level.height ? `${level.height}p` : `Qualité ${i + 1}`
+            );
+            setAvailableQualities(qualities);
+            setCurrentQualityIndex(hls.currentLevel);
+          }
 
           if (userPreferences.autoplay) {
             video.play().catch(console.error);
           }
         });
 
-        hls.on(Hls.Events.ERROR, (_event: string, data: HlsErrorData) => {
+        hls.on(Hls.Events.ERROR, (_event, data: HlsErrorData) => {
           console.error('HLS Error:', data);
           if (data.fatal) {
             setError('Erreur de lecture du flux. Veuillez réessayer.');
             setIsLoading(false);
+            if (onPlaybackError) {
+              onPlaybackError(currentChannel);
+            }
           }
         });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = currentChannel.url;
+      } else {
+        // Fallback pour les formats non HLS ou non supportés
+        video.src = url;
         setIsLoading(false);
+        if (userPreferences.autoplay) {
+          video.play().catch(console.error);
+        }
       }
     } catch (err) {
       console.error("Erreur d'initialisation du lecteur:", err);
       setError("Erreur d'initialisation du lecteur.");
       setIsLoading(false);
     }
-  }, [currentChannel, userPreferences.autoplay]);
+  }, [currentChannel, userPreferences.autoplay, onPlaybackError]);
 
   useEffect(() => {
     initializePlayer();
+
     return () => {
+      // Nettoyage à la désactivation du composant
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
@@ -228,11 +252,18 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
     setCurrentView(ViewType.HOME);
   }, [setCurrentChannel, setCurrentView]);
 
-  const handleToggleFavorite = useCallback(() => {
+  // CORRECTION URGENTE:
+  // L'action `toggleFavorite` a été mise à jour pour accepter l'objet `Channel` entier.
+  const handleToggleFavorite = useCallback(async () => {
     if (!currentChannel) return;
     const currentlyFavorite = isFavorite(currentChannel.id);
-    toggleFavorite(currentChannel.id);
-    toast.success(currentlyFavorite ? 'Retiré des favoris' : 'Ajouté aux favoris');
+    try {
+      await toggleFavorite(currentChannel);
+      toast.success(currentlyFavorite ? `"${currentChannel.name}" a été retirée des favoris.` : `"${currentChannel.name}" a été ajoutée aux favoris.`);
+    } catch (error) {
+      toast.error('Erreur lors de la mise à jour des favoris.');
+      console.error('Error toggling favorite:', error);
+    }
   }, [currentChannel, isFavorite, toggleFavorite]);
 
   const handleShare = useCallback(() => {
@@ -246,14 +277,15 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
     hideControls();
   }, [hideControls]);
 
-  const handleQualityChange = (index: number) => {
+  const handleQualityChange = useCallback((index: number) => {
     if (hlsRef.current) {
       hlsRef.current.currentLevel = index;
       setCurrentQualityIndex(index);
       toast.success(`Qualité changée : ${availableQualities[index]}`);
     }
-  };
+  }, [availableQualities]);
 
+  // Raccourcis clavier pour une meilleure UX (Smart TV/Desktop)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -269,13 +301,28 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
           handleFullscreenToggle();
           break;
         case 'Escape':
-          handleClose();
+          // Quitte le mode plein écran ou ferme le lecteur
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            handleClose();
+          }
+          break;
+        case 'ArrowRight':
+        case 'ArrowLeft':
+          setShowControls(true);
+          hideControls();
+          break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+          setShowControls(true);
+          hideControls();
           break;
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handlePlayPause, handleMuteToggle, handleFullscreenToggle, handleClose]);
+  }, [handlePlayPause, handleMuteToggle, handleFullscreenToggle, handleClose, hideControls]);
 
   if (!currentChannel) {
     return (
@@ -292,20 +339,24 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
     <div className="space-y-4">
       <div
         ref={playerContainerRef}
-        className="relative bg-black rounded-lg overflow-hidden aspect-video group"
+        className={`relative bg-black rounded-lg overflow-hidden aspect-video group ${
+          isFullscreen && 'fixed inset-0 z-50 rounded-none'
+        }`}
         onMouseMove={handleMouseMove}
         onTouchStart={handleMouseMove}
       >
         <video
           ref={videoRef}
-          className="w-full h-full"
+          className={`w-full h-full object-contain ${
+            showControls && 'cursor-pointer'
+          } ${!showControls && isFullscreen && 'cursor-none'}`}
           poster={currentChannel.tvgLogo}
           onClick={handlePlayPause}
           playsInline
         />
 
         {(isLoading || error) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white z-20">
             {isLoading ? (
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
@@ -321,14 +372,14 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
         )}
 
         <div
-          className={`absolute inset-0 bg-gradient-to-t from-black/70 to-transparent transition-opacity duration-300 ${
+          className={`absolute inset-0 bg-gradient-to-t from-black/70 to-transparent transition-opacity duration-300 z-10 ${
             showControls && !error ? 'opacity-100' : 'opacity-0'
           }`}
         >
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 bg-black/50 backdrop-blur-sm p-2 rounded-lg">
               <Badge variant="destructive">🔴 LIVE</Badge>
-              <h3 className="text-white font-semibold">{currentChannel.name}</h3>
+              <h3 className="text-white font-semibold line-clamp-1">{currentChannel.name}</h3>
             </div>
             <div className="flex items-center space-x-1">
               <Button
@@ -359,11 +410,11 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
             </Button>
             <Slider value={[isMuted ? 0 : volume]} onValueChange={handleVolumeChange} max={1} step={0.1} className="w-24" />
 
-            {availableQualities.length > 0 && (
+            {availableQualities.length > 1 && (
               <div className="flex items-center space-x-2 ml-auto">
                 <Signal className="text-white h-4 w-4" />
                 <select
-                  className="bg-black text-white text-sm rounded px-2 py-1 border border-white/30"
+                  className="bg-black/50 backdrop-blur-sm text-white text-sm rounded px-2 py-1 border border-white/30 focus:outline-none"
                   onChange={(e) => handleQualityChange(parseInt(e.target.value))}
                   value={currentQualityIndex ?? -1}
                 >
@@ -399,12 +450,12 @@ const PlayerPage: React.FC<PlayerPageProps> = ({ onPlaybackError }) => {
               </div>
             </div>
             {currentChannel.tvgLogo && (
-              <div className="relative w-16 h-16 flex-shrink-0">
+              <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
                 <Image
                   src={currentChannel.tvgLogo}
                   alt={`Logo de ${currentChannel.name}`}
                   fill
-                  className="object-contain rounded"
+                  className="object-contain"
                   sizes="64px"
                 />
               </div>
