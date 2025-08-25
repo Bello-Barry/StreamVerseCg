@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 
 /**
  * Charge un fichier image dans le bucket de stockage Supabase 'movie-posters'.
