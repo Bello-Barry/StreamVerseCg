@@ -1,4 +1,5 @@
-// Enums
+// src/types/index.ts
+
 export enum ViewType {
   HOME = 'home',
   CATEGORIES = 'categories',
@@ -7,12 +8,13 @@ export enum ViewType {
   SEARCH = 'search',
   PLAYER = 'player',
   PLAYLISTS = 'playlists',
-  SETTINGS = 'settings',
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
   THEMES = 'themes',
   TORRENTS = 'torrents'
+  MOVIES = 'movies', // Nouvelle vue pour les films
 }
+
 
 export enum PlaylistStatus {
   ACTIVE = 'active',

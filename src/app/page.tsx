@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -15,6 +14,7 @@ import PlaylistsPage from '@/components/pages/PlaylistsPage';
 import { AnalyticsPage } from '@/components/pages/AnalyticsPage';
 import { NotificationsPage } from '@/components/pages/NotificationsPage';
 import ThemesPage from '@/components/pages/ThemesPage';
+import MoviesPage from '@/components/pages/MoviesPage'; // Import du composant MoviesPage
 
 import { AnalyticsProvider } from '@/components/AnalyticsProvider';
 import { NotificationProvider } from '@/components/NotificationProvider';
@@ -24,7 +24,6 @@ import type { AppState, Channel } from '@/types';
 import { ViewType } from '@/types';
 
 // Import des nouveaux composants
-import { SmartChannelGrid } from '@/components/SmartChannelGrid';
 import { ChannelAlternativesModal } from '@/components/ChannelAlternativesModal';
 
 export default function StreamVersePage() {
@@ -51,8 +50,8 @@ export default function StreamVersePage() {
     setSearchQuery(query);
   };
 
-  const handleViewChange = (view: string) => {
-    setCurrentView(view as ViewType);
+  const handleViewChange = (view: ViewType) => {
+    setCurrentView(view);
   };
 
   const handleChannelSelect = (channel: Channel) => {
@@ -75,10 +74,6 @@ export default function StreamVersePage() {
   const renderCurrentView = () => {
     switch (currentView) {
       case ViewType.HOME:
-        // Remplacer HomePage par SmartChannelGrid si c'est la vue principale des chaînes
-        // Pour cet exemple, nous allons garder HomePage et montrer comment SmartChannelGrid pourrait être utilisé à l'intérieur
-        // Si HomePage est votre page d'accueil avec une grille de chaînes, vous pourriez la remplacer par:
-        // return <SmartChannelGrid channels={channels} onChannelSelect={handleChannelSelect} showRecommendations={true} enableFilters={true} />;
         return <HomePage onChannelSelect={handleChannelSelect} onPlaybackError={handlePlaybackError} />;
       case ViewType.CATEGORIES:
         return <CategoriesPage />;
@@ -98,6 +93,8 @@ export default function StreamVersePage() {
         return <NotificationsPage />;
       case ViewType.THEMES:
         return <ThemesPage />;
+      case ViewType.MOVIES: // Ajout du cas pour la page Films & Séries
+        return <MoviesPage />;
       default:
         return <HomePage onChannelSelect={handleChannelSelect} onPlaybackError={handlePlaybackError} />;
     }
@@ -131,13 +128,13 @@ export default function StreamVersePage() {
               isOpen={showAlternatives}
               onClose={() => setShowAlternatives(false)}
               failedChannel={failedChannel}
-              allChannels={channels} // Passer toutes les chaînes disponibles
+              allChannels={channels}
               onChannelSelect={handleChannelSelect}
               onRetry={() => {
-  if (failedChannel) {
-    handleRetryChannel(failedChannel);
-  }
-}}
+                if (failedChannel) {
+                  handleRetryChannel(failedChannel);
+                }
+              }}
             />
           </div>
         </NotificationProvider>
