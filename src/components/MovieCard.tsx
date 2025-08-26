@@ -10,12 +10,14 @@ interface MovieCardProps {
   onClick: () => void;
 }
 
-/**
- * Composant pour afficher une carte de film ou de série.
- * Encapsule la logique d'affichage et gère le clic pour la lecture.
- */
 export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
-  const thumbnail = movie.poster || getYoutubeThumbnail(movie.youtubeId, movie.playlistId) || "/placeholder.png";
+  const thumbnail =
+    movie.poster ||
+    (movie.youtubeId
+      ? getYoutubeThumbnail(movie.youtubeId)
+      : movie.playlistId
+        ? "/playlist-placeholder.png" // ✅ placeholder pour playlists
+        : "/placeholder.png");
 
   return (
     <Card
@@ -25,7 +27,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
       <CardContent className="p-2">
         <div className="relative aspect-video">
           <img
-            src={thumbnail}
+            src={thumbnail || "/placeholder.png"}
             alt={movie.title}
             className="w-full h-full object-cover rounded-xl"
             loading="lazy"
