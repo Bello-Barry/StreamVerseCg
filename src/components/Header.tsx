@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { Search, Menu, X, Tv, Heart, History, Grid3X3, Settings, Moon, Sun, Film, BarChart3, Bell, Palette } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Search, Menu, X, Tv, Heart, History, Grid3X3, Settings, Moon, Sun, Film, BarChart3, Bell, Palette, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NavigationMenu, NavigationMenuItem, NavigationMenuList } from '@/components/ui/navigation-menu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Switch } from '@/components/ui/switch';
 import { useTheme } from 'next-themes';
 import { HeaderProps, ViewType } from '@/types';
 
@@ -14,12 +13,20 @@ import { HeaderProps, ViewType } from '@/types';
 const navItems = [
   { id: ViewType.HOME, label: 'Accueil', icon: Tv },
   { id: ViewType.CATEGORIES, label: 'Catégories', icon: Grid3X3 },
-  { id: ViewType.MOVIES, label: 'Films & Séries', icon: Film }, // Correction : Utilisation de l'icône Film
+  { id: ViewType.MOVIES, label: 'Films & Séries', icon: Film },
   { id: ViewType.FAVORITES, label: 'Favoris', icon: Heart },
   { id: ViewType.HISTORY, label: 'Historique', icon: History },
 ];
 
-const Header: React.FC<HeaderProps> = ({
+/**
+ * Interface pour les props du composant Header.
+ * 💡 Correction: Le type de 'onViewChange' est maintenant 'ViewType' pour correspondre à son utilisation.
+ */
+interface HeaderComponentProps extends HeaderProps {
+  onViewChange: (view: ViewType) => void;
+}
+
+const Header: React.FC<HeaderComponentProps> = ({
   onSearch,
   searchQuery,
   currentView,
@@ -31,7 +38,6 @@ const Header: React.FC<HeaderProps> = ({
 
   // Utilisation d'un debounce pour la recherche
   const debouncedSearch = useCallback((query: string) => {
-    // Note: Une implémentation plus robuste utiliserait un hook personnalisé (ex: useDebounce)
     const timeoutId = setTimeout(() => {
       onSearch(query);
     }, 300);
@@ -116,7 +122,6 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Actions - Desktop */}
           <div className="hidden md:flex items-center space-x-2 animate-slide-in-right">
-            {/* Toggle thème */}
             <Button
               variant="ghost"
               size="sm"
@@ -127,7 +132,6 @@ const Header: React.FC<HeaderProps> = ({
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
 
-            {/* Menu paramètres */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="nav-item">
@@ -206,7 +210,68 @@ const Header: React.FC<HeaderProps> = ({
               })}
               
               <div className="border-t border-border/50 pt-3 mt-3 space-y-1">
-                {/* ... (Autres boutons de menu mobile) */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleTheme}
+                  className="w-full justify-start nav-item flex items-center space-x-3"
+                  title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                >
+                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  <span>{theme === 'dark' ? 'Mode clair' : 'Mode sombre'}</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onViewChange(ViewType.PLAYLISTS);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start nav-item flex items-center space-x-3"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                  <span>Gérer les playlists</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onViewChange(ViewType.ANALYTICS);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start nav-item flex items-center space-x-3"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Analytics</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onViewChange(ViewType.NOTIFICATIONS);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start nav-item flex items-center space-x-3"
+                >
+                  <Bell className="h-4 w-4" />
+                  <span>Notifications</span>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onViewChange(ViewType.THEMES);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full justify-start nav-item flex items-center space-x-3"
+                >
+                  <Palette className="h-4 w-4" />
+                  <span>Thèmes</span>
+                </Button>
               </div>
             </div>
           </div>
