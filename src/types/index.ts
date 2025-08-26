@@ -11,7 +11,7 @@ export enum ViewType {
   ANALYTICS = 'analytics',
   NOTIFICATIONS = 'notifications',
   THEMES = 'themes',
-  TORRENTS = 'torrents'
+  TORRENTS = 'torrents', 
   MOVIES = 'movies', // Nouvelle vue pour les films
 }
 
