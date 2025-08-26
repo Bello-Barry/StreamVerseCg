@@ -111,83 +111,85 @@ export default function MoviesPage() {
     }
   }, []);
 
-  // ...
-const handleAdd = useCallback(async () => {
-  if (!user) {
-    toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
-    return;
-  }
-
-  if (!formData.url || !formData.title || isAdding) {
-    toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
-    return;
-  }
-
-  setIsAdding(true);
-  toast.info('Ajout en cours...', { id: 'add-movie-toast' });
-
-  try {
-    const videoMatch = formData.url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|e\/|watch\?v=|embed\/|user\/[^/]+\/)\??)([^"&?\/\s]{11})/);
-    const playlistMatch = formData.url.match(/(?:youtube\.com\/(?:playlist\?list=))([^&]+)/);
-    const isVideo = !!videoMatch;
-    const isPlaylist = !!playlistMatch;
-
-    if (!isVideo && !isPlaylist) {
-      toast.error('Lien YouTube invalide', { id: 'add-movie-toast', description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' });
-      setIsAdding(false);
+  // Fonction pour gérer l'ajout d'un nouveau film/série
+  const handleAdd = useCallback(async () => {
+    if (!user) {
+      toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
       return;
     }
 
-    const youtubeid = isVideo ? videoMatch![1] : null;
-    const playlistid = isPlaylist ? playlistMatch![1] : null;
+    if (!formData.url || !formData.title || isAdding) {
+      toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
+      return;
+    }
 
-    // Construction des données pour Supabase
-    const movieData: MovieInsert = {
-      title: formData.title,
-      description: formData.description || '',
-      type: formData.type,
-      category: formData.category,
-      youtubeid,
-      playlistid,
-      poster: string, // sera rempli après upload ou fallback
-    };
+    setIsAdding(true);
+    toast.info('Ajout en cours...', { id: 'add-movie-toast' });
 
-    // Upload de l'image si fournie
-    if (formData.posterFile) {
-      try {
-        const posterUrl = await uploadPoster(formData.posterFile);
-        if (posterUrl) movieData.poster = posterUrl;
-      } catch {
-        toast.warning('Image non uploadée, la miniature YouTube sera utilisée.');
+    try {
+      const videoMatch = formData.url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|e\/|watch\?v=|embed\/|user\/[^/]+\/)\??)([^"&?\/\s]{11})/);
+      const playlistMatch = formData.url.match(/(?:youtube\.com\/(?:playlist\?list=))([^&]+)/);
+      const isVideo = !!videoMatch;
+      const isPlaylist = !!playlistMatch;
+
+      if (!isVideo && !isPlaylist) {
+        toast.error('Lien YouTube invalide', { id: 'add-movie-toast', description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' });
+        setIsAdding(false);
+        return;
       }
+
+      // Correction de l'erreur de typage : on convertit 'null' en 'undefined'
+      const youtubeid = isVideo ? videoMatch![1] : undefined;
+      const playlistid = isPlaylist ? playlistMatch![1] : undefined;
+      
+      let posterUrl = '';
+
+      // Upload de l'image si fournie
+      if (formData.posterFile) {
+        try {
+          posterUrl = await uploadPoster(formData.posterFile);
+        } catch {
+          toast.warning('Image non uploadée, la miniature YouTube sera utilisée.');
+        }
+      }
+
+      // Fallback miniature YouTube si pas d'image personnalisée
+      if (!posterUrl && youtubeid) {
+        posterUrl = getYoutubeThumbnail(youtubeid) || '';
+      }
+
+      // Construction des données pour Supabase
+      const movieData: MovieInsert = {
+        title: formData.title,
+        description: formData.description || '',
+        type: formData.type,
+        category: formData.category,
+        youtubeid,
+        playlistid,
+        poster: posterUrl,
+      };
+
+      // Ajout via le store
+      await addMovie(movieData);
+
+      toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
+
+      // Réinitialisation du formulaire
+      setFormData({
+        url: '',
+        title: '',
+        description: '',
+        type: 'video',
+        category: 'Autre',
+        posterFile: null
+      });
+    } catch (error) {
+      console.error('Erreur ajout film:', error);
+      toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
+    } finally {
+      setIsAdding(false);
     }
-
-    // Fallback miniature YouTube si pas d'image personnalisée
-    if (!movieData.poster && youtubeid) {
-      movieData.poster = getYoutubeThumbnail(youtubeid) || '';
-    }
-
-    // Ajout via le store
-    await addMovie(movieData);
-
-    toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
-
-    // Réinitialisation du formulaire
-    setFormData({
-      url: '',
-      title: '',
-      description: '',
-      type: 'video',
-      category: 'Autre',
-      posterFile: null
-    });
-  } catch (error) {
-    console.error('Erreur ajout film:', error);
-    toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
-  } finally {
-    setIsAdding(false);
-  }
-}, [formData, addMovie, isAdding, user]);
+  }, [formData, addMovie, isAdding, user]);
 
   const filteredMovies = useMemo(() => {
     if (filterCategory === 'All') return movies;
@@ -409,8 +411,8 @@ const handleAdd = useCallback(async () => {
                     className="absolute top-0 left-0 w-full h-full"
                     src={
                       currentMovie.type === 'playlist'
-                        ? `https://www.youtube.com/embed/videoseries?list=${currentMovie.playlistId}`
-                        : `https://www.youtube.com/embed/${currentMovie.youtubeId}`
+                        ? `https://www.youtube.com/embed/videoseries?list=${currentMovie.playlistid}`
+                        : `https://www.youtube.com/embed/${currentMovie.youtubeid}`
                     }
                     title={`Lecteur vidéo YouTube - ${currentMovie.title}`}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
