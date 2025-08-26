@@ -4,8 +4,8 @@ export interface Movie {
   id: string;
   title: string;
   description?: string;
-  youtubeId?: string;
-  playlistId?: string;
+  youtubeid?: string;
+  playlistid?: string;
   poster?: string;
   type: 'video' | 'playlist';
   category?: 'Action' | 'Comédie' | 'Drame' | 'Horreur' | 'Animation' | 'Série' | 'Documentaire' | 'Autre';
