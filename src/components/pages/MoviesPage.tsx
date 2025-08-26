@@ -126,10 +126,14 @@ export default function MoviesPage() {
     toast.info('Ajout en cours...', { id: 'add-movie-toast' });
 
     try {
+      console.log('🎬 Début de l\'ajout du film avec les données:', formData);
+      
       const videoMatch = formData.url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|e\/|watch\?v=|embed\/|user\/[^/]+\/)\??)([^"&?\/\s]{11})/);
       const playlistMatch = formData.url.match(/(?:youtube\.com\/(?:playlist\?list=))([^&]+)/);
       const isVideo = !!videoMatch;
       const isPlaylist = !!playlistMatch;
+
+      console.log('🔍 Analyse URL:', { isVideo, isPlaylist, videoMatch, playlistMatch });
 
       if (!isVideo && !isPlaylist) {
         toast.error('Lien YouTube invalide', { id: 'add-movie-toast', description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' });
@@ -149,25 +153,36 @@ export default function MoviesPage() {
         playlistId,
       };
 
+      console.log('📝 Données du film avant poster:', movieData);
+
       // Gestion du poster
       if (formData.posterFile) {
         try {
           const posterUrl = await uploadPoster(formData.posterFile);
           if (posterUrl) {
             movieData.poster = posterUrl;
+            console.log('✅ Image uploadée avec succès:', posterUrl);
+          } else {
+            console.warn('⚠️ Échec de l\'upload d\'image, utilisation de la miniature par défaut');
+            toast.warning('Image non uploadée', { description: 'Le contenu sera ajouté avec la miniature YouTube.' });
           }
         } catch (error) {
-          console.error('Erreur upload poster:', error);
-          toast.warning('Image non uploadée', { description: 'Le contenu sera ajouté sans image personnalisée.' });
+          console.error('❌ Erreur upload poster:', error);
+          toast.warning('Image non uploadée', { description: 'Le contenu sera ajouté avec la miniature YouTube.' });
         }
       }
 
       // Fallback pour la miniature YouTube si pas de poster personnalisé
       if (!movieData.poster && youtubeId) {
         movieData.poster = getYoutubeThumbnail(youtubeId) || undefined;
+        console.log('🖼️ Miniature YouTube utilisée:', movieData.poster);
       }
 
-      await addMovie(movieData as Omit<Movie, 'id' | 'createdAt'>);
+      console.log('📤 Données finales à envoyer à Supabase:', movieData);
+      
+      await addMovie(movieData as MovieInsert);
+      
+      console.log('✅ Film ajouté avec succès dans Supabase');
       toast.success(`"${formData.title}" a été ajouté avec succès !`, { id: 'add-movie-toast' });
 
       // Réinitialiser le formulaire
