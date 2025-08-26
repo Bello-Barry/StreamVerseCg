@@ -138,11 +138,12 @@ export default function MoviesPage() {
         return;
       }
 
-      // Correction de l'erreur de typage : on convertit 'null' en 'undefined'
+      // Correction de l'erreur de typage
       const youtubeid = isVideo ? videoMatch![1] : undefined;
       const playlistid = isPlaylist ? playlistMatch![1] : undefined;
       
-      let posterUrl = '';
+      // Correction de la nouvelle erreur de typage : posterUrl doit accepter null
+      let posterUrl: string | null = null;
 
       // Upload de l'image si fournie
       if (formData.posterFile) {
@@ -155,10 +156,10 @@ export default function MoviesPage() {
 
       // Fallback miniature YouTube si pas d'image personnalisée
       if (!posterUrl && youtubeid) {
-        posterUrl = getYoutubeThumbnail(youtubeid) || '';
+        posterUrl = getYoutubeThumbnail(youtubeid) || null;
       }
 
-      // Construction des données pour Supabase
+      // Construction des données pour Supabase, en s'assurant que poster est de type string ou undefined
       const movieData: MovieInsert = {
         title: formData.title,
         description: formData.description || '',
@@ -166,7 +167,7 @@ export default function MoviesPage() {
         category: formData.category,
         youtubeid,
         playlistid,
-        poster: posterUrl,
+        poster: posterUrl ?? undefined, // Convertit null en undefined
       };
 
       // Ajout via le store
