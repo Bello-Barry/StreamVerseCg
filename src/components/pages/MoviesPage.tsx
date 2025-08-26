@@ -111,96 +111,83 @@ export default function MoviesPage() {
     }
   }, []);
 
-  const handleAdd = useCallback(async () => {
-    if (!user) {
-      toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
-      return;
-    }
+  // ...
+const handleAdd = useCallback(async () => {
+  if (!user) {
+    toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
+    return;
+  }
 
-    if (!formData.url || !formData.title || isAdding) {
-      toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
-      return;
-    }
+  if (!formData.url || !formData.title || isAdding) {
+    toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
+    return;
+  }
 
-    setIsAdding(true);
-    toast.info('Ajout en cours...', { id: 'add-movie-toast' });
+  setIsAdding(true);
+  toast.info('Ajout en cours...', { id: 'add-movie-toast' });
 
-    try {
-      console.log('🎬 Début de l\'ajout du film avec les données:', formData);
-      
-      const videoMatch = formData.url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|e\/|watch\?v=|embed\/|user\/[^/]+\/)\??)([^"&?\/\s]{11})/);
-      const playlistMatch = formData.url.match(/(?:youtube\.com\/(?:playlist\?list=))([^&]+)/);
-      const isVideo = !!videoMatch;
-      const isPlaylist = !!playlistMatch;
+  try {
+    const videoMatch = formData.url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|e\/|watch\?v=|embed\/|user\/[^/]+\/)\??)([^"&?\/\s]{11})/);
+    const playlistMatch = formData.url.match(/(?:youtube\.com\/(?:playlist\?list=))([^&]+)/);
+    const isVideo = !!videoMatch;
+    const isPlaylist = !!playlistMatch;
 
-      console.log('🔍 Analyse URL:', { isVideo, isPlaylist, videoMatch, playlistMatch });
-
-      if (!isVideo && !isPlaylist) {
-        toast.error('Lien YouTube invalide', { id: 'add-movie-toast', description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' });
-        setIsAdding(false);
-        return;
-      }
-
-      const youtubeId = isVideo ? videoMatch![1] : undefined;
-      const playlistId = isPlaylist ? playlistMatch![1] : undefined;
-
-      let movieData: Partial<Movie> = {
-        title: formData.title,
-        description: formData.description || undefined,
-        type: formData.type,
-        category: formData.category,
-        youtubeId,
-        playlistId,
-      };
-
-      console.log('📝 Données du film avant poster:', movieData);
-
-      // Gestion du poster
-      if (formData.posterFile) {
-        try {
-          const posterUrl = await uploadPoster(formData.posterFile);
-          if (posterUrl) {
-            movieData.poster = posterUrl;
-            console.log('✅ Image uploadée avec succès:', posterUrl);
-          } else {
-            console.warn('⚠️ Échec de l\'upload d\'image, utilisation de la miniature par défaut');
-            toast.warning('Image non uploadée', { description: 'Le contenu sera ajouté avec la miniature YouTube.' });
-          }
-        } catch (error) {
-          console.error('❌ Erreur upload poster:', error);
-          toast.warning('Image non uploadée', { description: 'Le contenu sera ajouté avec la miniature YouTube.' });
-        }
-      }
-
-      // Fallback pour la miniature YouTube si pas de poster personnalisé
-      if (!movieData.poster && youtubeId) {
-        movieData.poster = getYoutubeThumbnail(youtubeId) || undefined;
-        console.log('🖼️ Miniature YouTube utilisée:', movieData.poster);
-      }
-
-      console.log('📤 Données finales à envoyer à Supabase:', movieData);
-      
-      await addMovie(movieData as MovieInsert);
-      
-      console.log('✅ Film ajouté avec succès dans Supabase');
-      toast.success(`"${formData.title}" a été ajouté avec succès !`, { id: 'add-movie-toast' });
-
-      // Réinitialiser le formulaire
-      setFormData({
-        url: '',
-        title: '',
-        description: '',
-        type: 'video',
-        category: 'Autre',
-        posterFile: null
-      });
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout du film:', error);
-      toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
-    } finally {
+    if (!isVideo && !isPlaylist) {
+      toast.error('Lien YouTube invalide', { id: 'add-movie-toast', description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' });
       setIsAdding(false);
+      return;
     }
-  }, [formData, addMovie, isAdding, user]);
+
+    const youtubeid = isVideo ? videoMatch![1] : null;
+    const playlistid = isPlaylist ? playlistMatch![1] : null;
+
+    // Construction des données pour Supabase
+    const movieData: MovieInsert = {
+      title: formData.title,
+      description: formData.description || '',
+      type: formData.type,
+      category: formData.category,
+      youtubeid,
+      playlistid,
+      poster: null, // sera rempli après upload ou fallback
+    };
+
+    // Upload de l'image si fournie
+    if (formData.posterFile) {
+      try {
+        const posterUrl = await uploadPoster(formData.posterFile);
+        if (posterUrl) movieData.poster = posterUrl;
+      } catch {
+        toast.warning('Image non uploadée, la miniature YouTube sera utilisée.');
+      }
+    }
+
+    // Fallback miniature YouTube si pas d'image personnalisée
+    if (!movieData.poster && youtubeid) {
+      movieData.poster = getYoutubeThumbnail(youtubeid) || '';
+    }
+
+    // Ajout via le store
+    await addMovie(movieData);
+
+    toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
+
+    // Réinitialisation du formulaire
+    setFormData({
+      url: '',
+      title: '',
+      description: '',
+      type: 'video',
+      category: 'Autre',
+      posterFile: null
+    });
+  } catch (error) {
+    console.error('Erreur ajout film:', error);
+    toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
+  } finally {
+    setIsAdding(false);
+  }
+}, [formData, addMovie, isAdding, user]);
 
   const filteredMovies = useMemo(() => {
     if (filterCategory === 'All') return movies;
