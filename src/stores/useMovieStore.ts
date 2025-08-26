@@ -60,8 +60,8 @@ export const useMovieStore = create<MovieStore>()(
               id: row.id,
               title: row.title,
               description: row.description || undefined,
-              youtubeId: row.youtubeId || undefined, // Respecter la casse
-              playlistId: row.playlistId || undefined, // Respecter la casse  
+              youtubeid: row.youtubeid || undefined, // Respecter la casse
+              playlistid: row.playlistid || undefined, // Respecter la casse  
               poster: row.poster || undefined,
               type: row.type || 'video',
               category: row.category || undefined,
@@ -92,8 +92,8 @@ export const useMovieStore = create<MovieStore>()(
           const supabaseData = {
             title: movieData.title,
             description: movieData.description || null,
-            youtubeId: movieData.youtubeId || null, // Respecter la casse
-            playlistId: movieData.playlistId || null, // Respecter la casse
+            youtubeid: movieData.youtubeid || null, // Respecter la casse
+            playlistid: movieData.playlistid || null, // Respecter la casse
             poster: movieData.poster || null,
             type: movieData.type,
             category: movieData.category || null,
@@ -115,8 +115,8 @@ export const useMovieStore = create<MovieStore>()(
               id: data.id,
               title: data.title,
               description: data.description || undefined,
-              youtubeId: data.youtubeId || undefined, // Respecter la casse
-              playlistId: data.playlistId || undefined, // Respecter la casse
+              youtubeid: data.youtubeid || undefined, // Respecter la casse
+              playlistid: data.playlistid || undefined, // Respecter la casse
               poster: data.poster || undefined,
               type: data.type || 'video',
               category: data.category || undefined,
@@ -148,8 +148,8 @@ export const useMovieStore = create<MovieStore>()(
           const supabaseUpdates = {
             title: updates.title,
             description: updates.description || null,
-            youtubeId: updates.youtubeId || null, // Respecter la casse
-            playlistId: updates.playlistId || null, // Respecter la casse
+            youtubeid: updates.youtubeid || null, // Respecter la casse
+            playlistid: updates.playlistid || null, // Respecter la casse
             poster: updates.poster || null,
             type: updates.type,
             category: updates.category || null,
@@ -171,8 +171,8 @@ export const useMovieStore = create<MovieStore>()(
               id: data.id,
               title: data.title,
               description: data.description || undefined,
-              youtubeId: data.youtubeId || undefined, // Respecter la casse
-              playlistId: data.playlistId || undefined, // Respecter la casse
+              youtubeid: data.youtubeid || undefined, // Respecter la casse
+              playlistid: data.playlistid || undefined, // Respecter la casse
               poster: data.poster || undefined,
               type: data.type || 'video',
               category: data.category || undefined,
