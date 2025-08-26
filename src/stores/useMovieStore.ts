@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { Movie } from "@/types/movie";
+import { Movie, MovieInsert } from "@/types/movie";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
@@ -19,11 +19,12 @@ type MovieStore = {
   // Actions
   setCurrentMovie: (movie: Movie | null) => void;
   fetchMovies: () => Promise<void>;
-  addMovie: (movie: Omit<Movie, "id" | "createdAt">) => Promise<void>;
+  addMovie: (movie: MovieInsert) => Promise<void>;
+  updateMovie: (id: string, updates: Partial<MovieInsert>) => Promise<void>;
+  deleteMovie: (id: string) => Promise<void>;
 };
 
 export const useMovieStore = create<MovieStore>()(
-  // Utilisation de `sessionStorage` car les films peuvent être nombreux et ne nécessitent pas une persistance infinie.
   persist(
     (set, get) => ({
       movies: [],
@@ -54,7 +55,20 @@ export const useMovieStore = create<MovieStore>()(
           }
 
           if (data) {
-            set({ movies: data as Movie[] });
+            // Mapper les noms de colonnes Supabase vers nos types TypeScript
+            const movies: Movie[] = data.map(row => ({
+              id: row.id,
+              title: row.title,
+              description: row.description || undefined,
+              youtubeId: row.youtubeid || undefined,
+              playlistId: row.playlistid || undefined,
+              poster: row.poster || undefined,
+              type: row.type || 'video',
+              category: row.category || undefined,
+              createdAt: row.created_at,
+            }));
+            
+            set({ movies });
           }
         } catch (err) {
           const errorMessage = `Échec de la récupération des films: ${err instanceof Error ? err.message : 'Erreur inconnue'}`;
@@ -71,12 +85,23 @@ export const useMovieStore = create<MovieStore>()(
       /**
        * Ajoute un nouveau film à la base de données et au store.
        */
-      addMovie: async (movie) => {
+      addMovie: async (movieData) => {
         set({ loading: true, error: null });
         try {
+          // Mapper les champs TypeScript vers les colonnes Supabase
+          const supabaseData = {
+            title: movieData.title,
+            description: movieData.description || null,
+            youtubeid: movieData.youtubeId || null,
+            playlistid: movieData.playlistId || null,
+            poster: movieData.poster || null,
+            type: movieData.type,
+            category: movieData.category || null,
+          };
+
           const { data, error } = await supabase
             .from("movies")
-            .insert(movie)
+            .insert(supabaseData)
             .select()
             .single();
 
@@ -85,8 +110,20 @@ export const useMovieStore = create<MovieStore>()(
           }
 
           if (data) {
-            // Met à jour l'état en ajoutant le nouveau film au début de la liste
-            set({ movies: [data as Movie, ...get().movies] });
+            // Mapper la réponse Supabase vers notre type Movie
+            const newMovie: Movie = {
+              id: data.id,
+              title: data.title,
+              description: data.description || undefined,
+              youtubeId: data.youtubeid || undefined,
+              playlistId: data.playlistid || undefined,
+              poster: data.poster || undefined,
+              type: data.type || 'video',
+              category: data.category || undefined,
+              createdAt: data.created_at,
+            };
+            
+            set({ movies: [newMovie, ...get().movies] });
             toast.success("Film ajouté avec succès !");
           }
         } catch (err) {
@@ -96,6 +133,100 @@ export const useMovieStore = create<MovieStore>()(
           toast.error("Échec de l'ajout", {
             description: "Le film n'a pas pu être ajouté."
           });
+          throw err; // Relancer l'erreur pour que le composant puisse la gérer
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      /**
+       * Met à jour un film existant.
+       */
+      updateMovie: async (id, updates) => {
+        set({ loading: true, error: null });
+        try {
+          const supabaseUpdates = {
+            title: updates.title,
+            description: updates.description || null,
+            youtubeid: updates.youtubeId || null,
+            playlistid: updates.playlistId || null,
+            poster: updates.poster || null,
+            type: updates.type,
+            category: updates.category || null,
+          };
+
+          const { data, error } = await supabase
+            .from("movies")
+            .update(supabaseUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+
+          if (error) {
+            throw error;
+          }
+
+          if (data) {
+            const updatedMovie: Movie = {
+              id: data.id,
+              title: data.title,
+              description: data.description || undefined,
+              youtubeId: data.youtubeid || undefined,
+              playlistId: data.playlistid || undefined,
+              poster: data.poster || undefined,
+              type: data.type || 'video',
+              category: data.category || undefined,
+              createdAt: data.created_at,
+            };
+            
+            set({
+              movies: get().movies.map(movie => 
+                movie.id === id ? updatedMovie : movie
+              )
+            });
+            toast.success("Film mis à jour avec succès !");
+          }
+        } catch (err) {
+          const errorMessage = `Échec de la mise à jour: ${err instanceof Error ? err.message : 'Erreur inconnue'}`;
+          console.error(errorMessage, err);
+          set({ error: errorMessage });
+          toast.error("Échec de la mise à jour", {
+            description: "Le film n'a pas pu être mis à jour."
+          });
+          throw err;
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      /**
+       * Supprime un film de la base de données et du store.
+       */
+      deleteMovie: async (id) => {
+        set({ loading: true, error: null });
+        try {
+          const { error } = await supabase
+            .from("movies")
+            .delete()
+            .eq('id', id);
+
+          if (error) {
+            throw error;
+          }
+
+          set({
+            movies: get().movies.filter(movie => movie.id !== id),
+            currentMovie: get().currentMovie?.id === id ? null : get().currentMovie
+          });
+          toast.success("Film supprimé avec succès !");
+        } catch (err) {
+          const errorMessage = `Échec de la suppression: ${err instanceof Error ? err.message : 'Erreur inconnue'}`;
+          console.error(errorMessage, err);
+          set({ error: errorMessage });
+          toast.error("Échec de la suppression", {
+            description: "Le film n'a pas pu être supprimé."
+          });
+          throw err;
         } finally {
           set({ loading: false });
         }
@@ -104,8 +235,6 @@ export const useMovieStore = create<MovieStore>()(
     {
       name: "movie-store",
       storage: createJSONStorage(() => sessionStorage),
-      // Permet de ne stocker que certaines parties du store si nécessaire,
-      // mais ici, le store complet est pertinent pour la session.
       partialize: (state) => ({
         currentMovie: state.currentMovie,
       }),

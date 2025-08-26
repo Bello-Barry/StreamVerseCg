@@ -1,23 +1,16 @@
 // src/types/movie.ts
-export type MovieType = "video" | "playlist"
-
-export type MovieCategory =
-  | "Action"
-  | "Comédie"
-  | "Drame"
-  | "Horreur"
-  | "Animation"
-  | "Série"
-  | "Documentaire"
-  | "Autre"
 
 export interface Movie {
-  id: string
-  title: string
-  type: MovieType
-  youtubeId?: string
-  playlistId?: string
-  poster?: string
-  category: MovieCategory
-  createdAt: string
+  id: string;
+  title: string;
+  description?: string;
+  youtubeId?: string;
+  playlistId?: string;
+  poster?: string;
+  type: 'video' | 'playlist';
+  category?: 'Action' | 'Comédie' | 'Drame' | 'Horreur' | 'Animation' | 'Série' | 'Documentaire' | 'Autre';
+  createdAt: string; // Correspond à created_at dans Supabase (timestamp)
 }
+
+// Type pour les données à insérer (sans id et createdAt)
+export type MovieInsert = Omit<Movie, 'id' | 'createdAt'>;
