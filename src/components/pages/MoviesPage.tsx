@@ -149,7 +149,7 @@ const handleAdd = useCallback(async () => {
       category: formData.category,
       youtubeid,
       playlistid,
-      poster: null, // sera rempli après upload ou fallback
+      poster: string, // sera rempli après upload ou fallback
     };
 
     // Upload de l'image si fournie
