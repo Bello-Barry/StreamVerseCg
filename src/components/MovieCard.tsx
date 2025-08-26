@@ -13,9 +13,9 @@ interface MovieCardProps {
 export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
   const thumbnail =
     movie.poster ||
-    (movie.youtubeId
-      ? getYoutubeThumbnail(movie.youtubeId)
-      : movie.playlistId
+    (movie.youtubeid
+      ? getYoutubeThumbnail(movie.youtubeid)
+      : movie.playlistid
         ? "/playlist-placeholder.png" // ✅ placeholder pour playlists
         : "/placeholder.png");
 
