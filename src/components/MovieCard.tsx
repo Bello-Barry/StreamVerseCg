@@ -16,16 +16,12 @@ interface MovieCardProps {
  * Utilise l'optimisation d'image de Next.js pour de meilleures performances.
  */
 export const MovieCard: React.FC<MovieCardProps> = ({ movie, onClick }) => {
-  // Détermine la source de la vignette en cascade.
-  // 1. Priorité à l'affiche (poster) si elle existe.
-  // 2. Sinon, utilise la vignette YouTube si un ID est présent.
-  // 3. Sinon, utilise un placeholder de playlist si un ID de playlist est présent.
-  // 4. Enfin, utilise le placeholder par défaut.
-  const thumbnailSrc = movie.poster || (
-    movie.youtubeid ? getYoutubeThumbnail(movie.youtubeid) : (
-      movie.playlistid ? "/playlist-placeholder.png" : "/placeholder.png"
-    )
-  );
+  // Détermine la source de la vignette en cascade, en garantissant un fallback non-null.
+  const thumbnailSrc = 
+    movie.poster || 
+    (movie.youtubeid ? getYoutubeThumbnail(movie.youtubeid) : null) || 
+    (movie.playlistid ? "/playlist-placeholder.png" : null) || 
+    "/placeholder.png";
 
   return (
     <Card
