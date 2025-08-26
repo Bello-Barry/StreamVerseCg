@@ -299,13 +299,13 @@ export interface CategoryGridProps {
   onCategorySelect: (category: string) => void;
   selectedCategory?: string;
 }
-
 export interface HeaderProps {
   onSearch: (query: string) => void;
   searchQuery: string;
-  currentView: string;
-  onViewChange: (view: string) => void;
+  currentView: ViewType;               // ✅ bon typage
+  onViewChange: (view: ViewType) => void; // ✅ bon typage
 }
+
 
 export interface PlayerProps {
   channel: Channel | null;
