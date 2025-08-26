@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useMovieStore } from '@/stores/useMovieStore';
 import { useAuth } from '@/hooks/useAuth';
-import { Movie } from '@/types/movie';
+import { Movie, MovieInsert } from '@/types/movie';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
