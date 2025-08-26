@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useMovieStore } from '@/stores/useMovieStore';
-import { useAuth } from '@/hooks/useAuth'; // Import du hook d'authentification
+import { useAuth } from '@/hooks/useAuth';
 import { Movie } from '@/types/movie';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,17 +14,24 @@ import { toast } from 'sonner';
 import { MovieCard } from '@/components/MovieCard';
 import { X } from 'lucide-react';
 
-// Types pour les catégories de films (plus robuste)
-type MovieCategory = 'Action' | 'Comédie' | 'Drame' | 'Horreur' | 'Animation' | 'Série' | 'Documentaire' | 'Autre';
+// Types pour les catégories de films
+type MovieCategory =
+  | 'Action'
+  | 'Comédie'
+  | 'Drame'
+  | 'Horreur'
+  | 'Animation'
+  | 'Série'
+  | 'Documentaire'
+  | 'Autre';
 
 export default function MoviesPage() {
   const { movies, currentMovie, setCurrentMovie, fetchMovies, addMovie } = useMovieStore();
-  const { user } = useAuth(); // Utilisation du hook useAuth pour obtenir l'utilisateur
+  const { user } = useAuth();
 
   const [newUrl, setNewUrl] = useState('');
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  
   const [filterCategory, setFilterCategory] = useState<MovieCategory | 'All'>('All');
 
   const categories: (MovieCategory | 'All')[] = useMemo(() => {
@@ -37,16 +44,12 @@ export default function MoviesPage() {
   }, [fetchMovies]);
 
   const handleAdd = useCallback(async () => {
-    // 🛡️ Étape 1 : Vérifier l'authentification de l'utilisateur
     if (!user) {
-      toast.error("Connexion requise", {
-        description: "Vous devez être connecté pour ajouter un film."
-      });
+      toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
       return;
     }
 
     if (!newUrl || isAdding) return;
-
     setIsAdding(true);
     toast.info('Ajout en cours...', { id: 'add-movie-toast' });
 
@@ -61,14 +64,13 @@ export default function MoviesPage() {
         return;
       }
 
-      // Récupération du titre
       const title = (await getYoutubeTitle(newUrl)) || (isVideo ? 'Vidéo YouTube' : 'Playlist YouTube');
 
-      let movieData: Partial<Movie> = { 
-        title, 
+      let movieData: Partial<Movie> = {
+        title,
         type: isVideo ? 'video' : 'playlist',
-        youtubeId: isVideo ? videoMatch[1] : undefined,
-        playlistId: isPlaylist ? playlistMatch[1] : undefined,
+        youtubeId: isVideo ? videoMatch![1] : undefined,
+        playlistId: isPlaylist ? playlistMatch![1] : undefined,
       };
 
       // Upload du poster si fourni
@@ -77,13 +79,13 @@ export default function MoviesPage() {
         if (posterUrl) {
           movieData.poster = posterUrl;
         } else {
-          toast.error("Erreur lors de l'upload de l'image.", { id: 'add-movie-toast' });
+          toast.error('Erreur lors de l\'upload de l\'image.', { id: 'add-movie-toast' });
         }
       }
 
-      // Fallback vers la miniature YouTube si pas de poster
-      if (!movieData.poster) {
-        movieData.poster = getYoutubeThumbnail(movieData.youtubeId, movieData.playlistId) || undefined;
+      // Fallback vers la miniature YouTube pour les vidéos uniquement
+      if (!movieData.poster && movieData.youtubeId) {
+        movieData.poster = getYoutubeThumbnail(movieData.youtubeId) || undefined;
       }
 
       await addMovie(movieData as Omit<Movie, 'id' | 'createdAt'>);
@@ -100,9 +102,7 @@ export default function MoviesPage() {
   }, [newUrl, posterFile, addMovie, isAdding, user]);
 
   const filteredMovies = useMemo(() => {
-    if (filterCategory === 'All') {
-      return movies;
-    }
+    if (filterCategory === 'All') return movies;
     return movies.filter(movie => movie.category === filterCategory);
   }, [movies, filterCategory]);
 
@@ -110,7 +110,6 @@ export default function MoviesPage() {
     <div className="p-4 space-y-6">
       <h1 className="text-3xl font-bold">🎬 Films & Séries</h1>
 
-      {/* 🛡️ Contrôle d'accès : Afficher la section d'ajout uniquement pour les utilisateurs connectés */}
       {user ? (
         <Card>
           <CardContent className="p-4 space-y-4">
@@ -127,8 +126,8 @@ export default function MoviesPage() {
               onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
               className="p-2"
             />
-            <Button 
-              onClick={handleAdd} 
+            <Button
+              onClick={handleAdd}
               disabled={!newUrl || isAdding}
               className="w-full h-12 text-lg font-semibold"
             >
@@ -138,9 +137,7 @@ export default function MoviesPage() {
         </Card>
       ) : (
         <Card className="p-4 text-center border-dashed">
-          <p className="text-muted-foreground">
-            Connectez-vous pour ajouter de nouveaux films et séries.
-          </p>
+          <p className="text-muted-foreground">Connectez-vous pour ajouter de nouveaux films et séries.</p>
         </Card>
       )}
 
@@ -186,7 +183,7 @@ export default function MoviesPage() {
               <iframe
                 className="w-full aspect-video rounded-xl"
                 src={
-                  currentMovie.type === "playlist"
+                  currentMovie.type === 'playlist'
                     ? `https://www.youtube.com/embed/videoseries?list=${currentMovie.playlistId}`
                     : `https://www.youtube.com/embed/${currentMovie.youtubeId}`
                 }
