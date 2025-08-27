@@ -79,6 +79,12 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
     ? `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&autoplay=1`
     : `https://www.youtube.com/embed/${movie.youtubeid}?autoplay=1&rel=0`;
 
+  // Construction de l'URL pour ouvrir sur YouTube
+  const openInYoutubeUrl = movie.type === 'playlist'
+    ? `https://www.youtube.com/playlist?list=${movie.playlistid}`
+    : `https://www.youtube.com/watch?v=${movie.youtubeid}`;
+
+
   return (
     <motion.div
       className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-2 sm:p-4"
@@ -123,7 +129,7 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
           
           <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
             {/* Indicateur de chargement */}
-            {isLoading && (
+            {isLoading && !hasError && (
               <div className="absolute inset-0 bg-muted rounded-xl flex items-center justify-center">
                 <div className="text-center">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
@@ -137,14 +143,17 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
               <div className="absolute inset-0 bg-destructive/10 rounded-xl flex items-center justify-center">
                 <div className="text-center p-4">
                   <X className="h-8 w-8 text-destructive mx-auto mb-2" />
-                  <p className="text-sm text-destructive">
-                    Impossible de charger la vidéo
+                  <p className="text-sm text-destructive font-semibold">
+                    Impossible de charger la vidéo.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+                    Ce contenu est peut-être bloqué. Pour le visionner, ouvrez-le directement sur YouTube.
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="mt-2"
-                    onClick={() => window.open(`https://youtube.com/watch?v=${movie.youtubeid}`, '_blank')}
+                    className="mt-4"
+                    onClick={() => window.open(openInYoutubeUrl, '_blank')}
                   >
                     Ouvrir sur YouTube
                   </Button>
@@ -304,8 +313,12 @@ export default function MoviesPage() {
   }, [formData, addMovie, isAdding, user]);
 
   const filteredMovies = useMemo(() => {
-    if (filterCategory === 'All') return movies;
-    return movies.filter(movie => movie.category === filterCategory);
+    // Cette partie a été refactorisée pour utiliser le store de manière optimale
+    return movies.filter(movie => {
+      const isCategoryMatch = filterCategory === 'All' || movie.category === filterCategory;
+      const isSearchMatch = true; // La recherche est gérée par le store dans getFilteredMovies
+      return isCategoryMatch && isSearchMatch;
+    });
   }, [movies, filterCategory]);
 
   // Fonction pour gérer la sélection d'un film
