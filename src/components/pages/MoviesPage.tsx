@@ -15,7 +15,7 @@ import { getYoutubeTitle } from '@/lib/getYoutubeTitle';
 import { getYoutubeThumbnail } from '@/lib/getYoutubeThumbnail';
 import { toast } from 'sonner';
 import { MovieCard } from '@/components/MovieCard';
-import { X, Loader2, LogIn, Upload, Film } from 'lucide-react';
+import { X, Loader2, LogIn, Upload, Film, Play, Pause } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // Types pour les catégories de films
@@ -56,6 +56,121 @@ const LoginPrompt = () => (
     </div>
   </Card>
 );
+
+// Composant Modal de lecture amélioré
+const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleIframeError = () => {
+    setIsLoading(false);
+    setHasError(true);
+    toast.error('Erreur de chargement', {
+      description: 'Impossible de charger la vidéo. Vérifiez que le lien YouTube est valide.'
+    });
+  };
+
+  // Construction de l'URL YouTube
+  const youtubeUrl = movie.type === 'playlist'
+    ? `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&autoplay=1`
+    : `https://www.youtube.com/embed/${movie.youtubeid}?autoplay=1&rel=0`;
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-2 sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose} // Fermer en cliquant sur l'arrière-plan
+    >
+      <Card 
+        className="w-full max-w-6xl max-h-[95vh] p-2 sm:p-4 relative overflow-hidden"
+        onClick={(e) => e.stopPropagation()} // Empêcher la fermeture en cliquant sur le contenu
+      >
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute top-2 right-2 z-20 rounded-full bg-black/70 hover:bg-black text-white"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+        
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.2 }}
+          className="space-y-3"
+        >
+          <div className="pr-10">
+            <h2 className="text-lg sm:text-2xl font-bold truncate">{movie.title}</h2>
+            {movie.description && (
+              <p className="text-muted-foreground mt-1 text-sm line-clamp-2">{movie.description}</p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                {movie.category || 'Non classé'}
+              </span>
+              <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded-full">
+                {movie.type === 'playlist' ? 'Playlist' : 'Vidéo'}
+              </span>
+            </div>
+          </div>
+          
+          <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+            {/* Indicateur de chargement */}
+            {isLoading && (
+              <div className="absolute inset-0 bg-muted rounded-xl flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Chargement de la vidéo...</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Message d'erreur */}
+            {hasError && (
+              <div className="absolute inset-0 bg-destructive/10 rounded-xl flex items-center justify-center">
+                <div className="text-center p-4">
+                  <X className="h-8 w-8 text-destructive mx-auto mb-2" />
+                  <p className="text-sm text-destructive">
+                    Impossible de charger la vidéo
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={() => window.open(`https://youtube.com/watch?v=${movie.youtubeid}`, '_blank')}
+                  >
+                    Ouvrir sur YouTube
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* Iframe YouTube */}
+            {!hasError && (
+              <iframe
+                className="absolute top-0 left-0 w-full h-full rounded-xl"
+                src={youtubeUrl}
+                title={`Lecteur vidéo YouTube - ${movie.title}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+                style={{ border: 'none' }}
+              />
+            )}
+          </div>
+        </motion.div>
+      </Card>
+    </motion.div>
+  );
+};
 
 export default function MoviesPage() {
   const { movies, currentMovie, setCurrentMovie, fetchMovies, addMovie } = useMovieStore();
@@ -138,11 +253,9 @@ export default function MoviesPage() {
         return;
       }
 
-      // Correction de l'erreur de typage
       const youtubeid = isVideo ? videoMatch![1] : undefined;
       const playlistid = isPlaylist ? playlistMatch![1] : undefined;
       
-      // Correction de la nouvelle erreur de typage : posterUrl doit accepter null
       let posterUrl: string | null = null;
 
       // Upload de l'image si fournie
@@ -159,7 +272,6 @@ export default function MoviesPage() {
         posterUrl = getYoutubeThumbnail(youtubeid) || null;
       }
 
-      // Construction des données pour Supabase, en s'assurant que poster est de type string ou undefined
       const movieData: MovieInsert = {
         title: formData.title,
         description: formData.description || '',
@@ -167,10 +279,9 @@ export default function MoviesPage() {
         category: formData.category,
         youtubeid,
         playlistid,
-        poster: posterUrl ?? undefined, // Convertit null en undefined
+        poster: posterUrl ?? undefined,
       };
 
-      // Ajout via le store
       await addMovie(movieData);
 
       toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
@@ -196,6 +307,19 @@ export default function MoviesPage() {
     if (filterCategory === 'All') return movies;
     return movies.filter(movie => movie.category === filterCategory);
   }, [movies, filterCategory]);
+
+  // Fonction pour gérer la sélection d'un film
+  const handleMovieSelect = useCallback((movie: Movie) => {
+    // Vérification que le film a bien un ID YouTube ou Playlist
+    if (!movie.youtubeid && !movie.playlistid) {
+      toast.error('Vidéo non disponible', {
+        description: 'Ce contenu ne peut pas être lu car il manque l\'identifiant YouTube.'
+      });
+      return;
+    }
+    
+    setCurrentMovie(movie);
+  }, [setCurrentMovie]);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -361,68 +485,42 @@ export default function MoviesPage() {
             onClick={() => setFilterCategory(cat)}
             className="shrink-0"
           >
-            {cat}
+            {cat} {cat !== 'All' && `(${movies.filter(m => m.category === cat).length})`}
           </Button>
         ))}
       </div>
 
+      {/* Message si aucun film */}
+      {filteredMovies.length === 0 && (
+        <Card className="p-8 text-center">
+          <Film className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">
+            {filterCategory === 'All' 
+              ? 'Aucun film ou série ajouté pour le moment.' 
+              : `Aucun contenu trouvé dans la catégorie "${filterCategory}".`
+            }
+          </p>
+        </Card>
+      )}
+
       {/* Grille des films */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {filteredMovies.map((movie) => (
           <MovieCard
             key={movie.id}
             movie={movie}
-            onClick={() => setCurrentMovie(movie)}
+            onClick={() => handleMovieSelect(movie)}
           />
         ))}
       </div>
 
-      {/* Modal de lecture */}
+      {/* Modal de lecture amélioré */}
       <AnimatePresence>
         {currentMovie && (
-          <motion.div
-            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <Card className="w-full max-w-4xl p-4 sm:p-6 relative overflow-hidden">
-              <Button
-                variant="secondary"
-                size="icon"
-                className="absolute top-2 right-2 z-10 rounded-full"
-                onClick={() => setCurrentMovie(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4"
-              >
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold truncate">{currentMovie.title}</h2>
-                  {currentMovie.description && (
-                    <p className="text-muted-foreground mt-2">{currentMovie.description}</p>
-                  )}
-                </div>
-                <div className="relative pt-[56.25%] w-full rounded-xl overflow-hidden">
-                  <iframe
-                    className="absolute top-0 left-0 w-full h-full"
-                    src={
-                      currentMovie.type === 'playlist'
-                        ? `https://www.youtube.com/embed/videoseries?list=${currentMovie.playlistid}`
-                        : `https://www.youtube.com/embed/${currentMovie.youtubeid}`
-                    }
-                    title={`Lecteur vidéo YouTube - ${currentMovie.title}`}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                  />
-                </div>
-              </motion.div>
-            </Card>
-          </motion.div>
+          <VideoModal 
+            movie={currentMovie} 
+            onClose={() => setCurrentMovie(null)} 
+          />
         )}
       </AnimatePresence>
     </div>
