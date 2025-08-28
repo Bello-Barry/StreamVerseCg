@@ -439,8 +439,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
   } finally {
     setIsAdding(false);
   }
-};
-   [formData, addMovie, isAdding, user]);
+}, [formData, addMovie, isAdding, user]);
 
   const filteredMovies = useMemo(() => {
     // Cette partie a été refactorisée pour utiliser le store de manière optimale
