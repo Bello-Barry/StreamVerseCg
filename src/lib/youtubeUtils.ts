@@ -1,47 +1,27 @@
-// src/lib/youtubeValidation.ts
+import { google, youtube_v3 } from 'googleapis';
+import { env } from '@/env.mjs';
+
+// Initialisation de l'API YouTube Data
+const youtube = google.youtube({
+  version: 'v3',
+  auth: env.YOUTUBE_API_KEY,
+});
 
 /**
- * Valide si une vidéo YouTube peut être intégrée
+ * Cache pour les résultats de l'API (pour économiser les quotas)
+ * Utilisation de Map pour un accès rapide.
  */
-export async function validateYouTubeEmbed(videoId: string): Promise<{
-  canEmbed: boolean;
-  reason?: string;
-}> {
-  try {
-    // Essayer d'abord avec l'API oEmbed de YouTube
-    const oEmbedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-    
-    const response = await fetch(oEmbedUrl);
-    
-    if (response.ok) {
-      return { canEmbed: true };
-    } else if (response.status === 401) {
-      return { 
-        canEmbed: false, 
-        reason: "Vidéo privée ou restreinte" 
-      };
-    } else if (response.status === 404) {
-      return { 
-        canEmbed: false, 
-        reason: "Vidéo introuvable" 
-      };
-    } else {
-      return { 
-        canEmbed: false, 
-        reason: "Intégration désactivée par l'auteur" 
-      };
-    }
-  } catch (error) {
-    console.error('Erreur validation YouTube:', error);
-    return { 
-      canEmbed: false, 
-      reason: "Impossible de vérifier la disponibilité" 
-    };
-  }
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
 }
+const cache = new Map<string, CacheEntry<any>>();
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 heures
 
 /**
- * Extrait l'ID vidéo et playlist d'une URL YouTube
+ * Extrait l'ID de la vidéo ou de la playlist d'une URL YouTube.
+ * @param url L'URL YouTube à analyser.
+ * @returns Un objet contenant les IDs et un statut de validité.
  */
 export function extractYouTubeIds(url: string): {
   videoId?: string;
@@ -49,82 +29,113 @@ export function extractYouTubeIds(url: string): {
   isValid: boolean;
 } {
   try {
-    const urlObj = new URL(url);
-    
-    // Patterns pour différents formats d'URL YouTube
-    const videoPatterns = [
-      /(?:youtu\.be\/)([^?&]+)/,
-      /(?:youtube\.com\/watch\?v=)([^&]+)/,
-      /(?:youtube\.com\/embed\/)([^?&]+)/,
-      /(?:youtube\.com\/v\/)([^?&]+)/
-    ];
-    
-    const playlistPattern = /[?&]list=([^&]+)/;
-    
-    let videoId: string | undefined;
-    let playlistId: string | undefined;
-    
-    // Recherche de l'ID vidéo
-    for (const pattern of videoPatterns) {
-      const match = url.match(pattern);
-      if (match && match[1]) {
-        videoId = match[1];
-        break;
-      }
+    const videoRegex = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=))([^&?]+)/;
+    const playlistRegex = /(?:list=)([a-zA-Z0-9_-]+)/;
+
+    const videoMatch = url.match(videoRegex);
+    const playlistMatch = url.match(playlistRegex);
+
+    if (videoMatch && videoMatch[1]) {
+      return { videoId: videoMatch[1], isValid: true };
     }
-    
-    // Recherche de l'ID playlist
-    const playlistMatch = url.match(playlistPattern);
     if (playlistMatch && playlistMatch[1]) {
-      playlistId = playlistMatch[1];
+      return { playlistId: playlistMatch[1], isValid: true };
     }
-    
-    return {
-      videoId,
-      playlistId,
-      isValid: !!(videoId || playlistId)
-    };
+
+    return { isValid: false };
   } catch (error) {
-    return {
-      isValid: false
-    };
+    console.error('Erreur lors de l\'extraction des IDs YouTube:', error);
+    return { isValid: false };
   }
 }
 
 /**
- * Génère des URLs alternatives pour contourner les blocages
+ * Récupère le titre d'une vidéo YouTube.
+ * @param videoId L'ID de la vidéo.
+ * @returns Le titre de la vidéo ou une chaîne vide en cas d'erreur.
  */
-export function generateAlternativeUrls(videoId: string, playlistId?: string) {
-  const baseParams = 'rel=0&modestbranding=1&showinfo=0&controls=1';
-  
-  if (playlistId) {
-    return [
-      `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistId}&${baseParams}`,
-      `https://www.youtube.com/embed/videoseries?list=${playlistId}&${baseParams}`,
-    ];
-  } else {
-    return [
-      `https://www.youtube-nocookie.com/embed/${videoId}?${baseParams}`,
-      `https://www.youtube.com/embed/${videoId}?${baseParams}`,
-      `https://www.youtube.com/embed/${videoId}?${baseParams}&origin=${window.location.origin}`,
-    ];
+export async function getYoutubeTitle(videoId: string): Promise<string> {
+  const cacheKey = `title_${videoId}`;
+  const cachedData = cache.get(cacheKey);
+
+  if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRY_MS) {
+    return cachedData.data;
+  }
+
+  try {
+    const response = await youtube.videos.list({
+      part: ['snippet'],
+      id: [videoId],
+    });
+
+    const title = response.data.items?.[0]?.snippet?.title || '';
+    cache.set(cacheKey, { data: title, timestamp: Date.now() });
+    return title;
+  } catch (error) {
+    console.error('Erreur lors de la récupération du titre YouTube:', error);
+    return '';
   }
 }
 
 /**
- * Vérifie si l'intégration est bloquée et suggère des alternatives
+ * Génère l'URL d'une miniature YouTube à partir d'un ID de vidéo.
+ * Utilise le cache pour les futures demandes.
+ * @param videoId L'ID de la vidéo.
+ * @returns L'URL de la miniature.
  */
-export function handleEmbedError(videoId: string, playlistId?: string) {
-  const directUrl = playlistId 
-    ? `https://www.youtube.com/playlist?list=${playlistId}`
-    : `https://www.youtube.com/watch?v=${videoId}`;
-    
-  return {
-    directUrl,
-    suggestions: [
-      "Ouvrir sur YouTube",
-      "Essayer dans un nouvel onglet",
-      "Copier le lien pour partager"
-    ]
-  };
+export function getYoutubeThumbnail(videoId: string): string {
+  // Les miniatures n'ont pas besoin d'une requête API.
+  // Utilise la miniature de haute qualité par défaut.
+  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 }
+
+/**
+ * Valide si une vidéo YouTube est intégrable via l'API.
+ * @param videoId L'ID de la vidéo à valider.
+ * @returns Un objet indiquant si l'intégration est possible et la raison si elle ne l'est pas.
+ */
+export async function validateYouTubeEmbed(videoId: string): Promise<{
+  canEmbed: boolean;
+  reason?: string;
+}> {
+  const cacheKey = `embed_${videoId}`;
+  const cachedData = cache.get(cacheKey);
+
+  if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRY_MS) {
+    return cachedData.data;
+  }
+
+  try {
+    const response = await youtube.videos.list({
+      part: ['status', 'contentDetails'],
+      id: [videoId],
+    });
+
+    const video = response.data.items?.[0];
+
+    if (!video) {
+      return { canEmbed: false, reason: 'Vidéo non trouvée.' };
+    }
+
+    if (video.status?.embeddable === false) {
+      return { canEmbed: false, reason: 'L\'intégration est désactivée par le propriétaire de la vidéo.' };
+    }
+
+    if (video.contentDetails?.regionRestriction) {
+      return { canEmbed: false, reason: 'La vidéo est bloquée dans certaines régions.' };
+    }
+
+    const result = { canEmbed: true };
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+
+  } catch (error: any) {
+    if (error.response?.data?.error?.message) {
+      console.error('Erreur API YouTube:', error.response.data.error.message);
+      return { canEmbed: false, reason: `Erreur API: ${error.response.data.error.message}` };
+    }
+    console.error('Erreur de validation de la vidéo YouTube:', error);
+    return { canEmbed: false, reason: 'Erreur technique lors de la vérification.' };
+  }
+}
+
