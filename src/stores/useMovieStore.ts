@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { Movie, MovieInsert } from "@/types/movie";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { validateYouTubeEmbed, extractYouTubeIds } from "@/lib/youtubeValidation";
 
 /**
  * Interface pour l'état du store avec nouvelles fonctionnalités.
@@ -15,6 +16,7 @@ type MovieStore = {
   favorites: string[]; // IDs des films favoris
   watchHistory: string[]; // IDs des films regardés
   recentlyAdded: Movie[]; // Films récemment ajoutés
+  embedBlocked: string[]; // IDs des films avec embed bloqué
   loading: boolean;
   error: string | null;
   searchQuery: string;
@@ -39,6 +41,11 @@ type MovieStore = {
   getRecentMovies: (limit?: number) => Movie[];
   duplicateMovie: (id: string) => Promise<void>;
   
+  // Gestion des erreurs d'embed
+  markAsEmbedBlocked: (movieId: string) => void;
+  isEmbedBlocked: (movieId: string) => boolean;
+  validateMovieEmbed: (movieId: string) => Promise<boolean>;
+  
   // Analytics
   getMovieStats: () => {
     totalMovies: number;
@@ -46,6 +53,7 @@ type MovieStore = {
     categoriesCount: Record<string, number>;
     mostWatchedCategory: string;
     recentlyWatchedCount: number;
+    embedBlockedCount: number;
   };
 };
 
@@ -57,6 +65,7 @@ export const useMovieStore = create<MovieStore>()(
       favorites: [],
       watchHistory: [],
       recentlyAdded: [],
+      embedBlocked: [],
       loading: false,
       error: null,
       searchQuery: '',
@@ -119,7 +128,7 @@ export const useMovieStore = create<MovieStore>()(
       },
 
       /**
-       * Ajoute un nouveau film avec validation étendue.
+       * Ajoute un nouveau film avec validation étendue et vérification d'embed.
        */
       addMovie: async (movieData) => {
         set({ loading: true, error: null });
@@ -138,6 +147,27 @@ export const useMovieStore = create<MovieStore>()(
             });
             set({ loading: false });
             return;
+          }
+
+          // Validation de l'URL YouTube si fournie
+          if (movieData.youtubeid) {
+            try {
+              const validation = await validateYouTubeEmbed(movieData.youtubeid);
+              if (!validation.canEmbed) {
+                toast.warning("Avertissement d'intégration", {
+                  description: `${validation.reason}. Le contenu sera ajouté mais pourrait ne pas être lisible directement.`
+                });
+                // Marquer comme potentiellement bloqué
+                setTimeout(() => {
+                  const newMovieInState = get().movies.find(m => m.youtubeid === movieData.youtubeid);
+                  if (newMovieInState) {
+                    get().markAsEmbedBlocked(newMovieInState.id);
+                  }
+                }, 1000);
+              }
+            } catch (error) {
+              console.warn('Validation YouTube échouée:', error);
+            }
           }
 
           const supabaseData = {
@@ -284,6 +314,7 @@ export const useMovieStore = create<MovieStore>()(
             favorites: state.favorites.filter(fav => fav !== id),
             watchHistory: state.watchHistory.filter(hist => hist !== id),
             recentlyAdded: state.recentlyAdded.filter(movie => movie.id !== id),
+            embedBlocked: state.embedBlocked.filter(blocked => blocked !== id),
             currentMovie: state.currentMovie?.id === id ? null : state.currentMovie
           }));
           
@@ -355,6 +386,51 @@ export const useMovieStore = create<MovieStore>()(
        */
       setSorting: (sortBy, order) => {
         set({ sortBy, sortOrder: order });
+      },
+
+      /**
+       * Marque un film comme ayant l'embed bloqué.
+       */
+      markAsEmbedBlocked: (movieId) => {
+        set(state => {
+          if (state.embedBlocked.includes(movieId)) return state;
+          
+          return {
+            embedBlocked: [...state.embedBlocked, movieId]
+          };
+        });
+      },
+
+      /**
+       * Vérifie si l'embed d'un film est bloqué.
+       */
+      isEmbedBlocked: (movieId) => {
+        return get().embedBlocked.includes(movieId);
+      },
+
+      /**
+       * Valide si l'embed d'un film fonctionne.
+       */
+      validateMovieEmbed: async (movieId) => {
+        const movie = get().movies.find(m => m.id === movieId);
+        if (!movie || !movie.youtubeid) return false;
+
+        try {
+          const validation = await validateYouTubeEmbed(movie.youtubeid);
+          if (!validation.canEmbed) {
+            get().markAsEmbedBlocked(movieId);
+            return false;
+          }
+          
+          // Retirer de la liste des bloqués si la validation réussit
+          set(state => ({
+            embedBlocked: state.embedBlocked.filter(id => id !== movieId)
+          }));
+          return true;
+        } catch (error) {
+          console.error('Erreur validation embed:', error);
+          return false;
+        }
       },
 
       /**
@@ -436,7 +512,7 @@ export const useMovieStore = create<MovieStore>()(
       },
 
       /**
-       * Retourne les statistiques de la collection.
+       * Retourne les statistiques de la collection avec embed bloqué.
        */
       getMovieStats: () => {
         const state = get();
@@ -453,6 +529,7 @@ export const useMovieStore = create<MovieStore>()(
           .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Aucune';
 
         const recentlyWatchedCount = state.watchHistory.length;
+        const embedBlockedCount = state.embedBlocked.length;
 
         return {
           totalMovies,
@@ -460,16 +537,18 @@ export const useMovieStore = create<MovieStore>()(
           categoriesCount,
           mostWatchedCategory,
           recentlyWatchedCount,
+          embedBlockedCount,
         };
       },
     }),
     {
       name: "movie-store",
-      storage: createJSONStorage(() => localStorage), // Changé en localStorage pour persister plus de données
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         currentMovie: state.currentMovie,
         favorites: state.favorites,
         watchHistory: state.watchHistory,
+        embedBlocked: state.embedBlocked,
         searchQuery: state.searchQuery,
         sortBy: state.sortBy,
         sortOrder: state.sortOrder,

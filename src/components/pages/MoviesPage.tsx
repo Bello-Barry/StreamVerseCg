@@ -57,10 +57,11 @@ const LoginPrompt = () => (
   </Card>
 );
 
-// Composant Modal de lecture amélioré
+// Composant Modal de lecture amélioré avec gestion d'erreurs
 const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [embedBlocked, setEmbedBlocked] = useState(false);
 
   const handleIframeLoad = () => {
     setIsLoading(false);
@@ -69,21 +70,84 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
   const handleIframeError = () => {
     setIsLoading(false);
     setHasError(true);
-    toast.error('Erreur de chargement', {
-      description: 'Impossible de charger la vidéo. Vérifiez que le lien YouTube est valide.'
-    });
+    setEmbedBlocked(true);
   };
 
-  // Construction de l'URL YouTube
-  const youtubeUrl = movie.type === 'playlist'
-    ? `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&autoplay=1`
-    : `https://www.youtube.com/embed/${movie.youtubeid}?autoplay=1&rel=0`;
+  // URLs avec différentes stratégies
+  const getEmbedUrls = (movie: Movie) => {
+    const baseParams = 'rel=0&modestbranding=1&showinfo=0&controls=1';
+    
+    if (movie.type === 'playlist') {
+      return {
+        primary: `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&${baseParams}`,
+        fallback: `https://www.youtube.com/playlist?list=${movie.playlistid}`,
+        directLink: `https://www.youtube.com/playlist?list=${movie.playlistid}`
+      };
+    } else {
+      return {
+        primary: `https://www.youtube-nocookie.com/embed/${movie.youtubeid}?${baseParams}`,
+        secondary: `https://www.youtube.com/embed/${movie.youtubeid}?${baseParams}`,
+        fallback: `https://www.youtube.com/watch?v=${movie.youtubeid}`,
+        directLink: `https://www.youtube.com/watch?v=${movie.youtubeid}`
+      };
+    }
+  };
 
-  // Construction de l'URL pour ouvrir sur YouTube
-  const openInYoutubeUrl = movie.type === 'playlist'
-    ? `https://www.youtube.com/playlist?list=${movie.playlistid}`
-    : `https://www.youtube.com/watch?v=${movie.youtubeid}`;
+  const urls = getEmbedUrls(movie);
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
+  const embedUrls = movie.type === 'playlist' 
+    ? [urls.primary] 
+    : [urls.primary, urls.secondary];
 
+  // Tentative de chargement de l'URL suivante
+  const tryNextUrl = () => {
+    if (currentUrlIndex < embedUrls.length - 1) {
+      setCurrentUrlIndex(prev => prev + 1);
+      setIsLoading(true);
+      setHasError(false);
+    } else {
+      setEmbedBlocked(true);
+    }
+  };
+
+  // Détection du blocage après un délai
+  useEffect(() => {
+    if (isLoading) {
+      const timeout = setTimeout(() => {
+        if (isLoading) {
+          tryNextUrl();
+        }
+      }, 5000); // 5 secondes de timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading, currentUrlIndex]);
+
+  const openInYoutube = () => {
+    window.open(urls.directLink, '_blank');
+  };
+
+  const openInNewTab = () => {
+    // Essayer d'ouvrir dans un nouvel onglet avec l'embed
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${movie.title}</title>
+          <style>
+            body { margin: 0; background: #000; }
+            iframe { width: 100vw; height: 100vh; border: none; }
+          </style>
+        </head>
+        <body>
+          <iframe src="${embedUrls[currentUrlIndex]}" allowfullscreen></iframe>
+        </body>
+        </html>
+      `);
+    }
+  };
 
   return (
     <motion.div
@@ -91,11 +155,11 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose} // Fermer en cliquant sur l'arrière-plan
+      onClick={onClose}
     >
       <Card 
         className="w-full max-w-6xl max-h-[95vh] p-2 sm:p-4 relative overflow-hidden"
-        onClick={(e) => e.stopPropagation()} // Empêcher la fermeture en cliquant sur le contenu
+        onClick={(e) => e.stopPropagation()}
       >
         <Button
           variant="secondary"
@@ -129,49 +193,82 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
           
           <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
             {/* Indicateur de chargement */}
-            {isLoading && !hasError && (
+            {isLoading && !embedBlocked && (
               <div className="absolute inset-0 bg-muted rounded-xl flex items-center justify-center">
                 <div className="text-center">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Chargement de la vidéo...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Chargement de la vidéo...
+                    {currentUrlIndex > 0 && " (Tentative alternative)"}
+                  </p>
                 </div>
               </div>
             )}
             
-            {/* Message d'erreur */}
-            {hasError && (
+            {/* Message d'erreur avec options */}
+            {(hasError || embedBlocked) && (
               <div className="absolute inset-0 bg-destructive/10 rounded-xl flex items-center justify-center">
-                <div className="text-center p-4">
-                  <X className="h-8 w-8 text-destructive mx-auto mb-2" />
-                  <p className="text-sm text-destructive font-semibold">
-                    Impossible de charger la vidéo.
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                    Ce contenu est peut-être bloqué. Pour le visionner, ouvrez-le directement sur YouTube.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-4"
-                    onClick={() => window.open(openInYoutubeUrl, '_blank')}
-                  >
-                    Ouvrir sur YouTube
-                  </Button>
+                <div className="text-center p-4 space-y-4">
+                  <div>
+                    <X className="h-8 w-8 text-destructive mx-auto mb-2" />
+                    <p className="text-sm text-destructive font-medium mb-1">
+                      Contenu bloqué pour l'intégration
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Cette vidéo ne peut pas être lue dans cette application
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={openInYoutube}
+                      className="flex items-center gap-2"
+                    >
+                      <Play className="h-4 w-4" />
+                      Ouvrir sur YouTube
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={openInNewTab}
+                      className="flex items-center gap-2"
+                    >
+                      <Film className="h-4 w-4" />
+                      Nouvel onglet
+                    </Button>
+                    
+                    {currentUrlIndex < embedUrls.length - 1 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={tryNextUrl}
+                        className="flex items-center gap-2"
+                      >
+                        <Loader2 className="h-4 w-4" />
+                        Réessayer
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
             
             {/* Iframe YouTube */}
-            {!hasError && (
+            {!embedBlocked && (
               <iframe
+                key={currentUrlIndex} // Force le rechargement quand l'URL change
                 className="absolute top-0 left-0 w-full h-full rounded-xl"
-                src={youtubeUrl}
+                src={embedUrls[currentUrlIndex]}
                 title={`Lecteur vidéo YouTube - ${movie.title}`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 allowFullScreen
                 onLoad={handleIframeLoad}
                 onError={handleIframeError}
                 style={{ border: 'none' }}
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
               />
             )}
           </div>
@@ -180,6 +277,7 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
     </motion.div>
   );
 };
+
 
 export default function MoviesPage() {
   const { movies, currentMovie, setCurrentMovie, fetchMovies, addMovie } = useMovieStore();
@@ -235,82 +333,114 @@ export default function MoviesPage() {
     }
   }, []);
 
-  // Fonction pour gérer l'ajout d'un nouveau film/série
-  const handleAdd = useCallback(async () => {
-    if (!user) {
-      toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
+  // Fonction pour gérer l'ajout d'un nouveau film/série// Ajout au handleAdd dans MoviesPage.tsx
+
+const handleAdd = useCallback(async () => {
+  if (!user) {
+    toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
+    return;
+  }
+
+  if (!formData.url || !formData.title || isAdding) {
+    toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
+    return;
+  }
+
+  setIsAdding(true);
+  toast.info('Validation en cours...', { id: 'add-movie-toast' });
+
+  try {
+    // Utiliser la nouvelle fonction d'extraction
+    const { videoId, playlistId, isValid } = extractYouTubeIds(formData.url);
+
+    if (!isValid) {
+      toast.error('Lien YouTube invalide', { 
+        id: 'add-movie-toast', 
+        description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' 
+      });
+      setIsAdding(false);
       return;
     }
 
-    if (!formData.url || !formData.title || isAdding) {
-      toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
-      return;
-    }
-
-    setIsAdding(true);
-    toast.info('Ajout en cours...', { id: 'add-movie-toast' });
-
-    try {
-      const videoMatch = formData.url.match(/(?:youtu\.be\/|youtube\.com\/(?:v\/|e\/|watch\?v=|embed\/|user\/[^/]+\/)\??)([^"&?\/\s]{11})/);
-      const playlistMatch = formData.url.match(/(?:youtube\.com\/(?:playlist\?list=))([^&]+)/);
-      const isVideo = !!videoMatch;
-      const isPlaylist = !!playlistMatch;
-
-      if (!isVideo && !isPlaylist) {
-        toast.error('Lien YouTube invalide', { id: 'add-movie-toast', description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' });
+    // Validation de l'intégrabilité pour les vidéos
+    if (videoId) {
+      toast.info('Vérification de la disponibilité...', { id: 'add-movie-toast' });
+      const validation = await validateYouTubeEmbed(videoId);
+      
+      if (!validation.canEmbed) {
+        toast.warning('Avertissement', {
+          id: 'add-movie-toast',
+          description: `${validation.reason}. La vidéo sera ajoutée mais pourrait ne pas être lisible dans l'app.`,
+          action: {
+            label: 'Continuer quand même',
+            onClick: () => proceedWithAdd(videoId, playlistId)
+          }
+        });
         setIsAdding(false);
         return;
       }
-
-      const youtubeid = isVideo ? videoMatch![1] : undefined;
-      const playlistid = isPlaylist ? playlistMatch![1] : undefined;
-      
-      let posterUrl: string | null = null;
-
-      // Upload de l'image si fournie
-      if (formData.posterFile) {
-        try {
-          posterUrl = await uploadPoster(formData.posterFile);
-        } catch {
-          toast.warning('Image non uploadée, la miniature YouTube sera utilisée.');
-        }
-      }
-
-      // Fallback miniature YouTube si pas d'image personnalisée
-      if (!posterUrl && youtubeid) {
-        posterUrl = getYoutubeThumbnail(youtubeid) || null;
-      }
-
-      const movieData: MovieInsert = {
-        title: formData.title,
-        description: formData.description || '',
-        type: formData.type,
-        category: formData.category,
-        youtubeid,
-        playlistid,
-        poster: posterUrl ?? undefined,
-      };
-
-      await addMovie(movieData);
-
-      toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
-
-      // Réinitialisation du formulaire
-      setFormData({
-        url: '',
-        title: '',
-        description: '',
-        type: 'video',
-        category: 'Autre',
-        posterFile: null
-      });
-    } catch (error) {
-      console.error('Erreur ajout film:', error);
-      toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
-    } finally {
-      setIsAdding(false);
     }
-  }, [formData, addMovie, isAdding, user]);
+
+    await proceedWithAdd(videoId, playlistId);
+  } catch (error) {
+    console.error('Erreur ajout film:', error);
+    toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
+    setIsAdding(false);
+  }
+}, [formData, addMovie, isAdding, user]);
+
+// Fonction séparée pour poursuivre l'ajout
+const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
+  try {
+    toast.info('Ajout en cours...', { id: 'add-movie-toast' });
+
+    let posterUrl: string | null = null;
+
+    // Upload de l'image si fournie
+    if (formData.posterFile) {
+      try {
+        posterUrl = await uploadPoster(formData.posterFile);
+      } catch {
+        toast.warning('Image non uploadée, la miniature YouTube sera utilisée.');
+      }
+    }
+
+    // Fallback miniature YouTube si pas d'image personnalisée
+    if (!posterUrl && videoId) {
+      posterUrl = getYoutubeThumbnail(videoId) || null;
+    }
+
+    const movieData: MovieInsert = {
+      title: formData.title,
+      description: formData.description || '',
+      type: formData.type,
+      category: formData.category,
+      youtubeid: videoId,
+      playlistid: playlistId,
+      poster: posterUrl ?? undefined,
+    };
+
+    await addMovie(movieData);
+
+    toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
+
+    // Réinitialisation du formulaire
+    setFormData({
+      url: '',
+      title: '',
+      description: '',
+      type: 'video',
+      category: 'Autre',
+      posterFile: null
+    });
+  } catch (error) {
+    console.error('Erreur ajout film:', error);
+    toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
+  } finally {
+    setIsAdding(false);
+  }
+};
+   [formData, addMovie, isAdding, user]);
 
   const filteredMovies = useMemo(() => {
     // Cette partie a été refactorisée pour utiliser le store de manière optimale
