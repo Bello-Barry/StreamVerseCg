@@ -1,58 +1,69 @@
-'use server';
+'use server'; // Indique à Next.js que ce fichier s'exécute uniquement sur le serveur.
 
-import { google } from 'googleapis';
-import { env } from '@/env.mjs'; // Assurez-vous que l'importation de `env` est correcte
-import { Video } from '@/types/video';
+import { google, youtube_v3 } from 'googleapis';
+import { env } from '../../env.mjs';
 
-// Initialisation de l'API YouTube
+// Initialisation de l'API YouTube Data
 const youtube = google.youtube({
   version: 'v3',
   auth: env.YOUTUBE_API_KEY,
 });
 
 /**
- * Récupère le titre d'une vidéo ou d'une playlist YouTube.
- * @param url L'URL de la vidéo ou de la playlist.
- * @returns Le titre du contenu.
+ * Cache pour les résultats de l'API (pour économiser les quotas)
+ * Utilisation de Map pour un accès rapide.
  */
-export async function getYoutubeTitle(url: string): Promise<string | null> {
-  const urlObj = new URL(url);
-  const videoId = urlObj.searchParams.get('v');
-  const playlistId = urlObj.searchParams.get('list');
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+const cache = new Map<string, CacheEntry<any>>();
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 heures
+
+/**
+ * Récupère le titre d'une vidéo YouTube.
+ * @param videoId L'ID de la vidéo.
+ * @returns Le titre de la vidéo ou une chaîne vide en cas d'erreur.
+ */
+export async function getYoutubeTitle(videoId: string): Promise<string> {
+  const cacheKey = `title_${videoId}`;
+  const cachedData = cache.get(cacheKey);
+
+  if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRY_MS) {
+    return cachedData.data;
+  }
 
   try {
-    if (videoId) {
-      const response = await youtube.videos.list({
-        part: ['snippet'],
-        id: [videoId],
-      });
-      const title = response.data.items?.[0]?.snippet?.title;
-      return title || null;
-    }
+    const response = await youtube.videos.list({
+      part: ['snippet'],
+      id: [videoId],
+    });
 
-    if (playlistId) {
-      const response = await youtube.playlists.list({
-        part: ['snippet'],
-        id: [playlistId],
-      });
-      const title = response.data.items?.[0]?.snippet?.title;
-      return title || null;
-    }
+    const title = response.data.items?.[0]?.snippet?.title || '';
+    cache.set(cacheKey, { data: title, timestamp: Date.now() });
+    return title;
   } catch (error) {
     console.error('Erreur lors de la récupération du titre YouTube:', error);
+    return '';
   }
-  return null;
 }
 
 /**
- * Valide si une vidéo YouTube peut être intégrée et renvoie un message détaillé.
- * @param videoId L'ID de la vidéo.
- * @returns Un objet indiquant si l'intégration est possible et la raison le cas échéant.
+ * Valide si une vidéo YouTube est intégrable via l'API.
+ * @param videoId L'ID de la vidéo à valider.
+ * @returns Un objet indiquant si l'intégration est possible et la raison si elle ne l'est pas.
  */
 export async function validateYouTubeEmbed(videoId: string): Promise<{
   canEmbed: boolean;
   reason?: string;
 }> {
+  const cacheKey = `embed_${videoId}`;
+  const cachedData = cache.get(cacheKey);
+
+  if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRY_MS) {
+    return cachedData.data;
+  }
+
   try {
     const response = await youtube.videos.list({
       part: ['status', 'contentDetails'],
@@ -62,51 +73,27 @@ export async function validateYouTubeEmbed(videoId: string): Promise<{
     const video = response.data.items?.[0];
 
     if (!video) {
-      return { canEmbed: false, reason: 'Vidéo introuvable.' };
+      return { canEmbed: false, reason: 'Vidéo non trouvée.' };
     }
 
-    // Vérifie si l'intégration est autorisée par l'auteur
     if (video.status?.embeddable === false) {
-      return {
-        canEmbed: false,
-        reason: "L'intégration a été désactivée par l'auteur de la vidéo.",
-      };
+      return { canEmbed: false, reason: 'L\'intégration est désactivée par le propriétaire de la vidéo.' };
     }
 
-    // Vérifie les restrictions de pays
-    const regionRestriction = video.contentDetails?.regionRestriction;
-    if (regionRestriction?.blocked && regionRestriction.blocked.length > 0) {
-      return {
-        canEmbed: true, // L'intégration est techniquement possible, mais restreinte
-        reason: 'Vidéo bloquée dans certaines régions.',
-      };
+    if (video.contentDetails?.regionRestriction) {
+      return { canEmbed: false, reason: 'La vidéo est bloquée dans certaines régions.' };
     }
 
-    if (regionRestriction?.allowed && regionRestriction.allowed.length > 0) {
-      return {
-        canEmbed: true,
-        reason: 'Vidéo restreinte à certaines régions.',
-      };
-    }
+    const result = { canEmbed: true };
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
 
-    // Gère le cas des vidéos privées ou non listées
-    if (video.status?.privacyStatus !== 'public' && video.status?.privacyStatus !== 'unlisted') {
-      return {
-        canEmbed: false,
-        reason: 'La vidéo est privée ou non listée.',
-      };
-    }
-
-    return { canEmbed: true };
   } catch (error: any) {
-    console.error('Erreur lors de la validation de la vidéo YouTube:', error.message);
-    if (error.message.includes('API key not valid')) {
-      return { canEmbed: false, reason: 'Clé API invalide.' };
+    if (error.response?.data?.error?.message) {
+      console.error('Erreur API YouTube:', error.response.data.error.message);
+      return { canEmbed: false, reason: `Erreur API: ${error.response.data.error.message}` };
     }
-    return {
-      canEmbed: false,
-      reason: 'Une erreur est survenue lors de la vérification de la vidéo.',
-    };
+    console.error('Erreur de validation de la vidéo YouTube:', error);
+    return { canEmbed: false, reason: 'Erreur technique lors de la vérification.' };
   }
 }
- 
