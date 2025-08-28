@@ -1,41 +1,65 @@
-// Ce fichier contient uniquement des utilitaires qui n'ont pas besoin d'appels API.
+// src/lib/youtubeValidation.ts
+
+import { google } from 'googleapis';
+import NodeCache from 'node-cache';
 
 /**
- * Extrait l'ID de la vidéo ou de la playlist d'une URL YouTube.
- * @param url L'URL YouTube à analyser.
- * @returns Un objet contenant les IDs et un statut de validité.
+ * Cache mémoire pour éviter de solliciter trop l’API YouTube
  */
-export function extractYouTubeIds(url: string): {
-  videoId?: string;
-  playlistId?: string;
-  isValid: boolean;
-} {
-  try {
-    const videoRegex = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.*&v=))([^&?]+)/;
-    const playlistRegex = /(?:list=)([a-zA-Z0-9_-]+)/;
+const cache = new NodeCache({ stdTTL: 60 * 5 }); // 5 minutes
+const CACHE_EXPIRY_MS = 1000 * 60 * 5;
 
-    const videoMatch = url.match(videoRegex);
-    const playlistMatch = url.match(playlistRegex);
+const youtube = google.youtube({
+  version: 'v3',
+  auth: process.env.YOUTUBE_API_KEY,
+});
 
-    if (videoMatch && videoMatch[1]) {
-      return { videoId: videoMatch[1], isValid: true };
-    }
-    if (playlistMatch && playlistMatch[1]) {
-      return { playlistId: playlistMatch[1], isValid: true };
-    }
+/**
+ * Valide si une vidéo YouTube peut être intégrée
+ */
+export async function validateYouTubeEmbed(videoId: string): Promise<{
+  canEmbed: boolean;
+  reason?: string;
+}> {
+  const cacheKey = `embed_${videoId}`;
+  const cachedData = cache.get(cacheKey);
 
-    return { isValid: false };
-  } catch (error) {
-    console.error('Erreur lors de l\'extraction des IDs YouTube:', error);
-    return { isValid: false };
+  if (cachedData && Date.now() - cachedData.timestamp < CACHE_EXPIRY_MS) {
+    return cachedData.data;
   }
-}
 
-/**
- * Génère l'URL d'une miniature YouTube à partir d'un ID de vidéo.
- * @param videoId L'ID de la vidéo.
- * @returns L'URL de la miniature.
- */
-export function getYoutubeThumbnail(videoId: string): string {
-  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  try {
+    const response = await youtube.videos.list({
+      part: ['status'],
+      id: [videoId],
+    });
+
+    const video = response.data.items?.[0];
+    if (!video) {
+      return { canEmbed: false, reason: 'Vidéo non trouvée.' };
+    }
+
+    // 🚨 Blocage uniquement si le propriétaire interdit l’intégration
+    if (video.status?.embeddable === false) {
+      return {
+        canEmbed: false,
+        reason: 'L’intégration est désactivée par le propriétaire.',
+      };
+    }
+
+    // ✅ Ne bloque PAS sur regionRestriction → simple avertissement
+    const result = { canEmbed: true };
+    cache.set(cacheKey, { data: result, timestamp: Date.now() });
+    return result;
+  } catch (error: any) {
+    if (error.response?.data?.error?.message) {
+      console.error('Erreur API YouTube:', error.response.data.error.message);
+      return {
+        canEmbed: false,
+        reason: `Erreur API: ${error.response.data.error.message}`,
+      };
+    }
+    console.error('Erreur de validation:', error);
+    return { canEmbed: false, reason: 'Erreur technique.' };
+  }
 }
