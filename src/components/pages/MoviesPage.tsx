@@ -12,10 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { uploadPoster } from '@/lib/uploadPoster';
 import { getYoutubeTitle } from '@/lib/getYoutubeTitle';
-import { getYoutubeThumbnail } from '@/lib/getYoutubeThumbnail';
+import { getYoutubeThumbnail, extractYouTubeIds, validateYouTubeEmbed } from '@/lib/youtubeUtils';
 import { toast } from 'sonner';
 import { MovieCard } from '@/components/MovieCard';
-import { X, Loader2, LogIn, Upload, Film, Play, Pause } from 'lucide-react';
+import { X, Loader2, LogIn, Upload, Film, Play } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // Types pour les catégories de films
@@ -278,7 +278,6 @@ const VideoModal = ({ movie, onClose }: { movie: Movie; onClose: () => void }) =
   );
 };
 
-
 export default function MoviesPage() {
   const { movies, currentMovie, setCurrentMovie, fetchMovies, addMovie } = useMovieStore();
   const { user } = useAuth();
@@ -333,120 +332,110 @@ export default function MoviesPage() {
     }
   }, []);
 
-  // Fonction pour gérer l'ajout d'un nouveau film/série// Ajout au handleAdd dans MoviesPage.tsx
-
-const handleAdd = useCallback(async () => {
-  if (!user) {
-    toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
-    return;
-  }
-
-  if (!formData.url || !formData.title || isAdding) {
-    toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
-    return;
-  }
-
-  setIsAdding(true);
-  toast.info('Validation en cours...', { id: 'add-movie-toast' });
-
-  try {
-    // Utiliser la nouvelle fonction d'extraction
-    const { videoId, playlistId, isValid } = extractYouTubeIds(formData.url);
-
-    if (!isValid) {
-      toast.error('Lien YouTube invalide', { 
-        id: 'add-movie-toast', 
-        description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' 
-      });
-      setIsAdding(false);
+  // Fonction pour gérer l'ajout d'un nouveau film/série
+  const handleAdd = useCallback(async () => {
+    if (!user) {
+      toast.error('Connexion requise', { description: 'Vous devez être connecté pour ajouter un film.' });
       return;
     }
 
-    // Validation de l'intégrabilité pour les vidéos
-    if (videoId) {
-      toast.info('Vérification de la disponibilité...', { id: 'add-movie-toast' });
-      const validation = await validateYouTubeEmbed(videoId);
-      
-      if (!validation.canEmbed) {
-        toast.warning('Avertissement', {
-          id: 'add-movie-toast',
-          description: `${validation.reason}. La vidéo sera ajoutée mais pourrait ne pas être lisible dans l'app.`,
-          action: {
-            label: 'Continuer quand même',
-            onClick: () => proceedWithAdd(videoId, playlistId)
-          }
+    if (!formData.url || !formData.title) {
+      toast.error('Champs requis', { description: 'L\'URL et le titre sont obligatoires.' });
+      return;
+    }
+
+    if (isAdding) {
+      return;
+    }
+    
+    setIsAdding(true);
+    const toastId = toast.info('Validation en cours...', { id: 'add-movie-toast' });
+
+    try {
+      const { videoId, playlistId, isValid } = extractYouTubeIds(formData.url);
+
+      if (!isValid) {
+        toast.error('Lien YouTube invalide', { 
+          id: toastId, 
+          description: 'Le lien doit être une URL de vidéo ou de playlist YouTube valide.' 
         });
-        setIsAdding(false);
         return;
       }
-    }
 
-    await proceedWithAdd(videoId, playlistId);
-  } catch (error) {
-    console.error('Erreur ajout film:', error);
-    toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
-    setIsAdding(false);
-  }
-}, [formData, addMovie, isAdding, user]);
+      const proceedWithAdd = async () => {
+        toast.info('Ajout en cours...', { id: toastId });
 
-// Fonction séparée pour poursuivre l'ajout
-const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
-  try {
-    toast.info('Ajout en cours...', { id: 'add-movie-toast' });
+        let posterUrl: string | null = null;
+        if (formData.posterFile) {
+          try {
+            posterUrl = await uploadPoster(formData.posterFile);
+          } catch {
+            toast.warning('Image non uploadée, la miniature YouTube sera utilisée.', { id: toastId });
+          }
+        }
 
-    let posterUrl: string | null = null;
+        if (!posterUrl && videoId) {
+          posterUrl = getYoutubeThumbnail(videoId) || null;
+        }
 
-    // Upload de l'image si fournie
-    if (formData.posterFile) {
-      try {
-        posterUrl = await uploadPoster(formData.posterFile);
-      } catch {
-        toast.warning('Image non uploadée, la miniature YouTube sera utilisée.');
+        const movieData: MovieInsert = {
+          title: formData.title,
+          description: formData.description || '',
+          type: formData.type,
+          category: formData.category,
+          youtubeid: videoId,
+          playlistid: playlistId,
+          poster: posterUrl ?? undefined,
+        };
+
+        await addMovie(movieData);
+
+        toast.success(`"${formData.title}" ajouté avec succès !`, { id: toastId });
+
+        // Réinitialisation du formulaire
+        setFormData({
+          url: '',
+          title: '',
+          description: '',
+          type: 'video',
+          category: 'Autre',
+          posterFile: null
+        });
+      };
+      
+      // Validation de l'intégrabilité pour les vidéos
+      if (videoId) {
+        toast.info('Vérification de la disponibilité...', { id: toastId });
+        const validation = await validateYouTubeEmbed(videoId);
+        
+        if (!validation.canEmbed) {
+          toast.warning('Avertissement', {
+            id: toastId,
+            description: `${validation.reason}. La vidéo sera ajoutée mais pourrait ne pas être lisible dans l'app.`,
+            action: {
+              label: 'Continuer quand même',
+              onClick: () => proceedWithAdd()
+            }
+          });
+          return; // Sortir ici pour attendre l'action de l'utilisateur
+        }
       }
+
+      // Si la validation est passée ou si c'est une playlist, continuer
+      await proceedWithAdd();
+
+    } catch (error) {
+      console.error('Erreur ajout film:', error);
+      toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
+    } finally {
+      setIsAdding(false);
     }
-
-    // Fallback miniature YouTube si pas d'image personnalisée
-    if (!posterUrl && videoId) {
-      posterUrl = getYoutubeThumbnail(videoId) || null;
-    }
-
-    const movieData: MovieInsert = {
-      title: formData.title,
-      description: formData.description || '',
-      type: formData.type,
-      category: formData.category,
-      youtubeid: videoId,
-      playlistid: playlistId,
-      poster: posterUrl ?? undefined,
-    };
-
-    await addMovie(movieData);
-
-    toast.success(`"${formData.title}" ajouté avec succès !`, { id: 'add-movie-toast' });
-
-    // Réinitialisation du formulaire
-    setFormData({
-      url: '',
-      title: '',
-      description: '',
-      type: 'video',
-      category: 'Autre',
-      posterFile: null
-    });
-  } catch (error) {
-    console.error('Erreur ajout film:', error);
-    toast.error('Une erreur est survenue lors de l\'ajout.', { id: 'add-movie-toast' });
-  } finally {
-    setIsAdding(false);
-  }
-}, [formData, addMovie, isAdding, user]);
+  }, [formData, addMovie, user]);
 
   const filteredMovies = useMemo(() => {
     // Cette partie a été refactorisée pour utiliser le store de manière optimale
     return movies.filter(movie => {
-      const isCategoryMatch = filterCategory === 'All' || movie.category === filterCategory;
-      const isSearchMatch = true; // La recherche est gérée par le store dans getFilteredMovies
-      return isCategoryMatch && isSearchMatch;
+      return filterCategory === 'All' || movie.category === filterCategory;
     });
   }, [movies, filterCategory]);
 
@@ -493,7 +482,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
                       value={formData.url}
                       onChange={(e) => handleUrlChange(e.target.value)}
                       className="h-12 text-base"
-                      disabled={autoFilling}
+                      disabled={autoFilling || isAdding}
                     />
                     {autoFilling && (
                       <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
@@ -513,6 +502,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
                       value={formData.title}
                       onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                       className="h-12"
+                      disabled={isAdding}
                     />
                   </div>
 
@@ -524,6 +514,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
                       onValueChange={(value: 'video' | 'playlist') => 
                         setFormData(prev => ({ ...prev, type: value }))
                       }
+                      disabled={isAdding}
                     >
                       <SelectTrigger className="h-12">
                         <SelectValue />
@@ -543,6 +534,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
                       onValueChange={(value: MovieCategory) => 
                         setFormData(prev => ({ ...prev, category: value }))
                       }
+                      disabled={isAdding}
                     >
                       <SelectTrigger className="h-12">
                         <SelectValue />
@@ -571,6 +563,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
                         posterFile: e.target.files?.[0] || null 
                       }))}
                       className="p-2 cursor-pointer file:text-blue-500 file:bg-transparent file:border-0"
+                      disabled={isAdding}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Si aucune image n'est fournie, la miniature YouTube sera utilisée
@@ -585,6 +578,7 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       className="min-h-[80px]"
+                      disabled={isAdding}
                     />
                   </div>
                 </div>
@@ -668,3 +662,4 @@ const proceedWithAdd = async (videoId?: string, playlistId?: string) => {
     </div>
   );
 }
+
