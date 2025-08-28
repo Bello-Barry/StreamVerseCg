@@ -11,8 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { uploadPoster } from '@/lib/uploadPoster';
-import { getYoutubeTitle } from '@/lib/getYoutubeTitle';
-import { getYoutubeThumbnail, extractYouTubeIds, validateYouTubeEmbed } from '@/lib/youtubeUtils';
+import { getYoutubeThumbnail, extractYouTubeIds } from '@/lib/youtubeUtils';
+import { getYoutubeTitle, validateYouTubeEmbed } from '@/lib/actions';
 import { toast } from 'sonner';
 import { MovieCard } from '@/components/MovieCard';
 import { X, Loader2, LogIn, Upload, Film, Play } from 'lucide-react';
@@ -316,13 +316,16 @@ export default function MoviesPage() {
     if (url && (url.includes('youtube.com') || url.includes('youtu.be'))) {
       setAutoFilling(true);
       try {
-        const title = await getYoutubeTitle(url);
-        if (title) {
-          setFormData(prev => ({ 
-            ...prev, 
-            title: prev.title || title, // Ne remplace que si le titre est vide
-            type: url.includes('list=') ? 'playlist' : 'video'
-          }));
+        const { videoId, playlistId } = extractYouTubeIds(url);
+        if (videoId || playlistId) {
+          const title = await getYoutubeTitle(url);
+          if (title) {
+            setFormData(prev => ({ 
+              ...prev, 
+              title: prev.title || title, // Ne remplace que si le titre est vide
+              type: playlistId ? 'playlist' : 'video'
+            }));
+          }
         }
       } catch (error) {
         console.error('Erreur lors de la récupération du titre:', error);
@@ -662,4 +665,3 @@ export default function MoviesPage() {
     </div>
   );
 }
-
