@@ -1,5 +1,6 @@
-import { google, youtube_v3 } from 'googleapis';
-import { env } from '@/env.mjs';
+import { google } from 'googleapis';
+import { env } from '../../env.mjs'; // <-- Chemin d'importation corrigé
+import { youtube_v3 } from 'googleapis';
 
 // Initialisation de l'API YouTube Data
 const youtube = google.youtube({
@@ -79,7 +80,6 @@ export async function getYoutubeTitle(videoId: string): Promise<string> {
 
 /**
  * Génère l'URL d'une miniature YouTube à partir d'un ID de vidéo.
- * Utilise le cache pour les futures demandes.
  * @param videoId L'ID de la vidéo.
  * @returns L'URL de la miniature.
  */
