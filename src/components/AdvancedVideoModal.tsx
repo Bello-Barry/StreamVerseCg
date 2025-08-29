@@ -2,12 +2,11 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Loader2, X, Play, Pause, Volume2, VolumeX, Maximize, 
+import {
+  Loader2, X, Play, Pause, Volume2, VolumeX, Maximize,
   SkipBack, SkipForward, Settings, Download, Share2,
   Heart, Plus, Info, Star, Clock, Calendar, Tv
 } from 'lucide-react';
@@ -42,19 +41,18 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(80);
   const [showControls, setShowControls] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
   const [progress, setProgress] = useState<VideoProgress>({
     currentTime: 0,
     duration: 0,
     buffered: 0
   });
-  
+
   const modalRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
-  
+  // Correction de l'erreur: useRef doit être initialisé avec une valeur
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // URLs avec paramètres pour masquer l'interface YouTube
   const getEmbedUrls = useCallback((movie: Movie) => {
     const customParams = [
@@ -63,16 +61,16 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
       'showinfo=0',       // Pas d'infos vidéo
       'controls=0',       // Masquer les contrôles YouTube
       'disablekb=1',      // Désactiver raccourcis clavier YouTube
-      'fs=0',            // Pas de fullscreen YouTube
+      'fs=0',             // Pas de fullscreen YouTube
       'iv_load_policy=3', // Pas d'annotations
       'cc_load_policy=0', // Pas de sous-titres auto
-      'playsinline=1',   // Lecture inline
-      'autoplay=0',      // Pas d'autoplay
-      'start=0',         // Début à 0
-      'enablejsapi=1',   // API JS
+      'playsinline=1',    // Lecture inline
+      'autoplay=0',       // Pas d'autoplay
+      'start=0',          // Début à 0
+      'enablejsapi=1',    // API JS pour les interactions
       'origin=' + window.location.origin
     ].join('&');
-    
+
     if (movie.type === 'playlist') {
       return {
         primary: `https://www.youtube-nocookie.com/embed/videoseries?list=${movie.playlistid}&${customParams}`,
@@ -113,7 +111,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
     loadMetadata();
   }, [movie]);
 
-  // Gestion des contrôles
+  // Gestion du masquage des contrôles
   useEffect(() => {
     const hideControls = () => {
       if (controlsTimeoutRef.current) {
@@ -135,9 +133,9 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying]);
+  }, [isPlaying, showControls]);
 
-  // Reset lors du changement de film
+  // Réinitialisation de l'état au changement de film
   useEffect(() => {
     setIsLoading(true);
     setHasError(false);
@@ -146,10 +144,10 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
     setProgress({ currentTime: 0, duration: 0, buffered: 0 });
   }, [movie?.id]);
 
-  // Timeout de chargement
+  // Timeout de chargement pour passer à l'URL alternative
   useEffect(() => {
     if (!isLoading) return;
-    
+
     const timeout = setTimeout(() => {
       if (currentUrlIndex < embedUrls.length - 1) {
         setCurrentUrlIndex(prev => prev + 1);
@@ -185,7 +183,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
 
   const togglePlay = () => setIsPlaying(!isPlaying);
   const toggleMute = () => setIsMuted(!isMuted);
-  
+
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
     if (newVolume === 0) setIsMuted(true);
@@ -198,7 +196,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
   };
 
   const handleDownload = () => {
-    toast.info('Téléchargement démarré...', { 
+    toast.info('Téléchargement démarré...', {
       description: 'Le téléchargement de la vidéo a commencé en arrière-plan.'
     });
   };
@@ -231,7 +229,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
       onMouseMove={handleMouseMove}
     >
       {/* Contenu principal */}
-      <div 
+      <div
         className="relative w-full h-full max-w-7xl mx-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -276,7 +274,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   <Button
                     variant="secondary"
@@ -337,7 +335,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   Impossible de charger la vidéo
                 </h3>
                 <p className="text-gray-400 max-w-md">
-                  Cette vidéo ne peut pas être lue dans le lecteur intégré. 
+                  Cette vidéo ne peut pas être lue dans le lecteur intégré.
                   Vous pouvez l'ouvrir directement sur YouTube.
                 </p>
                 <Button onClick={openInYoutube} className="bg-red-600 hover:bg-red-700">
@@ -355,7 +353,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
               className="w-full h-full"
               src={embedUrls[currentUrlIndex]}
               title={`${movie.title} - Lecteur vidéo`}
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
               onLoad={handleIframeLoad}
               onError={handleIframeError}
@@ -389,7 +387,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   >
                     {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
                   </Button>
-                  
+
                   <Button
                     variant="ghost"
                     size="icon"
@@ -397,7 +395,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   >
                     <SkipBack className="h-5 w-5" />
                   </Button>
-                  
+
                   <Button
                     variant="ghost"
                     size="icon"
@@ -415,7 +413,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                     >
                       {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                     </Button>
-                    
+
                     <div className="w-20">
                       <Progress value={isMuted ? 0 : volume} className="h-1" />
                     </div>
@@ -434,7 +432,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   >
                     <Settings className="h-5 w-5" />
                   </Button>
-                  
+
                   <Button
                     variant="ghost"
                     size="icon"
