@@ -1,5 +1,7 @@
+// Fichier: next.config.ts
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
+import { env } from './src/env.mjs';
 
 /**
  * @type {import('next-pwa').PWAConfig}
@@ -7,37 +9,36 @@ import withPWA from 'next-pwa';
 const pwaConfig = {
   dest: 'public',
   // Activez 'disable' en mode développement pour éviter la génération du service worker
-  // Cela rend le debug plus facile, le service worker peut être un peu capricieux
   disable: process.env.NODE_ENV === 'development',
   register: true,
   scope: '/',
   sw: 'service-worker.js',
   buildExcludes: [/middleware-manifest\.json$/], // Exclut ce fichier pour éviter les conflits
+  // Pré-cache des routes
+  // Permet un accès hors-ligne plus rapide aux pages essentielles
+  additionalManifestEntries: [
+    { url: '/', revision: Date.now().toString() },
+    { url: '/favorites', revision: Date.now().toString() },
+    { url: '/history', revision: Date.now().toString() },
+  ],
 };
 
 const nextConfig: NextConfig = {
-  /*
-   * Utilisation de 'withPWA' pour activer les fonctionnalités PWA.
-   */
+  // Utilisation de 'withPWA' pour activer les fonctionnalités PWA.
   ...withPWA(pwaConfig),
 
-  /*
-   * Configuration ESLint.
-   * Il est fortement recommandé de corriger les erreurs de linting au lieu de les ignorer.
-   * Nous commentons cette ligne pour que le build échoue en cas d'erreurs,
-   * ce qui est une bonne pratique de CI/CD.
-   */
-   eslint: {
-     ignoreDuringBuilds: true,
+  // Configuration ESLint
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 
   // Configuration Webpack pour WebTorrent et les dépendances natives
   webpack: (config, { isServer }) => {
-    // Exclure WebTorrent du rendu côté serveur
+    // Exclure WebTorrent du rendu côté serveur pour alléger le bundle
     if (isServer) {
       config.externals.push('webtorrent');
     } else {
-      // Configuration pour le côté client
+      // Configuration pour le côté client, pour gérer les modules Node.js
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -51,63 +52,30 @@ const nextConfig: NextConfig = {
 
     // Ignorer les warnings des dépendances natives
     config.ignoreWarnings = [
-      {
-        module: /fs-native-extensions/,
-      },
-      {
-        module: /require-addon/,
-      },
-      {
-        message: /Critical dependency/,
-      },
+      { module: /fs-native-extensions/ },
+      { module: /require-addon/ },
+      { message: /Critical dependency/ },
     ];
 
     return config;
   },
 
-  // Configuration expérimentale pour les modules ES
-  experimental: {
-    esmExternals: 'loose',
-  },
+  // Retrait de 'experimental.esmExternals' qui est déprécié dans Next.js 15
+  // et peut causer des problèmes de résolution de modules.
+  experimental: {},
 
   // Transpiler les modules nécessaires
   transpilePackages: ['webtorrent'],
 
-  /*
-   * Options de compilation SWC (Rust-based).
-   * C'est la valeur par défaut pour Next.js 15, mais on peut la personnaliser si nécessaire.
-   */
-  //swcMinify: true,
-
-  /*
-   * Optimisation des images.
-   * Crucial pour StreamVerse car les logos des chaînes sont chargés depuis des sources externes.
-   */
+  // Optimisation des images.
   images: {
-    // Permet d'optimiser les images de n'importe quel domaine.
-    // Cela évite de lister chaque URL de logo de chaîne.
     remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
+      { protocol: 'http', hostname: '**' },
+      { protocol: 'https', hostname: '**' },
     ],
   },
-
-  /*
-   * Configuration de l'output.
-   * Utile si vous déployez votre application dans un conteneur Docker.
-   * output: 'standalone',
-   */
-
-  /*
-   * En-têtes HTTP de sécurité.
-   * Améliore la sécurité de l'application en prévenant les attaques courantes.
-   */
+  
+  // En-têtes HTTP de sécurité.
   async headers() {
     return [
       {
@@ -120,7 +88,7 @@ const nextConfig: NextConfig = {
           {
             key: 'Content-Security-Policy',
             value: `default-src 'self' 'unsafe-inline'; \
-                    script-src 'self' 'unsafe-inline'; \
+                    script-src 'self' 'unsafe-inline' 'unsafe-eval'; \
                     style-src 'self' 'unsafe-inline' 'unsafe-eval'; \
                     img-src 'self' data: http: https: blob:; \
                     connect-src 'self' data: ws: http: https:; \
@@ -130,6 +98,12 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+
+  // Configuration env pour valider les variables d'environnement au build
+  // Next.js 15 gère mieux ce cas, mais cette ligne de validation est une bonne pratique.
+  env: {
+    YOUTUBE_API_KEY: env.YOUTUBE_API_KEY,
   },
 };
 
