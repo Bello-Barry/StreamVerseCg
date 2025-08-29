@@ -1,21 +1,18 @@
 // Fichier: next.config.ts
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
-import { env } from './src/env.mjs';
 
+// Configuration PWA pour un support PWA robuste
 /**
  * @type {import('next-pwa').PWAConfig}
  */
 const pwaConfig = {
   dest: 'public',
-  // Activez 'disable' en mode développement pour éviter la génération du service worker
   disable: process.env.NODE_ENV === 'development',
   register: true,
   scope: '/',
   sw: 'service-worker.js',
-  buildExcludes: [/middleware-manifest\.json$/], // Exclut ce fichier pour éviter les conflits
-  // Pré-cache des routes
-  // Permet un accès hors-ligne plus rapide aux pages essentielles
+  buildExcludes: [/middleware-manifest\.json$/],
   additionalManifestEntries: [
     { url: '/', revision: Date.now().toString() },
     { url: '/favorites', revision: Date.now().toString() },
@@ -34,11 +31,9 @@ const nextConfig: NextConfig = {
 
   // Configuration Webpack pour WebTorrent et les dépendances natives
   webpack: (config, { isServer }) => {
-    // Exclure WebTorrent du rendu côté serveur pour alléger le bundle
     if (isServer) {
       config.externals.push('webtorrent');
     } else {
-      // Configuration pour le côté client, pour gérer les modules Node.js
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -49,19 +44,15 @@ const nextConfig: NextConfig = {
         buffer: require.resolve('buffer'),
       };
     }
-
-    // Ignorer les warnings des dépendances natives
     config.ignoreWarnings = [
       { module: /fs-native-extensions/ },
       { module: /require-addon/ },
       { message: /Critical dependency/ },
     ];
-
     return config;
   },
 
   // Retrait de 'experimental.esmExternals' qui est déprécié dans Next.js 15
-  // et peut causer des problèmes de résolution de modules.
   experimental: {},
 
   // Transpiler les modules nécessaires
@@ -98,12 +89,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-  },
-
-  // Configuration env pour valider les variables d'environnement au build
-  // Next.js 15 gère mieux ce cas, mais cette ligne de validation est une bonne pratique.
-  env: {
-    YOUTUBE_API_KEY: env.YOUTUBE_API_KEY,
   },
 };
 

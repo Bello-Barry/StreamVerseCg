@@ -2,14 +2,15 @@
 'use server';
 
 import { google } from 'googleapis';
-import { env } from '@/env.mjs';
+// L'import de env n'est plus nécessaire ici
+// car process.env est disponible globalement sur le serveur.
+import { Video } from '@/types/video';
 
 // Initialisation de l'API YouTube.
-// Cette logique est volontairement isolée ici pour garantir qu'elle ne s'exécute
-// QUE sur le serveur et ne soit jamais incluse dans le bundle client.
+// Utilisation directe de process.env
 const youtube = google.youtube({
   version: 'v3',
-  auth: env.YOUTUBE_API_KEY,
+  auth: process.env.YOUTUBE_API_KEY,
 });
 
 /**
