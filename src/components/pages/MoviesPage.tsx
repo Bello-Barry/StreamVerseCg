@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Movie } from '@/types/movie';
 import { Button } from '@/components/ui/button';
 import MovieCard from '@/components/MovieCard';
-import VideoModal from '@/components/movies/VideoModal';
+import VideoModal from '@/components/VideoModal';
 
 export default function MoviesPage() {
   const { user } = useAuth();
