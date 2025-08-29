@@ -78,12 +78,13 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self' 'unsafe-inline'; \
-                    script-src 'self' 'unsafe-inline' 'unsafe-eval'; \
-                    style-src 'self' 'unsafe-inline' 'unsafe-eval'; \
-                    img-src 'self' data: http: https: blob:; \
-                    connect-src 'self' data: ws: http: https:; \
-                    media-src 'self' data: blob: http: https:; \
+            value: `default-src 'self' 'unsafe-inline';
+                    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com;
+                    style-src 'self' 'unsafe-inline' 'unsafe-eval';
+                    img-src 'self' data: http: https: blob:;
+                    connect-src 'self' data: ws: http: https:;
+                    media-src 'self' data: blob: https://www.youtube.com https://s.ytimg.com;
+                    frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;
                     font-src 'self' data:`,
           },
         ],
