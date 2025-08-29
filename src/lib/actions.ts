@@ -2,12 +2,10 @@
 'use server';
 
 import { google } from 'googleapis';
-// L'import de env n'est plus nécessaire ici
-// car process.env est disponible globalement sur le serveur.
-import { Video } from '@/types/video';
+import { Movie } from '@/types/movie'; // Utilisation du type Movie centralisé
 
 // Initialisation de l'API YouTube.
-// Utilisation directe de process.env
+// Utilisation directe de process.env, qui est disponible côté serveur
 const youtube = google.youtube({
   version: 'v3',
   auth: process.env.YOUTUBE_API_KEY,
@@ -76,7 +74,7 @@ export async function validateYouTubeEmbed(videoId: string): Promise<{
     const regionRestriction = video.contentDetails?.regionRestriction;
     if (regionRestriction?.blocked && regionRestriction.blocked.length > 0) {
       return {
-        canEmbed: true,
+        canEmbed: false, // J'ai corrigé cette ligne pour refléter le blocage
         reason: 'Vidéo bloquée dans certaines régions.',
       };
     }
