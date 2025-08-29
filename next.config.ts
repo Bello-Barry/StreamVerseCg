@@ -1,6 +1,7 @@
 // Fichier: next.config.ts
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
+import { env } from './src/env.mjs'; // Réintroduction de l'import
 
 // Configuration PWA pour un support PWA robuste
 /**
