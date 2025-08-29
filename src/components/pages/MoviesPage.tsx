@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { uploadPoster } from '@/lib/uploadPoster';
-import { getYoutubeThumbnail, extractYouTubeIds } from '@/lib/youtubeUtils';
+import { getYoutubeThumbnail, extractYouTubeIds } from '@/lib/youtubeClientUtils';
+// L'import des actions serveur reste le même
 import { getYoutubeTitle, validateYouTubeEmbed } from '@/lib/actions';
 import { toast } from 'sonner';
 import { MovieCard } from '@/components/MovieCard';
