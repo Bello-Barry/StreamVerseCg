@@ -1,454 +1,188 @@
+// src/components/VideoModal.tsx
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Loader2, X, Play, Pause, Volume2, VolumeX, Maximize, 
-  SkipBack, SkipForward, Settings, Download, Share2,
-  Heart, Plus, Info, Star, Clock, Calendar, Tv
-} from 'lucide-react';
+import { Loader2, X, Play, Film } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { toast } from 'sonner';
-import { getYoutubeTitle } from '@/lib/getYoutubeTitle';
 
 type Props = {
   movie: Movie;
   onClose: () => void;
 };
 
-interface VideoProgress {
-  currentTime: number;
-  duration: number;
-  buffered: number;
-}
-
-interface VideoMetadata {
-  title: string;
-  description: string;
-  duration: string;
-  publishedAt: string;
-  viewCount: string;
-  channelTitle: string;
-}
-
-export default function AdvancedVideoModal({ movie, onClose }: Props) {
+export default function VideoModal({ movie, onClose }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(80);
-  const [showControls, setShowControls] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [embedBlocked, setEmbedBlocked] = useState(false);
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
-  const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
-  const [progress, setProgress] = useState<VideoProgress>({
-    currentTime: 0,
-    duration: 0,
-    buffered: 0
-  });
-  
-  const modalRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
-  
-  // URLs avec paramètres pour masquer l'interface YouTube
-  const getEmbedUrls = useCallback((movie: Movie) => {
-    const customParams = [
-      'rel=0',           // Pas de vidéos associées
-      'modestbranding=1', // Interface YouTube minimale
-      'showinfo=0',       // Pas d'infos vidéo
-      'controls=0',       // Masquer les contrôles YouTube
-      'disablekb=1',      // Désactiver raccourcis clavier YouTube
-      'fs=0',            // Pas de fullscreen YouTube
-      'iv_load_policy=3', // Pas d'annotations
-      'cc_load_policy=0', // Pas de sous-titres auto
-      'playsinline=1',   // Lecture inline
-      'autoplay=0',      // Pas d'autoplay
-      'start=0',         // Début à 0
-      'enablejsapi=1',   // API JS
-      'origin=' + window.location.origin
-    ].join('&');
-    
+
+  const getEmbedUrls = (movie: Movie) => {
+    const baseParams = 'rel=0&modestbranding=1&showinfo=0&controls=1';
     if (movie.type === 'playlist') {
       return {
-        primary: `https://www.youtube-nocookie.com/embed/videoseries?list=${movie.playlistid}&${customParams}`,
+        primary: `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&${baseParams}`,
         directLink: `https://www.youtube.com/playlist?list=${movie.playlistid}`,
       };
     }
     return {
-      primary: `https://www.youtube-nocookie.com/embed/${movie.youtubeid}?${customParams}`,
-      secondary: `https://www.youtube.com/embed/${movie.youtubeid}?${customParams}`,
+      primary: `https://www.youtube-nocookie.com/embed/${movie.youtubeid}?${baseParams}`,
+      secondary: `https://www.youtube.com/embed/${movie.youtubeid}?${baseParams}`,
       directLink: `https://www.youtube.com/watch?v=${movie.youtubeid}`,
     };
-  }, []);
+  };
 
   const urls = getEmbedUrls(movie);
   const embedUrls = movie.type === 'playlist' ? [urls.primary] : [urls.primary, urls.secondary];
 
-  // Chargement des métadonnées
   useEffect(() => {
-    const loadMetadata = async () => {
-      if (movie.youtubeid) {
-        try {
-          const title = await getYoutubeTitle(`https://www.youtube.com/watch?v=${movie.youtubeid}`);
-          if (title) {
-            setVideoMetadata({
-              title: title || movie.title,
-              description: movie.description || '',
-              duration: `${Math.floor(Math.random() * 120) + 60}min`,
-              publishedAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR'),
-              viewCount: `${(Math.random() * 10000000).toFixed(0)} vues`,
-              channelTitle: 'Chaîne YouTube'
-            });
-          }
-        } catch (error) {
-          console.warn('Erreur chargement métadonnées:', error);
-        }
-      }
-    };
-    loadMetadata();
-  }, [movie]);
-
-  // Gestion des contrôles
-  useEffect(() => {
-    const hideControls = () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      controlsTimeoutRef.current = setTimeout(() => {
-        if (isPlaying) setShowControls(false);
-      }, 3000);
-    };
-
-    if (isPlaying) {
-      hideControls();
-    } else {
-      setShowControls(true);
-    }
-
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, [isPlaying]);
-
-  // Reset lors du changement de film
-  useEffect(() => {
+    // reset states when movie changes
     setIsLoading(true);
     setHasError(false);
+    setEmbedBlocked(false);
     setCurrentUrlIndex(0);
-    setIsPlaying(false);
-    setProgress({ currentTime: 0, duration: 0, buffered: 0 });
   }, [movie?.id]);
 
-  // Timeout de chargement
   useEffect(() => {
     if (!isLoading) return;
-    
     const timeout = setTimeout(() => {
+      // si l'iframe reste bloquée, essayer l'url suivante ou afficher le blocage
       if (currentUrlIndex < embedUrls.length - 1) {
-        setCurrentUrlIndex(prev => prev + 1);
+        setCurrentUrlIndex((p) => p + 1);
         setIsLoading(true);
         setHasError(false);
       } else {
-        setHasError(true);
-        setIsLoading(false);
-        toast.error('Impossible de charger la vidéo');
+        setEmbedBlocked(true);
+        toast.error('Impossible de charger l’embed — essayez d’ouvrir sur YouTube.');
       }
-    }, 8000);
-
+    }, 5000);
     return () => clearTimeout(timeout);
   }, [isLoading, currentUrlIndex, embedUrls.length]);
 
-  // Gestionnaires d'événements
   const handleIframeLoad = () => {
     setIsLoading(false);
     setHasError(false);
-    toast.success('Vidéo chargée avec succès');
   };
 
   const handleIframeError = () => {
+    setIsLoading(false);
+    setHasError(true);
+    // essayer l'url suivante si existante
     if (currentUrlIndex < embedUrls.length - 1) {
-      setCurrentUrlIndex(prev => prev + 1);
+      setCurrentUrlIndex((p) => p + 1);
       setIsLoading(true);
-      setHasError(false);
     } else {
-      setHasError(true);
-      setIsLoading(false);
+      setEmbedBlocked(true);
+      toast.error('Embed bloqué ou erreur réseau — vous pouvez ouvrir sur YouTube.');
     }
-  };
-
-  const togglePlay = () => setIsPlaying(!isPlaying);
-  const toggleMute = () => setIsMuted(!isMuted);
-  
-  const handleVolumeChange = (newVolume: number) => {
-    setVolume(newVolume);
-    if (newVolume === 0) setIsMuted(true);
-    else if (isMuted) setIsMuted(false);
   };
 
   const openInYoutube = () => {
     window.open(urls.directLink, '_blank');
-    toast.info('Ouverture sur YouTube...');
   };
 
-  const handleDownload = () => {
-    toast.info('Téléchargement démarré...', { 
-      description: 'Le téléchargement de la vidéo a commencé en arrière-plan.'
-    });
-  };
-
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: movie.title,
-        text: movie.description,
-        url: urls.directLink
-      });
-    } else {
-      navigator.clipboard.writeText(urls.directLink);
-      toast.success('Lien copié dans le presse-papiers');
+  const openInNewTab = () => {
+    const newWindow = window.open('', '_blank');
+    if (!newWindow) {
+      toast.error('Impossible d’ouvrir un nouvel onglet (bloqué par le navigateur).');
+      return;
     }
-  };
-
-  const handleMouseMove = () => {
-    setShowControls(true);
+    newWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8"/>
+          <title>${movie.title}</title>
+          <style>html,body{height:100%;margin:0;background:#000}iframe{border:0;width:100%;height:100%}</style>
+        </head>
+        <body>
+          <iframe src="${embedUrls[currentUrlIndex]}" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture;"></iframe>
+        </body>
+      </html>
+    `);
   };
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-2 sm:p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      ref={modalRef}
-      onMouseMove={handleMouseMove}
+      aria-modal="true"
+      role="dialog"
     >
-      {/* Contenu principal */}
-      <div 
-        className="relative w-full h-full max-w-7xl mx-auto flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header avec informations */}
-        <AnimatePresence>
-          {showControls && (
-            <motion.div
-              initial={{ opacity: 0, y: -50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 mr-6">
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    {videoMetadata?.title || movie.title}
-                  </h1>
-                  <div className="flex items-center gap-4 text-sm text-gray-300 mb-3">
-                    <Badge variant="secondary" className="bg-red-600 text-white">
-                      {movie.type === 'playlist' ? 'SÉRIE' : 'FILM'}
-                    </Badge>
-                    {videoMetadata && (
-                      <>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {videoMetadata.publishedAt}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {videoMetadata.duration}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Tv className="h-4 w-4" />
-                          {videoMetadata.viewCount}
-                        </div>
-                      </>
-                    )}
+      <Card className="w-full max-w-6xl max-h-[95vh] p-2 sm:p-4 relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute top-2 right-2 z-20 rounded-full bg-black/70 hover:bg-black text-white"
+          onClick={onClose}
+          aria-label="Fermer"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+
+        <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.18 }}>
+          <div className="pr-10 mb-3">
+            <h2 className="text-lg sm:text-2xl font-bold truncate">{movie.title}</h2>
+            {movie.description && <p className="text-muted-foreground mt-1 text-sm line-clamp-2">{movie.description}</p>}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">{movie.category || 'Non classé'}</span>
+              <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded-full">{movie.type === 'playlist' ? 'Playlist' : 'Vidéo'}</span>
+            </div>
+          </div>
+
+          <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
+            {isLoading && !embedBlocked && (
+              <div className="absolute inset-0 bg-muted rounded-xl flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">{currentUrlIndex > 0 ? 'Tentative alternative...' : 'Chargement de la vidéo...'}</p>
+                </div>
+              </div>
+            )}
+
+            {(hasError || embedBlocked) && (
+              <div className="absolute inset-0 bg-destructive/10 rounded-xl flex items-center justify-center p-4">
+                <div className="text-center space-y-3">
+                  <div className="mx-auto">
+                    <X className="h-8 w-8 text-destructive mx-auto mb-1" />
+                    <p className="text-sm text-destructive font-medium">Contenu bloqué pour l'intégration</p>
+                    <p className="text-xs text-muted-foreground">Cette vidéo ne peut pas être lue ici — essayez sur YouTube.</p>
                   </div>
-                  {movie.description && (
-                    <p className="text-gray-300 text-sm line-clamp-2">
-                      {movie.description}
-                    </p>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleDownload}
-                    className="bg-gray-800 hover:bg-gray-700"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleShare}
-                    className="bg-gray-800 hover:bg-gray-700"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={onClose}
-                    className="bg-gray-800 hover:bg-gray-700"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
-        {/* Lecteur vidéo */}
-        <div className="flex-1 relative">
-          {isLoading && (
-            <div className="absolute inset-0 bg-black flex items-center justify-center z-10">
-              <div className="text-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <Loader2 className="h-12 w-12 text-white mb-4 mx-auto" />
-                </motion.div>
-                <h3 className="text-white text-lg font-semibold mb-2">
-                  Chargement de la vidéo...
-                </h3>
-                <p className="text-gray-400 text-sm">
-                  {currentUrlIndex > 0 ? 'Tentative alternative...' : 'Préparation du lecteur...'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {hasError && (
-            <div className="absolute inset-0 bg-black flex items-center justify-center z-10">
-              <div className="text-center space-y-4">
-                <X className="h-16 w-16 text-red-500 mx-auto" />
-                <h3 className="text-white text-xl font-semibold">
-                  Impossible de charger la vidéo
-                </h3>
-                <p className="text-gray-400 max-w-md">
-                  Cette vidéo ne peut pas être lue dans le lecteur intégré. 
-                  Vous pouvez l'ouvrir directement sur YouTube.
-                </p>
-                <Button onClick={openInYoutube} className="bg-red-600 hover:bg-red-700">
-                  <Play className="h-4 w-4 mr-2" />
-                  Ouvrir sur YouTube
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {!hasError && (
-            <iframe
-              ref={iframeRef}
-              key={currentUrlIndex}
-              className="w-full h-full"
-              src={embedUrls[currentUrlIndex]}
-              title={`${movie.title} - Lecteur vidéo`}
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
-              allowFullScreen
-              onLoad={handleIframeLoad}
-              onError={handleIframeError}
-              style={{ border: 'none' }}
-            />
-          )}
-        </div>
-
-        {/* Contrôles personnalisés */}
-        <AnimatePresence>
-          {showControls && !hasError && !isLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-6"
-            >
-              {/* Barre de progression */}
-              <div className="mb-4">
-                <Progress value={30} className="h-1 bg-gray-700" />
-              </div>
-
-              {/* Contrôles */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={togglePlay}
-                    className="text-white hover:bg-white/20"
-                  >
-                    {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipBack className="h-5 w-5" />
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipForward className="h-5 w-5" />
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleMute}
-                      className="text-white hover:bg-white/20"
-                    >
-                      {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                  <div className="flex gap-2 justify-center">
+                    <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={openInYoutube}>
+                      <Play className="h-4 w-4" /> Ouvrir sur YouTube
                     </Button>
-                    
-                    <div className="w-20">
-                      <Progress value={isMuted ? 0 : volume} className="h-1" />
-                    </div>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={openInNewTab}>
+                      <Film className="h-4 w-4" /> Nouvel onglet
+                    </Button>
                   </div>
-
-                  <span className="text-white text-sm">
-                    1:23 / 15:42
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={openInYoutube}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Maximize className="h-5 w-5" />
-                  </Button>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            )}
+
+            {!embedBlocked && (
+              <iframe
+                key={currentUrlIndex}
+                className="absolute top-0 left-0 w-full h-full rounded-xl"
+                src={embedUrls[currentUrlIndex]}
+                title={`Lecteur vidéo - ${movie.title}`}
+                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              />
+            )}
+          </div>
+        </motion.div>
+      </Card>
     </motion.div>
   );
 }
