@@ -1,238 +1,526 @@
-// stores/useFavoritesStore.ts
+// Fichier: src/stores/useMovieStore.ts
+'use client';
+
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { Movie, MovieInsert } from '@/types/movie';
 import { supabase } from '@/lib/supabase';
-import { Channel } from '@/types';
+import { toast } from 'sonner';
+import { validateYouTubeEmbed } from '@/lib/youtubeValidation';
 
-interface FavoriteRecord {
-  id: number;
-  channel_id: string;
-  channel_name: string;
-  channel_group: string | null;
-  created_at: string;
-  vote_count: number;
-}
-
-interface FavoritesState {
-  favorites: FavoriteRecord[];
+/**
+ * Interface pour l'état du store.
+ */
+interface MovieState {
+  movies: Movie[];
+  currentMovie: Movie | null;
+  favorites: string[]; // IDs des films favoris
+  watchHistory: string[]; // IDs des films regardés
   loading: boolean;
   error: string | null;
+  searchQuery: string;
+  sortBy: 'title' | 'date' | 'category';
+  sortOrder: 'asc' | 'desc';
+  embedBlocked: string[];
 }
 
-interface FavoritesStore extends FavoritesState {
-  // Actions de base
-  fetchFavorites: () => Promise<void>;
-  toggleFavorite: (channel: Channel) => Promise<void>;
-  addFavorite: (channel: Channel) => Promise<void>;
-  removeFavorite: (channelId: string) => Promise<void>;
-  isFavorite: (channelId: string) => boolean;
-  
-  // Actions étendues
-  clearAllFavorites: () => Promise<void>;
-  getFavoriteChannels: (allChannels: Channel[]) => Channel[];
-  getFavoritesByCategory: (allChannels: Channel[]) => Record<string, Channel[]>;
-  getFavoritesCount: () => number;
-  exportFavorites: () => string[];
-  importFavorites: (favoriteIds: string[], allChannels: Channel[]) => Promise<void>;
-  
-  // Nouvelles fonctionnalités collaboratives
-  getMostPopularFavorites: (limit?: number) => FavoriteRecord[];
-  getRecentFavorites: (limit?: number) => FavoriteRecord[];
+/**
+ * Interface pour les actions du store.
+ */
+interface MovieActions {
+  setCurrentMovie: (movie: Movie | null) => void;
+  fetchMovies: () => Promise<void>;
+  addMovie: (movie: MovieInsert) => Promise<void>;
+  updateMovie: (id: string, updates: Partial<MovieInsert>) => Promise<void>;
+  deleteMovie: (id: string) => Promise<void>;
+  toggleFavorite: (movieId: string) => void;
+  addToWatchHistory: (movieId: string) => void;
+  clearWatchHistory: () => void;
+  setSearchQuery: (query: string) => void;
+  setSorting: (sortBy: 'title' | 'date' | 'category', order: 'asc' | 'desc') => void;
+  getFilteredMovies: (category?: string) => Movie[];
+  getFavoriteMovies: () => Movie[];
+  getRecentMovies: (limit?: number) => Movie[];
+  duplicateMovie: (id: string) => Promise<void>;
+  markAsEmbedBlocked: (movieId: string) => void;
+  isEmbedBlocked: (movieId: string) => boolean;
+  validateMovieEmbed: (movieId: string) => Promise<boolean>;
+  getMovieStats: () => {
+    totalMovies: number;
+    totalPlaylists: number;
+    categoriesCount: Record<string, number>;
+    mostWatchedCategory: string;
+    recentlyWatchedCount: number;
+    embedBlockedCount: number;
+  };
 }
 
-export const useFavoritesStore = create<FavoritesStore>()((set, get) => ({
+const initialState: MovieState = {
+  movies: [],
+  currentMovie: null,
   favorites: [],
+  watchHistory: [],
   loading: false,
   error: null,
+  searchQuery: '',
+  sortBy: 'date',
+  sortOrder: 'desc',
+  embedBlocked: [],
+};
 
-  // Récupérer tous les favoris depuis Supabase
-  fetchFavorites: async () => {
-    set({ loading: true, error: null });
-    try {
-      const { data, error } = await supabase
-        .from('favorites')
-        .select('*')
-        .order('vote_count', { ascending: false });
+export const useMovieStore = create<MovieState & MovieActions>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
 
-      if (error) throw error;
-      
-      set({ favorites: data || [], loading: false });
-    } catch (error) {
-      console.error('Erreur lors du chargement des favoris:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Erreur inconnue',
-        loading: false 
-      });
-    }
-  },
+      /**
+       * Définit le film actuellement sélectionné et l'ajoute à l'historique.
+       */
+      setCurrentMovie: (movie) => {
+        if (movie) {
+          get().addToWatchHistory(movie.id);
+        }
+        set({ currentMovie: movie });
+      },
 
-  // Basculer le statut favori d'une chaîne
-  toggleFavorite: async (channel: Channel) => {
-    const { favorites } = get();
-    const existingFavorite = favorites.find(f => f.channel_id === channel.id);
-    
-    if (existingFavorite) {
-      await get().removeFavorite(channel.id);
-    } else {
-      await get().addFavorite(channel);
-    }
-  },
+      /**
+       * Récupère la liste des films depuis la base de données Supabase.
+       */
+      fetchMovies: async () => {
+        set({ loading: true, error: null });
+        try {
+          const { data, error } = await supabase
+            .from('movies')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-  // Ajouter une chaîne aux favoris
-  addFavorite: async (channel: Channel) => {
-    try {
-      // Vérifier si la chaîne existe déjà
-      const { data: existing } = await supabase
-        .from('favorites')
-        .select('*')
-        .eq('channel_id', channel.id)
-        .single();
+          if (error) {
+            throw error;
+          }
 
-      if (existing) {
-        // Si elle existe, incrémenter le vote_count
-        const { error } = await supabase
-          .from('favorites')
-          .update({ vote_count: existing.vote_count + 1 })
-          .eq('channel_id', channel.id);
-
-        if (error) throw error;
-      } else {
-        // Si elle n'existe pas, la créer
-        const { error } = await supabase
-          .from('favorites')
-          .insert({
-            channel_id: channel.id,
-            channel_name: channel.name,
-            channel_group: channel.group || null,
-            vote_count: 1
+          if (data) {
+            const movies: Movie[] = data.map(row => ({
+              id: row.id,
+              title: row.title,
+              description: row.description || undefined,
+              youtubeid: row.youtubeid || undefined,
+              playlistid: row.playlistid || undefined,
+              poster: row.poster || undefined,
+              type: row.type || 'video',
+              category: row.category || undefined,
+              createdAt: row.created_at,
+            }));
+            set({ movies });
+          }
+        } catch (err) {
+          const errorMessage = `Échec de la récupération des films: ${
+            err instanceof Error ? err.message : 'Erreur inconnue'
+          }`;
+          console.error(errorMessage, err);
+          set({ error: errorMessage });
+          toast.error('Erreur de chargement', {
+            description: 'Impossible de récupérer la liste des films.',
           });
+        } finally {
+          set({ loading: false });
+        }
+      },
 
-        if (error) throw error;
-      }
+      /**
+       * Ajoute un nouveau film avec validation étendue et vérification d'embed.
+       */
+      addMovie: async (movieData) => {
+        set({ loading: true, error: null });
+        try {
+          const { movies } = get();
+          const isDuplicate = movies.some(
+            (movie) =>
+              (movie.youtubeid && movie.youtubeid === movieData.youtubeid) ||
+              (movie.playlistid && movie.playlistid === movieData.playlistid)
+          );
 
-      // Recharger les favoris
-      await get().fetchFavorites();
-    } catch (error) {
-      console.error('Erreur lors de l\'ajout aux favoris:', error);
-      set({ error: error instanceof Error ? error.message : 'Erreur inconnue' });
-    }
-  },
+          if (isDuplicate) {
+            toast.warning('Contenu déjà existant', {
+              description: 'Ce film ou cette série existe déjà dans votre collection.',
+            });
+            return;
+          }
 
-  // Retirer une chaîne des favoris
-  removeFavorite: async (channelId: string) => {
-    try {
-      const { data: existing } = await supabase
-        .from('favorites')
-        .select('*')
-        .eq('channel_id', channelId)
-        .single();
+          // Validation de l'URL YouTube si fournie
+          if (movieData.youtubeid) {
+            try {
+              const validation = await validateYouTubeEmbed(movieData.youtubeid);
+              if (!validation.canEmbed) {
+                toast.warning("Avertissement d'intégration", {
+                  description: `${validation.reason}. Le contenu sera ajouté mais pourrait ne pas être lisible directement.`,
+                });
+                set((state) => ({
+                  embedBlocked: [...state.embedBlocked, movieData.youtubeid!],
+                }));
+              }
+            } catch (error) {
+              console.warn('Validation YouTube échouée:', error);
+            }
+          }
 
-      if (existing) {
-        if (existing.vote_count > 1) {
-          // Si vote_count > 1, décrémenter
-          const { error } = await supabase
-            .from('favorites')
-            .update({ vote_count: existing.vote_count - 1 })
-            .eq('channel_id', channelId);
+          const { data, error } = await supabase
+            .from('movies')
+            .insert({
+              ...movieData,
+              description: movieData.description || null,
+              youtubeid: movieData.youtubeid || null,
+              playlistid: movieData.playlistid || null,
+              poster: movieData.poster || null,
+              category: movieData.category || null,
+            })
+            .select()
+            .single();
 
           if (error) throw error;
-        } else {
-          // Si vote_count = 1, supprimer complètement
-          const { error } = await supabase
-            .from('favorites')
-            .delete()
-            .eq('channel_id', channelId);
+
+          if (data) {
+            const newMovie: Movie = {
+              id: data.id,
+              title: data.title,
+              description: data.description || undefined,
+              youtubeid: data.youtubeid || undefined,
+              playlistid: data.playlistid || undefined,
+              poster: data.poster || undefined,
+              type: data.type || 'video',
+              category: data.category || undefined,
+              createdAt: data.created_at,
+            };
+
+            set((state) => ({
+              movies: [newMovie, ...state.movies],
+            }));
+
+            toast.success('Film ajouté avec succès !', {
+              description: `"${newMovie.title}" est maintenant dans votre collection.`,
+              action: {
+                label: 'Voir',
+                onClick: () => get().setCurrentMovie(newMovie),
+              },
+            });
+          }
+        } catch (err) {
+          const errorMessage = `Échec de l'ajout du film: ${
+            err instanceof Error ? err.message : 'Erreur inconnue'
+          }`;
+          console.error(errorMessage, err);
+          set({ error: errorMessage });
+          toast.error("Échec de l'ajout", {
+            description: "Le film n'a pas pu être ajouté.",
+          });
+          throw err;
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      /**
+       * Met à jour un film existant.
+       */
+      updateMovie: async (id, updates) => {
+        set({ loading: true, error: null });
+        try {
+          const { data, error } = await supabase
+            .from('movies')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
 
           if (error) throw error;
+
+          if (data) {
+            const updatedMovie: Movie = {
+              id: data.id,
+              title: data.title,
+              description: data.description || undefined,
+              youtubeid: data.youtubeid || undefined,
+              playlistid: data.playlistid || undefined,
+              poster: data.poster || undefined,
+              type: data.type || 'video',
+              category: data.category || undefined,
+              createdAt: data.created_at,
+            };
+
+            set((state) => ({
+              movies: state.movies.map((movie) =>
+                movie.id === id ? updatedMovie : movie
+              ),
+              currentMovie: state.currentMovie?.id === id ? updatedMovie : state.currentMovie,
+            }));
+
+            toast.success('Film mis à jour avec succès !');
+          }
+        } catch (err) {
+          const errorMessage = `Échec de la mise à jour: ${
+            err instanceof Error ? err.message : 'Erreur inconnue'
+          }`;
+          console.error(errorMessage, err);
+          set({ error: errorMessage });
+          toast.error('Échec de la mise à jour', {
+            description: "Le film n'a pas pu être mis à jour.",
+          });
+          throw err;
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      /**
+       * Supprime un film avec confirmation.
+       */
+      deleteMovie: async (id) => {
+        const movieToDelete = get().movies.find((m) => m.id === id);
+        if (!movieToDelete) return;
+
+        set({ loading: true, error: null });
+        try {
+          const { error } = await supabase.from('movies').delete().eq('id', id);
+
+          if (error) throw error;
+
+          set((state) => ({
+            movies: state.movies.filter((movie) => movie.id !== id),
+            favorites: state.favorites.filter((fav) => fav !== id),
+            watchHistory: state.watchHistory.filter((hist) => hist !== id),
+            embedBlocked: state.embedBlocked.filter((blocked) => blocked !== movieToDelete.youtubeid),
+            currentMovie: state.currentMovie?.id === id ? null : state.currentMovie,
+          }));
+
+          toast.success(`"${movieToDelete.title}" supprimé avec succès !`);
+        } catch (err) {
+          const errorMessage = `Échec de la suppression: ${
+            err instanceof Error ? err.message : 'Erreur inconnue'
+          }`;
+          console.error(errorMessage, err);
+          set({ error: errorMessage });
+          toast.error('Échec de la suppression', {
+            description: "Le film n'a pas pu être supprimé.",
+          });
+          throw err;
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      /**
+       * Bascule le statut favori d'un film.
+       */
+      toggleFavorite: (movieId) => {
+        set((state) => {
+          const isFavorite = state.favorites.includes(movieId);
+          const movie = state.movies.find((m) => m.id === movieId);
+          if (!movie) return state;
+
+          if (isFavorite) {
+            toast.info(`"${movie.title}" retiré des favoris`);
+            return {
+              favorites: state.favorites.filter((id) => id !== movieId),
+            };
+          } else {
+            toast.success(`"${movie.title}" ajouté aux favoris ⭐`);
+            return {
+              favorites: [...state.favorites, movieId],
+            };
+          }
+        });
+      },
+
+      /**
+       * Ajoute un film à l'historique de visionnage.
+       */
+      addToWatchHistory: (movieId) => {
+        set((state) => {
+          const newHistory = [movieId, ...state.watchHistory.filter((id) => id !== movieId)];
+          return {
+            watchHistory: newHistory.slice(0, 50), // Limite à 50 entrées
+          };
+        });
+      },
+
+      /**
+       * Efface l'historique de visionnage.
+       */
+      clearWatchHistory: () => {
+        set({ watchHistory: [] });
+        toast.success('Historique effacé');
+      },
+
+      /**
+       * Définit la requête de recherche.
+       */
+      setSearchQuery: (query) => {
+        set({ searchQuery: query });
+      },
+
+      /**
+       * Définit les paramètres de tri.
+       */
+      setSorting: (sortBy, order) => {
+        set({ sortBy, sortOrder: order });
+      },
+
+      /**
+       * Marque un film comme ayant l'embed bloqué.
+       */
+      markAsEmbedBlocked: (youtubeId) => {
+        set((state) => {
+          if (state.embedBlocked.includes(youtubeId)) return state;
+          return {
+            embedBlocked: [...state.embedBlocked, youtubeId],
+          };
+        });
+      },
+
+      /**
+       * Vérifie si l'embed d'un film est bloqué.
+       */
+      isEmbedBlocked: (youtubeId) => {
+        return get().embedBlocked.includes(youtubeId);
+      },
+
+      /**
+       * Valide si l'embed d'un film fonctionne.
+       */
+      validateMovieEmbed: async (movieId) => {
+        const movie = get().movies.find((m) => m.id === movieId);
+        if (!movie?.youtubeid) return false;
+
+        try {
+          const validation = await validateYouTubeEmbed(movie.youtubeid);
+          if (!validation.canEmbed) {
+            get().markAsEmbedBlocked(movie.youtubeid);
+            return false;
+          }
+          set((state) => ({
+            embedBlocked: state.embedBlocked.filter((id) => id !== movie.youtubeid),
+          }));
+          return true;
+        } catch (error) {
+          console.error('Erreur validation embed:', error);
+          return false;
+        }
+      },
+
+      /**
+       * Retourne les films filtrés selon les critères actuels.
+       */
+      getFilteredMovies: (category) => {
+        const state = get();
+        let filtered = state.movies;
+
+        if (category && category !== 'All') {
+          filtered = filtered.filter((movie) => movie.category === category);
         }
 
-        // Recharger les favoris
-        await get().fetchFavorites();
-      }
-    } catch (error) {
-      console.error('Erreur lors de la suppression des favoris:', error);
-      set({ error: error instanceof Error ? error.message : 'Erreur inconnue' });
+        if (state.searchQuery) {
+          const query = state.searchQuery.toLowerCase();
+          filtered = filtered.filter(
+            (movie) =>
+              movie.title.toLowerCase().includes(query) ||
+              movie.description?.toLowerCase().includes(query) ||
+              movie.category?.toLowerCase().includes(query)
+          );
+        }
+
+        filtered.sort((a, b) => {
+          let comparison = 0;
+          switch (state.sortBy) {
+            case 'title':
+              comparison = a.title.localeCompare(b.title);
+              break;
+            case 'date':
+              comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+              break;
+            case 'category':
+              comparison = (a.category || '').localeCompare(b.category || '');
+              break;
+          }
+          return state.sortOrder === 'desc' ? -comparison : comparison;
+        });
+
+        return filtered;
+      },
+
+      /**
+       * Retourne les films favoris.
+       */
+      getFavoriteMovies: () => {
+        const state = get();
+        return state.movies.filter((movie) => state.favorites.includes(movie.id));
+      },
+
+      /**
+       * Retourne les films récents.
+       */
+      getRecentMovies: (limit = 5) => {
+        return get().movies.slice(0, limit);
+      },
+
+      /**
+       * Duplique un film existant.
+       */
+      duplicateMovie: async (id) => {
+        const originalMovie = get().movies.find((m) => m.id === id);
+        if (!originalMovie) return;
+
+        const duplicateData: MovieInsert = {
+          title: `${originalMovie.title} (Copie)`,
+          description: originalMovie.description,
+          youtubeid: originalMovie.youtubeid,
+          playlistid: originalMovie.playlistid,
+          poster: originalMovie.poster,
+          type: originalMovie.type,
+          category: originalMovie.category,
+        };
+        await get().addMovie(duplicateData);
+      },
+
+      /**
+       * Retourne les statistiques de la collection.
+       */
+      getMovieStats: () => {
+        const state = get();
+        const movies = state.movies;
+        const totalMovies = movies.filter((m) => m.type === 'video').length;
+        const totalPlaylists = movies.filter((m) => m.type === 'playlist').length;
+
+        const categoriesCount = movies.reduce((acc, movie) => {
+          const category = movie.category || 'Non classé';
+          acc[category] = (acc[category] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const mostWatchedCategory = Object.entries(categoriesCount).sort(([, a], [, b]) => b - a)[0]?.[0] || 'Aucune';
+        const recentlyWatchedCount = state.watchHistory.length;
+        const embedBlockedCount = state.embedBlocked.length;
+
+        return {
+          totalMovies,
+          totalPlaylists,
+          categoriesCount,
+          mostWatchedCategory,
+          recentlyWatchedCount,
+          embedBlockedCount,
+        };
+      },
+    }),
+    {
+      name: 'movie-store',
+      storage: createJSONStorage(() => localStorage),
+      // Persiste uniquement les parties de l'état nécessaires pour le client
+      partialize: (state) => ({
+        favorites: state.favorites,
+        watchHistory: state.watchHistory,
+        embedBlocked: state.embedBlocked,
+        searchQuery: state.searchQuery,
+        sortBy: state.sortBy,
+        sortOrder: state.sortOrder,
+      }),
     }
-  },
-
-  // Vérifier si une chaîne est dans les favoris
-  isFavorite: (channelId: string) => {
-    const { favorites } = get();
-    return favorites.some(f => f.channel_id === channelId);
-  },
-
-  // Supprimer tous les favoris
-  clearAllFavorites: async () => {
-    try {
-      const { error } = await supabase
-        .from('favorites')
-        .delete()
-        .gte('id', 0); // Supprimer tous les enregistrements
-
-      if (error) throw error;
-      
-      set({ favorites: [] });
-    } catch (error) {
-      console.error('Erreur lors de la suppression de tous les favoris:', error);
-      set({ error: error instanceof Error ? error.message : 'Erreur inconnue' });
-    }
-  },
-
-  // Obtenir les chaînes favorites à partir de toutes les chaînes
-  getFavoriteChannels: (allChannels: Channel[]) => {
-    const { favorites } = get();
-    const favoriteIds = favorites.map(f => f.channel_id);
-    return allChannels.filter(channel => favoriteIds.includes(channel.id));
-  },
-
-  // Grouper les favoris par catégorie
-  getFavoritesByCategory: (allChannels: Channel[]) => {
-    const favoriteChannels = get().getFavoriteChannels(allChannels);
-    const categoryMap: Record<string, Channel[]> = {};
-    
-    favoriteChannels.forEach(channel => {
-      const category = channel.group || 'Non défini';
-      if (!categoryMap[category]) {
-        categoryMap[category] = [];
-      }
-      categoryMap[category].push(channel);
-    });
-    
-    return categoryMap;
-  },
-
-  // Obtenir le nombre de favoris
-  getFavoritesCount: () => get().favorites.length,
-
-  // Exporter les favoris (IDs seulement)
-  exportFavorites: () => get().favorites.map(f => f.channel_id),
-
-  // Importer des favoris
-  importFavorites: async (favoriteIds: string[], allChannels: Channel[]) => {
-    try {
-      const channelsToImport = allChannels.filter(ch => favoriteIds.includes(ch.id));
-      
-      for (const channel of channelsToImport) {
-        await get().addFavorite(channel);
-      }
-    } catch (error) {
-      console.error('Erreur lors de l\'importation des favoris:', error);
-      set({ error: error instanceof Error ? error.message : 'Erreur inconnue' });
-    }
-  },
-
-  // Obtenir les favoris les plus populaires
-  getMostPopularFavorites: (limit = 10) => {
-    const { favorites } = get();
-    return favorites
-      .sort((a, b) => b.vote_count - a.vote_count)
-      .slice(0, limit);
-  },
-
-  // Obtenir les favoris récents
-  getRecentFavorites: (limit = 10) => {
-    const { favorites } = get();
-    return favorites
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, limit);
-  }
-}));
+  )
+);
