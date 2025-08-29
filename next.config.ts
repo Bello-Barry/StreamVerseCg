@@ -1,7 +1,6 @@
 // Fichier: next.config.ts
 import type { NextConfig } from 'next';
 import withPWA from 'next-pwa';
-import { env } from './src/env.mjs'; // Réintroduction de l'import
 
 // Configuration PWA pour un support PWA robuste
 /**
@@ -59,7 +58,7 @@ const nextConfig: NextConfig = {
   // Transpiler les modules nécessaires
   transpilePackages: ['webtorrent'],
 
-  // Optimisation des images.
+  // Optimisation des images
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: '**' },
@@ -73,20 +72,24 @@ const nextConfig: NextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
+          // ❌ Supprimé car ça bloque les iframes YouTube
+          // { key: 'X-Frame-Options', value: 'DENY' },
+
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self' 'unsafe-inline';
-                    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com;
-                    style-src 'self' 'unsafe-inline' 'unsafe-eval';
-                    img-src 'self' data: http: https: blob:;
-                    connect-src 'self' data: ws: http: https:;
-                    media-src 'self' data: blob: https://www.youtube.com https://s.ytimg.com;
-                    frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;
-                    font-src 'self' data:`,
+            value: `
+              default-src 'self' 'unsafe-inline';
+              script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://s.ytimg.com;
+              style-src 'self' 'unsafe-inline' 'unsafe-eval';
+              img-src 'self' data: http: https: blob: https://i.ytimg.com;
+              connect-src 'self' data: ws: http: https:;
+              media-src 'self' data: blob: http: https:;
+              frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;
+              font-src 'self' data:;
+            `,
           },
         ],
       },
