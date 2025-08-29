@@ -41,6 +41,8 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(80);
   const [showControls, setShowControls] = useState(true);
+  // Correction de l'erreur: déclaration de l'état pour l'index de l'URL
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
   const [progress, setProgress] = useState<VideoProgress>({
     currentTime: 0,
@@ -50,7 +52,6 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
 
   const modalRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  // Correction de l'erreur: useRef doit être initialisé avec une valeur
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // URLs avec paramètres pour masquer l'interface YouTube
