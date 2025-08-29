@@ -5,7 +5,7 @@ import { useMovieStore } from '@/stores/useMovieStore';
 import { useAuth } from '@/hooks/useAuth';
 import { Movie } from '@/types/movie';
 import { Button } from '@/components/ui/button';
-import MovieCard from '@/components/movies/MovieCard';
+import MovieCard from '@/components/MovieCard';
 import VideoModal from '@/components/movies/VideoModal';
 
 export default function MoviesPage() {
