@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { uploadPoster } from '@/lib/uploadPoster';
 import { getYoutubeThumbnail, extractYouTubeIds } from '@/lib/youtubeClientUtils';
-import { getYoutubeTitle } from '@/lib/getYoutubeTitle'; // Utilisation de votre fonction
+import { getYoutubeTitle } from '@/lib/getYoutubeTitle';
 import { toast } from 'sonner';
 import { MovieCard } from '@/components/MovieCard';
 import { X, Loader2, LogIn, Upload, Film, Play, Search, Grid3X3, List, Heart, Download, Plus, Sparkles, TrendingUp, Filter } from 'lucide-react';
@@ -114,7 +114,7 @@ export default function MoviesPage() {
     fetchMovies();
   }, [fetchMovies]);
 
-  // Fonction améliorée utilisant votre getYoutubeTitle
+  // Fonction améliorée utilisant getYoutubeTitle
   const handleUrlChange = useCallback(async (url: string) => {
     setFormData(prev => ({ ...prev, url }));
     if (!url) return;
@@ -124,8 +124,7 @@ export default function MoviesPage() {
       try {
         const { videoId, playlistId } = extractYouTubeIds(url);
         if (videoId || playlistId) {
-          // Utilisation directe de votre fonction getYoutubeTitle
-          const title = await getYoutubeTitle(url); // Votre fonction prend l'URL complète
+          const title = await getYoutubeTitle(url);
           if (title) {
             setFormData(prev => ({
               ...prev,
@@ -251,7 +250,22 @@ export default function MoviesPage() {
     );
   }, []);
 
-  // Filtrage et tri des films
+  // Fonction helper pour obtenir la date de création
+  const getCreatedDate = useCallback((movie: Movie): number => {
+    // Essayez différentes propriétés possibles selon votre modèle Movie
+    if ('createdAt' in movie && movie.createdAt) {
+      return new Date(movie.createdAt).getTime();
+    }
+    if ('created_at' in movie && (movie as any).created_at) {
+      return new Date((movie as any).created_at).getTime();
+    }
+    if ('updatedAt' in movie && movie.updatedAt) {
+      return new Date(movie.updatedAt).getTime();
+    }
+    return 0;
+  }, []);
+
+  // Filtrage et tri des films - CORRIGÉ
   const filteredAndSortedMovies = useMemo(() => {
     let filtered = movies.filter(movie => {
       const matchesCategory = filterCategory === 'All' || movie.category === filterCategory;
@@ -261,7 +275,7 @@ export default function MoviesPage() {
       return matchesCategory && matchesSearch;
     });
 
-    // Tri
+    // Tri corrigé
     filtered.sort((a, b) => {
       switch (sortMode) {
         case 'title':
@@ -272,7 +286,7 @@ export default function MoviesPage() {
           return a.type.localeCompare(b.type);
         case 'recent':
         default:
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+          return getCreatedDate(b) - getCreatedDate(a);
       }
     });
 
@@ -281,7 +295,7 @@ export default function MoviesPage() {
       isFavorite: favorites.has(movie.id),
       isInWatchlist: watchlist.has(movie.id)
     })) as MovieWithMetadata[];
-  }, [movies, filterCategory, searchQuery, sortMode, favorites, watchlist]);
+  }, [movies, filterCategory, searchQuery, sortMode, favorites, watchlist, getCreatedDate]);
 
   const handleMovieSelect = useCallback((movie: Movie) => {
     if (!movie.youtubeid && !movie.playlistid) {
@@ -494,7 +508,12 @@ export default function MoviesPage() {
         </AnimatePresence>
 
         {/* Barre de recherche et filtres */}
-        <div className="space-y-4">
+        <motion.div 
+          className="space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
           {/* Recherche */}
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -565,13 +584,14 @@ export default function MoviesPage() {
             <span>•</span>
             <span>{watchlist.size} en attente</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Message si aucun contenu */}
         {filteredAndSortedMovies.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
           >
             <Card className="p-12 text-center bg-gray-800/30 border-gray-700">
               <Film className="mx-auto h-16 w-16 text-gray-500 mb-4" />
@@ -584,6 +604,16 @@ export default function MoviesPage() {
                   : 'Commencez par ajouter vos premiers films et séries pour créer votre collection personnalisée.'
                 }
               </p>
+              {searchQuery && (
+                <Button
+                  variant="outline"
+                  onClick={() => setSearchQuery('')}
+                  className="mt-4 bg-gray-800 border-gray-700 text-gray-300 hover:text-white"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Effacer la recherche
+                </Button>
+              )}
             </Card>
           </motion.div>
         )}
@@ -597,39 +627,159 @@ export default function MoviesPage() {
             }
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, staggerChildren: 0.1 }}
+            transition={{ duration: 0.5, staggerChildren: 0.05 }}
           >
-            {filteredAndSortedMovies.map((movie, index) => (
-              <motion.div
-                key={movie.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <MovieCard 
-                  movie={movie} 
-                  onClick={() => handleMovieSelect(movie)}
-                  onToggleFavorite={handleToggleFavorite}
-                  onAddToWatchlist={handleToggleWatchlist}
-                  onDownload={handleDownload}
-                  isFavorite={movie.isFavorite}
-                  isInWatchlist={movie.isInWatchlist}
-                />
-              </motion.div>
-            ))}
+            <AnimatePresence>
+              {filteredAndSortedMovies.map((movie, index) => (
+                <motion.div
+                  key={movie.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ delay: index * 0.03 }}
+                  layout
+                >
+                  <MovieCard 
+                    movie={movie} 
+                    onClick={() => handleMovieSelect(movie)}
+                    onToggleFavorite={handleToggleFavorite}
+                    onAddToWatchlist={handleToggleWatchlist}
+                    onDownload={handleDownload}
+                    isFavorite={movie.isFavorite}
+                    isInWatchlist={movie.isInWatchlist}
+                    viewMode={viewMode}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </motion.div>
+        )}
+
+        {/* Actions flottantes pour mobile */}
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="flex flex-col gap-3">
+            {user && !showAddForm && (
+              <Button
+                onClick={() => setShowAddForm(true)}
+                className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-2xl shadow-purple-500/25 border-0"
+                size="icon"
+              >
+                <Plus className="h-6 w-6 text-white" />
+              </Button>
+            )}
+            
+            {/* Bouton de retour en haut */}
+            <Button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              variant="outline"
+              className="w-14 h-14 rounded-full bg-gray-800/80 backdrop-blur-sm border-gray-700 hover:bg-gray-700"
+              size="icon"
+            >
+              <TrendingUp className="h-5 w-5 text-gray-300 rotate-180" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Shortcuts clavier */}
+        {user && (
+          <div className="hidden lg:block fixed bottom-6 left-6 z-40">
+            <Card className="bg-gray-800/80 backdrop-blur-sm border-gray-700 p-4">
+              <div className="text-xs text-gray-400 space-y-1">
+                <div className="font-semibold text-gray-300 mb-2">Raccourcis clavier</div>
+                <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Ctrl + K</kbd> Recherche</div>
+                <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">A</kbd> Ajouter</div>
+                <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">G</kbd> Grille</div>
+                <div><kbd className="px-2 py-1 bg-gray-700 rounded text-xs">L</kbd> Liste</div>
+              </div>
+            </Card>
+          </div>
         )}
       </div>
 
-      {/* Modal vidéo */}
+      {/* Modal vidéo avec gestion améliorée */}
       <AnimatePresence>
         {currentMovie && (
           <AdvancedVideoModal 
             movie={currentMovie} 
-            onClose={() => setCurrentMovie(null)} 
+            onClose={() => setCurrentMovie(null)}
+            onNext={() => {
+              const currentIndex = filteredAndSortedMovies.findIndex(m => m.id === currentMovie.id);
+              const nextMovie = filteredAndSortedMovies[currentIndex + 1];
+              if (nextMovie) setCurrentMovie(nextMovie);
+            }}
+            onPrevious={() => {
+              const currentIndex = filteredAndSortedMovies.findIndex(m => m.id === currentMovie.id);
+              const previousMovie = filteredAndSortedMovies[currentIndex - 1];
+              if (previousMovie) setCurrentMovie(previousMovie);
+            }}
+            hasNext={filteredAndSortedMovies.findIndex(m => m.id === currentMovie.id) < filteredAndSortedMovies.length - 1}
+            hasPrevious={filteredAndSortedMovies.findIndex(m => m.id === currentMovie.id) > 0}
           />
         )}
       </AnimatePresence>
+
+      {/* Effet de particules de fond (optionnel) */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-purple-500/20 rounded-full animate-pulse" 
+             style={{ animationDelay: '0s', animationDuration: '3s' }} />
+        <div className="absolute top-1/3 right-1/4 w-1 h-1 bg-blue-500/20 rounded-full animate-pulse" 
+             style={{ animationDelay: '1s', animationDuration: '4s' }} />
+        <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-purple-400/15 rounded-full animate-pulse" 
+             style={{ animationDelay: '2s', animationDuration: '5s' }} />
+        <div className="absolute bottom-1/4 right-1/3 w-1 h-1 bg-blue-400/15 rounded-full animate-pulse" 
+             style={{ animationDelay: '1.5s', animationDuration: '3.5s' }} />
+      </div>
+
+      {/* Gestion des raccourcis clavier */}
+      {typeof window !== 'undefined' && (
+        <div className="hidden">
+          {/* Écouteur d'événements clavier via useEffect - sera géré dans le composant */}
+        </div>
+      )}
     </div>
   );
+
+  // Effet pour les raccourcis clavier
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Éviter les conflits avec les champs de saisie
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case 'a':
+          if (user && !showAddForm) {
+            e.preventDefault();
+            setShowAddForm(true);
+          }
+          break;
+        case 'g':
+          e.preventDefault();
+          setViewMode('grid');
+          break;
+        case 'l':
+          e.preventDefault();
+          setViewMode('list');
+          break;
+        case 'escape':
+          if (currentMovie) {
+            setCurrentMovie(null);
+          } else if (showAddForm) {
+            setShowAddForm(false);
+          }
+          break;
+        case 'k':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const searchInput = document.querySelector('input[placeholder*="Rechercher"]') as HTMLInputElement;
+            searchInput?.focus();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user, showAddForm, currentMovie, setCurrentMovie, setShowAddForm]);
 }
