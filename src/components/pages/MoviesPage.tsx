@@ -252,15 +252,22 @@ export default function MoviesPage() {
 
   // Fonction helper pour obtenir la date de création
   const getCreatedDate = useCallback((movie: Movie): number => {
-    // Essayez différentes propriétés possibles selon votre modèle Movie
-    if ('createdAt' in movie && movie.createdAt) {
-      return new Date(movie.createdAt).getTime();
+    // Cast explicite pour gérer les propriétés optionnelles
+    const movieWithDates = movie as Movie & {
+      createdAt?: string | Date;
+      created_at?: string | Date;
+      updatedAt?: string | Date;
+    };
+
+    // Priorité : createdAt > created_at > updatedAt
+    if (movieWithDates.createdAt) {
+      return new Date(movieWithDates.createdAt).getTime();
     }
-    if ('created_at' in movie && (movie as any).created_at) {
-      return new Date((movie as any).created_at).getTime();
+    if (movieWithDates.created_at) {
+      return new Date(movieWithDates.created_at).getTime();
     }
-    if ('updatedAt' in movie && movie.updatedAt) {
-      return new Date(movie.updatedAt).getTime();
+    if (movieWithDates.updatedAt) {
+      return new Date(movieWithDates.updatedAt).getTime();
     }
     return 0;
   }, []);
