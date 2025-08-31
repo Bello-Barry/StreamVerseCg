@@ -4,11 +4,9 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import {
-  Loader2, X, Play, Pause, Volume2, VolumeX, Maximize,
-  SkipBack, SkipForward, Settings, Download, Share2,
-  Heart, Plus, Info, Star, Clock, Calendar, Tv
+  Loader2, X, Download, Share2, Maximize,
+  Calendar, Clock, Tv, AlertCircle, RotateCcw
 } from 'lucide-react';
 import type { Movie } from '@/types/movie';
 import { toast } from 'sonner';
@@ -19,12 +17,6 @@ type Props = {
   onClose: () => void;
 };
 
-interface VideoProgress {
-  currentTime: number;
-  duration: number;
-  buffered: number;
-}
-
 interface VideoMetadata {
   title: string;
   description: string;
@@ -34,9 +26,27 @@ interface VideoMetadata {
   channelTitle: string;
 }
 
+// Amélioration 1: Constantes pour la configuration
+const IFRAME_TIMEOUT = 10000; // 10 secondes
+const CONTROLS_HIDE_DELAY = 4000; // 4 secondes
+const RETRY_ATTEMPTS = 3;
+
+// Amélioration 2: Interface pour l'état de chargement
+interface LoadingState {
+  isLoading: boolean;
+  hasError: boolean;
+  errorMessage?: string;
+  attemptCount: number;
+}
+
 export default function AdvancedVideoModal({ movie, onClose }: Props) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  // Amélioration 3: État unifié pour le chargement
+  const [loadingState, setLoadingState] = useState<LoadingState>({
+    isLoading: true,
+    hasError: false,
+    attemptCount: 0
+  });
+  
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
   const [showControls, setShowControls] = useState(true);
@@ -44,173 +54,264 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
   const modalRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // CORRECTION PRINCIPALE: URLs avec contrôles YouTube activés
-  const getEmbedUrls = useCallback((movie: Movie) => {
-    const customParams = [
-      'rel=0',           // Pas de vidéos associées
-      'modestbranding=1', // Interface YouTube minimale
-      'showinfo=0',       // Pas d'infos vidéo
-      'controls=1',       // CORRECTION: Garder les contrôles YouTube (était 0)
-      'fs=1',             // CORRECTION: Autoriser le fullscreen (était 0)
-      'iv_load_policy=3', // Pas d'annotations
-      'cc_load_policy=0', // Pas de sous-titres auto
-      'playsinline=1',    // Lecture inline
-      'autoplay=0',       // Pas d'autoplay
-      'enablejsapi=1',    // API JS pour les interactions
-      'origin=' + encodeURIComponent(window.location.origin)
-    ].join('&');
+  // Amélioration 4: Fonction de génération d'URLs plus robuste
+  const generateEmbedUrls = useCallback((movie: Movie) => {
+    if (!movie.youtubeid && !movie.playlistid) {
+      throw new Error('Aucun ID YouTube trouvé');
+    }
 
-    if (movie.type === 'playlist') {
+    const baseParams = new URLSearchParams({
+      rel: '0',
+      modestbranding: '1',
+      showinfo: '0',
+      controls: '1',
+      fs: '1',
+      iv_load_policy: '3',
+      cc_load_policy: '0',
+      playsinline: '1',
+      autoplay: '0',
+      enablejsapi: '1',
+      origin: window.location.origin
+    });
+
+    const urls = [];
+
+    if (movie.type === 'playlist' && movie.playlistid) {
+      urls.push(
+        `https://www.youtube-nocookie.com/embed/videoseries?list=${movie.playlistid}&${baseParams.toString()}`,
+        `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&${baseParams.toString()}`
+      );
       return {
-        primary: `https://www.youtube-nocookie.com/embed/videoseries?list=${movie.playlistid}&${customParams}`,
-        secondary: `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&${customParams}`,
-        directLink: `https://www.youtube.com/playlist?list=${movie.playlistid}`,
+        embedUrls: urls,
+        directLink: `https://www.youtube.com/playlist?list=${movie.playlistid}`
       };
     }
-    return {
-      primary: `https://www.youtube-nocookie.com/embed/${movie.youtubeid}?${customParams}`,
-      secondary: `https://www.youtube.com/embed/${movie.youtubeid}?${customParams}`,
-      directLink: `https://www.youtube.com/watch?v=${movie.youtubeid}`,
-    };
+
+    if (movie.youtubeid) {
+      urls.push(
+        `https://www.youtube-nocookie.com/embed/${movie.youtubeid}?${baseParams.toString()}`,
+        `https://www.youtube.com/embed/${movie.youtubeid}?${baseParams.toString()}`
+      );
+      return {
+        embedUrls: urls,
+        directLink: `https://www.youtube.com/watch?v=${movie.youtubeid}`
+      };
+    }
+
+    throw new Error('Configuration vidéo invalide');
   }, []);
 
-  const urls = getEmbedUrls(movie);
-  const embedUrls = movie.type === 'playlist' 
-    ? [urls.primary, urls.secondary] 
-    : [urls.primary, urls.secondary];
+  // Amélioration 5: Chargement des métadonnées avec gestion d'erreur
+  const loadVideoMetadata = useCallback(async (movie: Movie) => {
+    if (!movie.youtubeid) return;
 
-  // Chargement des métadonnées
-  useEffect(() => {
-    const loadMetadata = async () => {
-      if (movie.youtubeid) {
-        try {
-          const title = await getYoutubeTitle(`https://www.youtube.com/watch?v=${movie.youtubeid}`);
-          if (title) {
-            setVideoMetadata({
-              title: title || movie.title,
-              description: movie.description || '',
-              duration: `${Math.floor(Math.random() * 120) + 60}min`,
-              publishedAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR'),
-              viewCount: `${(Math.random() * 10000000).toFixed(0)} vues`,
-              channelTitle: 'Chaîne YouTube'
-            });
-          }
-        } catch (error) {
-          console.warn('Erreur chargement métadonnées:', error);
-        }
-      }
-    };
-    loadMetadata();
-  }, [movie]);
+    try {
+      const title = await getYoutubeTitle(`https://www.youtube.com/watch?v=${movie.youtubeid}`);
+      
+      setVideoMetadata({
+        title: title || movie.title,
+        description: movie.description || '',
+        duration: `${Math.floor(Math.random() * 120) + 60}min`,
+        publishedAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR'),
+        viewCount: `${Math.floor(Math.random() * 10000000).toLocaleString()} vues`,
+        channelTitle: 'Chaîne YouTube'
+      });
+    } catch (error) {
+      console.warn('Erreur chargement métadonnées:', error);
+      // Continuer sans métadonnées détaillées
+      setVideoMetadata({
+        title: movie.title,
+        description: movie.description || '',
+        duration: 'Durée inconnue',
+        publishedAt: 'Date inconnue',
+        viewCount: 'Vues inconnues',
+        channelTitle: 'Chaîne YouTube'
+      });
+    }
+  }, []);
 
-  // Gestion du masquage des contrôles avec délai plus long
-  useEffect(() => {
-    const hideControls = () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 5000); // CORRECTION: Délai plus long (était 3000)
-    };
-
-    hideControls();
-
-    return () => {
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-    };
-  }, [showControls]);
-
-  // Réinitialisation de l'état au changement de film
-  useEffect(() => {
-    setIsLoading(true);
-    setHasError(false);
-    setCurrentUrlIndex(0);
+  // Amélioration 6: Gestion du masquage des contrôles optimisée
+  const resetControlsTimer = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
     setShowControls(true);
-  }, [movie?.id]);
+    
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, CONTROLS_HIDE_DELAY);
+  }, []);
 
-  // CORRECTION: Timeout réduit et gestion d'erreur améliorée
-  useEffect(() => {
-    if (!isLoading) return;
+  // Amélioration 7: Fonction de retry centralisée
+  const retryLoading = useCallback(() => {
+    const { embedUrls } = generateEmbedUrls(movie);
+    
+    if (loadingState.attemptCount >= RETRY_ATTEMPTS) {
+      setLoadingState(prev => ({
+        ...prev,
+        hasError: true,
+        isLoading: false,
+        errorMessage: 'Impossible de charger la vidéo après plusieurs tentatives'
+      }));
+      return;
+    }
 
-    const timeout = setTimeout(() => {
-      if (currentUrlIndex < embedUrls.length - 1) {
-        console.log(`Tentative URL ${currentUrlIndex + 1}:`, embedUrls[currentUrlIndex + 1]);
-        setCurrentUrlIndex(prev => prev + 1);
-        setIsLoading(true);
-        setHasError(false);
-      } else {
-        setHasError(true);
-        setIsLoading(false);
-        toast.error('Impossible de charger la vidéo');
-      }
-    }, 5000); // CORRECTION: Délai réduit (était 8000)
+    if (currentUrlIndex < embedUrls.length - 1) {
+      setCurrentUrlIndex(prev => prev + 1);
+      setLoadingState(prev => ({
+        ...prev,
+        isLoading: true,
+        hasError: false,
+        attemptCount: prev.attemptCount + 1
+      }));
+    } else {
+      setLoadingState(prev => ({
+        ...prev,
+        hasError: true,
+        isLoading: false,
+        errorMessage: 'Toutes les sources ont échoué'
+      }));
+    }
+  }, [movie, loadingState.attemptCount, currentUrlIndex, generateEmbedUrls]);
 
-    return () => clearTimeout(timeout);
-  }, [isLoading, currentUrlIndex, embedUrls.length]);
-
-  // Gestionnaires d'événements
+  // Amélioration 8: Gestionnaires d'événements optimisés
   const handleIframeLoad = useCallback(() => {
-    console.log('Iframe loaded successfully');
-    setIsLoading(false);
-    setHasError(false);
-    toast.success('Vidéo chargée avec succès');
+    console.log('Iframe chargée avec succès');
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+    
+    setLoadingState({
+      isLoading: false,
+      hasError: false,
+      attemptCount: 0
+    });
+    
+    toast.success('Vidéo chargée', { duration: 2000 });
   }, []);
 
   const handleIframeError = useCallback(() => {
-    console.error('Iframe failed to load');
-    if (currentUrlIndex < embedUrls.length - 1) {
-      setCurrentUrlIndex(prev => prev + 1);
-      setIsLoading(true);
-      setHasError(false);
-    } else {
-      setHasError(true);
-      setIsLoading(false);
-      toast.error('Erreur de chargement de la vidéo');
+    console.error('Erreur chargement iframe');
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
     }
-  }, [currentUrlIndex, embedUrls.length]);
+    retryLoading();
+  }, [retryLoading]);
 
-  const openInYoutube = useCallback(() => {
-    window.open(urls.directLink, '_blank');
-    toast.info('Ouverture sur YouTube...');
-  }, [urls.directLink]);
-
-  const handleDownload = useCallback(() => {
-    toast.info('Téléchargement démarré...', {
-      description: 'Le téléchargement de la vidéo a commencé en arrière-plan.'
-    });
-  }, []);
-
+  // Amélioration 9: Actions avec feedback utilisateur amélioré
   const handleShare = useCallback(async () => {
     try {
-      if (navigator.share) {
-        await navigator.share({
+      const { directLink } = generateEmbedUrls(movie);
+      
+      if (navigator.share && navigator.canShare) {
+        const shareData = {
           title: movie.title,
-          text: movie.description || '',
-          url: urls.directLink
-        });
-      } else {
-        await navigator.clipboard.writeText(urls.directLink);
-        toast.success('Lien copié dans le presse-papiers');
+          text: movie.description || `Regardez "${movie.title}" sur YouTube`,
+          url: directLink
+        };
+        
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          toast.success('Partagé avec succès');
+          return;
+        }
       }
+      
+      await navigator.clipboard.writeText(directLink);
+      toast.success('Lien copié dans le presse-papiers');
     } catch (error) {
       console.error('Erreur partage:', error);
       toast.error('Erreur lors du partage');
     }
-  }, [movie.title, movie.description, urls.directLink]);
+  }, [movie, generateEmbedUrls]);
 
-  const handleMouseMove = useCallback(() => {
-    setShowControls(true);
+  const handleOpenInYoutube = useCallback(() => {
+    try {
+      const { directLink } = generateEmbedUrls(movie);
+      window.open(directLink, '_blank', 'noopener,noreferrer');
+      toast.info('Ouverture sur YouTube...');
+    } catch (error) {
+      console.error('Erreur ouverture YouTube:', error);
+      toast.error('Impossible d\'ouvrir sur YouTube');
+    }
+  }, [movie, generateEmbedUrls]);
+
+  // Amélioration 10: Gestion du clavier
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case 'Escape':
+          onClose();
+          break;
+        case ' ':
+          event.preventDefault();
+          resetControlsTimer();
+          break;
+        case 'f':
+        case 'F':
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            handleOpenInYoutube();
+          }
+          break;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, resetControlsTimer, handleOpenInYoutube]);
+
+  // Effet d'initialisation
+  useEffect(() => {
+    setLoadingState({ isLoading: true, hasError: false, attemptCount: 0 });
+    setCurrentUrlIndex(0);
+    loadVideoMetadata(movie);
+    resetControlsTimer();
+  }, [movie?.id, loadVideoMetadata, resetControlsTimer]);
+
+  // Timeout de chargement
+  useEffect(() => {
+    if (!loadingState.isLoading) return;
+
+    loadingTimeoutRef.current = setTimeout(() => {
+      retryLoading();
+    }, IFRAME_TIMEOUT);
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [loadingState.isLoading, retryLoading]);
+
+  // Nettoyage
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+    };
   }, []);
 
-  // CORRECTION: Gestion du clic sur l'iframe
-  const handleIframeClick = useCallback(() => {
-    // Cette fonction permet de détecter les clics sur l'iframe
-    console.log('Click detected on iframe');
-  }, []);
+  // Amélioration 11: Génération des URLs avec gestion d'erreur
+  let embedUrls: string[] = [];
+  let directLink = '';
+
+  try {
+    const urls = generateEmbedUrls(movie);
+    embedUrls = urls.embedUrls;
+    directLink = urls.directLink;
+  } catch (error) {
+    console.error('Erreur génération URLs:', error);
+    setLoadingState(prev => ({
+      ...prev,
+      hasError: true,
+      isLoading: false,
+      errorMessage: 'Configuration vidéo invalide'
+    }));
+  }
 
   return (
     <motion.div
@@ -220,132 +321,175 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
       exit={{ opacity: 0 }}
       onClick={onClose}
       ref={modalRef}
-      onMouseMove={handleMouseMove}
+      onMouseMove={resetControlsTimer}
+      onTouchStart={resetControlsTimer}
     >
-      {/* Contenu principal */}
       <div
         className="relative w-full h-full max-w-7xl mx-auto flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header avec informations */}
+        {/* Header amélioré */}
         <AnimatePresence>
           {showControls && (
-            <motion.div
-              initial={{ opacity: 0, y: -50 }}
+            <motion.header
+              initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-6"
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/95 to-transparent p-4 sm:p-6"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 mr-6">
-                  <h1 className="text-2xl font-bold text-white mb-2">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold text-white mb-2 truncate">
                     {videoMetadata?.title || movie.title}
                   </h1>
-                  <div className="flex items-center gap-4 text-sm text-gray-300 mb-3">
-                    <Badge variant="secondary" className="bg-red-600 text-white">
+                  
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-300 mb-3">
+                    <Badge variant="secondary" className="bg-red-600 text-white text-xs">
                       {movie.type === 'playlist' ? 'SÉRIE' : 'FILM'}
                     </Badge>
+                    
                     {videoMetadata && (
                       <>
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {videoMetadata.publishedAt}
+                          <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">{videoMetadata.publishedAt}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {videoMetadata.duration}
+                          <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span>{videoMetadata.duration}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Tv className="h-4 w-4" />
-                          {videoMetadata.viewCount}
+                          <Tv className="h-3 w-3 sm:h-4 sm:w-4" />
+                          <span className="hidden sm:inline">{videoMetadata.viewCount}</span>
                         </div>
                       </>
                     )}
                   </div>
+                  
                   {movie.description && (
-                    <p className="text-gray-300 text-sm line-clamp-2">
+                    <p className="text-gray-300 text-xs sm:text-sm line-clamp-2">
                       {movie.description}
                     </p>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleDownload}
-                    className="bg-gray-800 hover:bg-gray-700"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                   <Button
                     variant="secondary"
                     size="icon"
                     onClick={handleShare}
-                    className="bg-gray-800 hover:bg-gray-700"
+                    className="bg-gray-800/80 hover:bg-gray-700/80 h-8 w-8 sm:h-10 sm:w-10"
+                    title="Partager"
                   >
-                    <Share2 className="h-4 w-4" />
+                    <Share2 className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
+                  
                   <Button
                     variant="secondary"
                     size="icon"
-                    onClick={openInYoutube}
-                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={handleOpenInYoutube}
+                    className="bg-blue-600/80 hover:bg-blue-700/80 h-8 w-8 sm:h-10 sm:w-10"
+                    title="Ouvrir sur YouTube (Ctrl+F)"
                   >
-                    <Maximize className="h-4 w-4" />
+                    <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
+                  
                   <Button
                     variant="secondary"
                     size="icon"
                     onClick={onClose}
-                    className="bg-gray-800 hover:bg-gray-700"
+                    className="bg-gray-800/80 hover:bg-gray-700/80 h-8 w-8 sm:h-10 sm:w-10"
+                    title="Fermer (Esc)"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </motion.header>
           )}
         </AnimatePresence>
 
-        {/* Lecteur vidéo */}
-        <div className="flex-1 relative">
-          {isLoading && (
+        {/* Lecteur vidéo amélioré */}
+        <main className="flex-1 relative">
+          {/* État de chargement */}
+          {loadingState.isLoading && (
             <div className="absolute inset-0 bg-black flex items-center justify-center z-10">
-              <div className="text-center">
+              <div className="text-center max-w-md px-4">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="mb-6"
                 >
-                  <Loader2 className="h-12 w-12 text-white mb-4 mx-auto" />
+                  <Loader2 className="h-12 w-12 text-white mx-auto" />
                 </motion.div>
+                
                 <h3 className="text-white text-lg font-semibold mb-2">
                   Chargement de la vidéo...
                 </h3>
-                <p className="text-gray-400 text-sm">
-                  {currentUrlIndex > 0 ? `Tentative ${currentUrlIndex + 1}...` : 'Préparation du lecteur...'}
+                
+                <p className="text-gray-400 text-sm mb-4">
+                  {loadingState.attemptCount > 0 
+                    ? `Tentative ${loadingState.attemptCount + 1}/${RETRY_ATTEMPTS + 1}`
+                    : 'Préparation du lecteur...'
+                  }
                 </p>
+                
+                <div className="w-full bg-gray-700 rounded-full h-1">
+                  <motion.div 
+                    className="bg-blue-600 h-1 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: "100%" }}
+                    transition={{ 
+                      duration: IFRAME_TIMEOUT / 1000,
+                      ease: "linear"
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}
 
-          {hasError && (
+          {/* État d'erreur amélioré */}
+          {loadingState.hasError && (
             <div className="absolute inset-0 bg-black flex items-center justify-center z-10">
-              <div className="text-center space-y-4">
-                <X className="h-16 w-16 text-red-500 mx-auto" />
-                <h3 className="text-white text-xl font-semibold">
-                  Impossible de charger la vidéo
-                </h3>
-                <p className="text-gray-400 max-w-md">
-                  Cette vidéo ne peut pas être lue dans le lecteur intégré.
-                  Vous pouvez l'ouvrir directement sur YouTube.
-                </p>
-                <div className="flex gap-4 justify-center">
-                  <Button onClick={openInYoutube} className="bg-red-600 hover:bg-red-700">
-                    <Play className="h-4 w-4 mr-2" />
+              <div className="text-center space-y-6 max-w-md px-4">
+                <AlertCircle className="h-16 w-16 text-red-500 mx-auto" />
+                
+                <div>
+                  <h3 className="text-white text-xl font-semibold mb-2">
+                    Impossible de charger la vidéo
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    {loadingState.errorMessage || 'Cette vidéo ne peut pas être lue dans le lecteur intégré.'}
+                  </p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={handleOpenInYoutube} 
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <Tv className="h-4 w-4 mr-2" />
                     Ouvrir sur YouTube
                   </Button>
-                  <Button variant="outline" onClick={onClose} className="border-gray-600 text-gray-300">
+                  
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setLoadingState({ isLoading: true, hasError: false, attemptCount: 0 });
+                      setCurrentUrlIndex(0);
+                    }}
+                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Réessayer
+                  </Button>
+                  
+                  <Button 
+                    variant="ghost" 
+                    onClick={onClose}
+                    className="text-gray-400 hover:text-white"
+                  >
                     Fermer
                   </Button>
                 </div>
@@ -353,74 +497,39 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
             </div>
           )}
 
-          {!hasError && (
+          {/* Iframe optimisée */}
+          {!loadingState.hasError && embedUrls.length > 0 && (
             <iframe
               ref={iframeRef}
-              key={`${currentUrlIndex}-${movie.id}`} // CORRECTION: Clé plus unique
+              key={`${currentUrlIndex}-${movie.id}-${loadingState.attemptCount}`}
               className="w-full h-full"
               src={embedUrls[currentUrlIndex]}
-              title={`${movie.title} - Lecteur vidéo`}
+              title={`${movie.title} - Lecteur vidéo YouTube`}
               allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               onLoad={handleIframeLoad}
               onError={handleIframeError}
-              onClick={handleIframeClick}
-              style={{ 
-                border: 'none',
-                pointerEvents: 'auto' // CORRECTION: S'assurer que les événements sont autorisés
-              }}
+              style={{ border: 'none' }}
+              loading="eager"
             />
           )}
-        </div>
+        </main>
 
-        {/* CORRECTION: Contrôles simplifiés qui ne bloquent pas l'iframe */}
+        {/* Instructions d'utilisation */}
         <AnimatePresence>
-          {showControls && !hasError && !isLoading && (
+          {showControls && !loadingState.hasError && !loadingState.isLoading && (
             <motion.div
-              initial={{ opacity: 0, y: 50 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-6"
-              style={{ pointerEvents: 'none' }} // CORRECTION: Laisser passer les clics vers l'iframe
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-white text-sm">
-                    Les contrôles sont disponibles dans le lecteur YouTube
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2" style={{ pointerEvents: 'auto' }}> {/* CORRECTION: Réactiver pour les boutons */}
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleShare}
-                    className="bg-gray-800/80 hover:bg-gray-700/80 backdrop-blur-sm"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={openInYoutube}
-                    className="bg-blue-600/80 hover:bg-blue-700/80 backdrop-blur-sm"
-                  >
-                    <Maximize className="h-4 w-4" />
-                  </Button>
-                </div>
+              <div className="bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs text-center">
+                Utilisez les contrôles YouTube • Esc pour fermer • Ctrl+F pour YouTube
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* CORRECTION: Affichage des URLs pour debug (à retirer en production) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="absolute top-20 left-4 bg-black/80 text-white p-2 rounded text-xs max-w-md">
-            <div>URL actuelle ({currentUrlIndex + 1}/{embedUrls.length}):</div>
-            <div className="break-all">{embedUrls[currentUrlIndex]}</div>
-          </div>
-        )}
       </div>
     </motion.div>
   );
