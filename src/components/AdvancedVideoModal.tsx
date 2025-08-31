@@ -37,44 +37,34 @@ interface VideoMetadata {
 export default function AdvancedVideoModal({ movie, onClose }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(80);
-  const [showControls, setShowControls] = useState(true);
-  // Correction de l'erreur: déclaration de l'état pour l'index de l'URL
   const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
-  const [progress, setProgress] = useState<VideoProgress>({
-    currentTime: 0,
-    duration: 0,
-    buffered: 0
-  });
+  const [showControls, setShowControls] = useState(true);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // URLs avec paramètres pour masquer l'interface YouTube
+  // CORRECTION PRINCIPALE: URLs avec contrôles YouTube activés
   const getEmbedUrls = useCallback((movie: Movie) => {
     const customParams = [
       'rel=0',           // Pas de vidéos associées
       'modestbranding=1', // Interface YouTube minimale
       'showinfo=0',       // Pas d'infos vidéo
-      'controls=0',       // Masquer les contrôles YouTube
-      'disablekb=1',      // Désactiver raccourcis clavier YouTube
-      'fs=0',             // Pas de fullscreen YouTube
+      'controls=1',       // CORRECTION: Garder les contrôles YouTube (était 0)
+      'fs=1',             // CORRECTION: Autoriser le fullscreen (était 0)
       'iv_load_policy=3', // Pas d'annotations
       'cc_load_policy=0', // Pas de sous-titres auto
       'playsinline=1',    // Lecture inline
       'autoplay=0',       // Pas d'autoplay
-      'start=0',          // Début à 0
       'enablejsapi=1',    // API JS pour les interactions
-      'origin=' + window.location.origin
+      'origin=' + encodeURIComponent(window.location.origin)
     ].join('&');
 
     if (movie.type === 'playlist') {
       return {
         primary: `https://www.youtube-nocookie.com/embed/videoseries?list=${movie.playlistid}&${customParams}`,
+        secondary: `https://www.youtube.com/embed/videoseries?list=${movie.playlistid}&${customParams}`,
         directLink: `https://www.youtube.com/playlist?list=${movie.playlistid}`,
       };
     }
@@ -86,7 +76,9 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
   }, []);
 
   const urls = getEmbedUrls(movie);
-  const embedUrls = movie.type === 'playlist' ? [urls.primary] : [urls.primary, urls.secondary];
+  const embedUrls = movie.type === 'playlist' 
+    ? [urls.primary, urls.secondary] 
+    : [urls.primary, urls.secondary];
 
   // Chargement des métadonnées
   useEffect(() => {
@@ -112,45 +104,41 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
     loadMetadata();
   }, [movie]);
 
-  // Gestion du masquage des contrôles
+  // Gestion du masquage des contrôles avec délai plus long
   useEffect(() => {
     const hideControls = () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
       controlsTimeoutRef.current = setTimeout(() => {
-        if (isPlaying) setShowControls(false);
-      }, 3000);
+        setShowControls(false);
+      }, 5000); // CORRECTION: Délai plus long (était 3000)
     };
 
-    if (isPlaying) {
-      hideControls();
-    } else {
-      setShowControls(true);
-    }
+    hideControls();
 
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying, showControls]);
+  }, [showControls]);
 
   // Réinitialisation de l'état au changement de film
   useEffect(() => {
     setIsLoading(true);
     setHasError(false);
     setCurrentUrlIndex(0);
-    setIsPlaying(false);
-    setProgress({ currentTime: 0, duration: 0, buffered: 0 });
+    setShowControls(true);
   }, [movie?.id]);
 
-  // Timeout de chargement pour passer à l'URL alternative
+  // CORRECTION: Timeout réduit et gestion d'erreur améliorée
   useEffect(() => {
     if (!isLoading) return;
 
     const timeout = setTimeout(() => {
       if (currentUrlIndex < embedUrls.length - 1) {
+        console.log(`Tentative URL ${currentUrlIndex + 1}:`, embedUrls[currentUrlIndex + 1]);
         setCurrentUrlIndex(prev => prev + 1);
         setIsLoading(true);
         setHasError(false);
@@ -159,19 +147,21 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
         setIsLoading(false);
         toast.error('Impossible de charger la vidéo');
       }
-    }, 8000);
+    }, 5000); // CORRECTION: Délai réduit (était 8000)
 
     return () => clearTimeout(timeout);
   }, [isLoading, currentUrlIndex, embedUrls.length]);
 
   // Gestionnaires d'événements
-  const handleIframeLoad = () => {
+  const handleIframeLoad = useCallback(() => {
+    console.log('Iframe loaded successfully');
     setIsLoading(false);
     setHasError(false);
     toast.success('Vidéo chargée avec succès');
-  };
+  }, []);
 
-  const handleIframeError = () => {
+  const handleIframeError = useCallback(() => {
+    console.error('Iframe failed to load');
     if (currentUrlIndex < embedUrls.length - 1) {
       setCurrentUrlIndex(prev => prev + 1);
       setIsLoading(true);
@@ -179,45 +169,48 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
     } else {
       setHasError(true);
       setIsLoading(false);
+      toast.error('Erreur de chargement de la vidéo');
     }
-  };
+  }, [currentUrlIndex, embedUrls.length]);
 
-  const togglePlay = () => setIsPlaying(!isPlaying);
-  const toggleMute = () => setIsMuted(!isMuted);
-
-  const handleVolumeChange = (newVolume: number) => {
-    setVolume(newVolume);
-    if (newVolume === 0) setIsMuted(true);
-    else if (isMuted) setIsMuted(false);
-  };
-
-  const openInYoutube = () => {
+  const openInYoutube = useCallback(() => {
     window.open(urls.directLink, '_blank');
     toast.info('Ouverture sur YouTube...');
-  };
+  }, [urls.directLink]);
 
-  const handleDownload = () => {
+  const handleDownload = useCallback(() => {
     toast.info('Téléchargement démarré...', {
       description: 'Le téléchargement de la vidéo a commencé en arrière-plan.'
     });
-  };
+  }, []);
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: movie.title,
-        text: movie.description,
-        url: urls.directLink
-      });
-    } else {
-      navigator.clipboard.writeText(urls.directLink);
-      toast.success('Lien copié dans le presse-papiers');
+  const handleShare = useCallback(async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: movie.title,
+          text: movie.description || '',
+          url: urls.directLink
+        });
+      } else {
+        await navigator.clipboard.writeText(urls.directLink);
+        toast.success('Lien copié dans le presse-papiers');
+      }
+    } catch (error) {
+      console.error('Erreur partage:', error);
+      toast.error('Erreur lors du partage');
     }
-  };
+  }, [movie.title, movie.description, urls.directLink]);
 
-  const handleMouseMove = () => {
+  const handleMouseMove = useCallback(() => {
     setShowControls(true);
-  };
+  }, []);
+
+  // CORRECTION: Gestion du clic sur l'iframe
+  const handleIframeClick = useCallback(() => {
+    // Cette fonction permet de détecter les clics sur l'iframe
+    console.log('Click detected on iframe');
+  }, []);
 
   return (
     <motion.div
@@ -296,6 +289,14 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   <Button
                     variant="secondary"
                     size="icon"
+                    onClick={openInYoutube}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Maximize className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
                     onClick={onClose}
                     className="bg-gray-800 hover:bg-gray-700"
                   >
@@ -322,7 +323,7 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   Chargement de la vidéo...
                 </h3>
                 <p className="text-gray-400 text-sm">
-                  {currentUrlIndex > 0 ? 'Tentative alternative...' : 'Préparation du lecteur...'}
+                  {currentUrlIndex > 0 ? `Tentative ${currentUrlIndex + 1}...` : 'Préparation du lecteur...'}
                 </p>
               </div>
             </div>
@@ -339,10 +340,15 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
                   Cette vidéo ne peut pas être lue dans le lecteur intégré.
                   Vous pouvez l'ouvrir directement sur YouTube.
                 </p>
-                <Button onClick={openInYoutube} className="bg-red-600 hover:bg-red-700">
-                  <Play className="h-4 w-4 mr-2" />
-                  Ouvrir sur YouTube
-                </Button>
+                <div className="flex gap-4 justify-center">
+                  <Button onClick={openInYoutube} className="bg-red-600 hover:bg-red-700">
+                    <Play className="h-4 w-4 mr-2" />
+                    Ouvrir sur YouTube
+                  </Button>
+                  <Button variant="outline" onClick={onClose} className="border-gray-600 text-gray-300">
+                    Fermer
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -350,20 +356,24 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
           {!hasError && (
             <iframe
               ref={iframeRef}
-              key={currentUrlIndex}
+              key={`${currentUrlIndex}-${movie.id}`} // CORRECTION: Clé plus unique
               className="w-full h-full"
               src={embedUrls[currentUrlIndex]}
               title={`${movie.title} - Lecteur vidéo`}
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               onLoad={handleIframeLoad}
               onError={handleIframeError}
-              style={{ border: 'none' }}
+              onClick={handleIframeClick}
+              style={{ 
+                border: 'none',
+                pointerEvents: 'auto' // CORRECTION: S'assurer que les événements sont autorisés
+              }}
             />
           )}
         </div>
 
-        {/* Contrôles personnalisés */}
+        {/* CORRECTION: Contrôles simplifiés qui ne bloquent pas l'iframe */}
         <AnimatePresence>
           {showControls && !hasError && !isLoading && (
             <motion.div
@@ -371,82 +381,46 @@ export default function AdvancedVideoModal({ movie, onClose }: Props) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}
               className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 to-transparent p-6"
+              style={{ pointerEvents: 'none' }} // CORRECTION: Laisser passer les clics vers l'iframe
             >
-              {/* Barre de progression */}
-              <div className="mb-4">
-                <Progress value={30} className="h-1 bg-gray-700" />
-              </div>
-
-              {/* Contrôles */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={togglePlay}
-                    className="text-white hover:bg-white/20"
-                  >
-                    {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipBack className="h-5 w-5" />
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <SkipForward className="h-5 w-5" />
-                  </Button>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleMute}
-                      className="text-white hover:bg-white/20"
-                    >
-                      {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-                    </Button>
-
-                    <div className="w-20">
-                      <Progress value={isMuted ? 0 : volume} className="h-1" />
-                    </div>
+                  <div className="text-white text-sm">
+                    Les contrôles sont disponibles dans le lecteur YouTube
                   </div>
-
-                  <span className="text-white text-sm">
-                    1:23 / 15:42
-                  </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" style={{ pointerEvents: 'auto' }}> {/* CORRECTION: Réactiver pour les boutons */}
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
-                    className="text-white hover:bg-white/20"
+                    onClick={handleShare}
+                    className="bg-gray-800/80 hover:bg-gray-700/80 backdrop-blur-sm"
                   >
-                    <Settings className="h-5 w-5" />
+                    <Share2 className="h-4 w-4" />
                   </Button>
 
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     onClick={openInYoutube}
-                    className="text-white hover:bg-white/20"
+                    className="bg-blue-600/80 hover:bg-blue-700/80 backdrop-blur-sm"
                   >
-                    <Maximize className="h-5 w-5" />
+                    <Maximize className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* CORRECTION: Affichage des URLs pour debug (à retirer en production) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute top-20 left-4 bg-black/80 text-white p-2 rounded text-xs max-w-md">
+            <div>URL actuelle ({currentUrlIndex + 1}/{embedUrls.length}):</div>
+            <div className="break-all">{embedUrls[currentUrlIndex]}</div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
