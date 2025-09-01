@@ -279,68 +279,6 @@ export const useMovieStore = create<MovieState & MovieActions>()(
         }
       },
 
-      /**
-       * CORRECTION 6: Gestion optimisée de l'historique
-       */
-      addToWatchHistory: (movieId) => {
-        set(state => {
-          // Éviter les doublons et limiter l'historique
-          const filteredHistory = state.watchHistory.filter(id => id !== movieId);
-          const newHistory = [movieId, ...filteredHistory].slice(0, 100);
-          
-          console.log('Film ajouté à l\'historique:', movieId);
-          return { watchHistory: newHistory };
-        });
-      },
-
-      /**
-       * CORRECTION 7: Gestion améliorée des embeds bloqués
-       */
-      markAsEmbedBlocked: (youtubeId) => {
-        set(state => {
-          if (state.embedBlocked.includes(youtubeId)) return state;
-          
-          console.log('Embed marqué comme bloqué:', youtubeId);
-          return {
-            embedBlocked: [...state.embedBlocked, youtubeId],
-          };
-        });
-      },
-
-      isEmbedBlocked: (youtubeId) => {
-        return get().embedBlocked.includes(youtubeId);
-      },
-
-      /**
-       * Validation d'embed avec mise en cache
-       */
-      validateMovieEmbed: async (movieId) => {
-        const movie = get().movies.find(m => m.id === movieId);
-        if (!movie?.youtubeid) return false;
-
-        // Vérifier le cache d'abord
-        if (get().isEmbedBlocked(movie.youtubeid)) {
-          return false;
-        }
-
-        try {
-          const validation = await validateYouTubeEmbed(movie.youtubeid);
-          if (!validation.canEmbed) {
-            get().markAsEmbedBlocked(movie.youtubeid);
-            return false;
-          }
-          
-          // Retirer du cache des bloqués si maintenant valide
-          set(state => ({
-            embedBlocked: state.embedBlocked.filter(id => id !== movie.youtubeid),
-          }));
-          return true;
-        } catch (error) {
-          console.error('Erreur validation embed:', error);
-          return false;
-        }
-      },
-
       updateMovie: async (id, updates) => {
         set({ loading: true, error: null });
         try {
@@ -445,12 +383,17 @@ export const useMovieStore = create<MovieState & MovieActions>()(
         });
       },
 
+      /**
+       * CORRECTION 6: Gestion optimisée de l'historique
+       */
       addToWatchHistory: (movieId) => {
         set(state => {
-          const newHistory = [movieId, ...state.watchHistory.filter(id => id !== movieId)];
-          return {
-            watchHistory: newHistory.slice(0, 100), // Limite augmentée
-          };
+          // Éviter les doublons et limiter l'historique
+          const filteredHistory = state.watchHistory.filter(id => id !== movieId);
+          const newHistory = [movieId, ...filteredHistory].slice(0, 100);
+          
+          console.log('Film ajouté à l\'historique:', movieId);
+          return { watchHistory: newHistory };
         });
       },
 
@@ -467,10 +410,14 @@ export const useMovieStore = create<MovieState & MovieActions>()(
         set({ sortBy, sortOrder: order });
       },
 
+      /**
+       * CORRECTION 7: Gestion améliorée des embeds bloqués
+       */
       markAsEmbedBlocked: (youtubeId) => {
         set(state => {
           if (state.embedBlocked.includes(youtubeId)) return state;
-          console.log('Marquage embed bloqué:', youtubeId);
+          
+          console.log('Embed marqué comme bloqué:', youtubeId);
           return {
             embedBlocked: [...state.embedBlocked, youtubeId],
           };
@@ -481,10 +428,14 @@ export const useMovieStore = create<MovieState & MovieActions>()(
         return get().embedBlocked.includes(youtubeId);
       },
 
+      /**
+       * Validation d'embed avec mise en cache
+       */
       validateMovieEmbed: async (movieId) => {
         const movie = get().movies.find(m => m.id === movieId);
         if (!movie?.youtubeid) return false;
 
+        // Vérifier le cache d'abord
         if (get().isEmbedBlocked(movie.youtubeid)) {
           return false;
         }
@@ -496,6 +447,7 @@ export const useMovieStore = create<MovieState & MovieActions>()(
             return false;
           }
           
+          // Retirer du cache des bloqués si maintenant valide
           set(state => ({
             embedBlocked: state.embedBlocked.filter(id => id !== movie.youtubeid),
           }));
