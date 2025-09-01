@@ -283,14 +283,38 @@ export default function MoviesPage() {
       isInWatchlist: watchlist.has(movie.id)
     })) as MovieWithMetadata[];
   }, [movies, filterCategory, searchQuery, sortMode, favorites, watchlist]);
+// CORRECTION: Mise à jour du gestionnaire de sélection de film
+const handleMovieSelect = useCallback((movie: Movie) => {
+  console.log('Film sélectionné:', movie.title);
+  
+  // Validation côté composant pour feedback immédiat
+  if (!movie.youtubeid && !movie.playlistid) {
+    toast.error('Vidéo non disponible', { 
+      description: 'Ce contenu ne possède pas d\'ID YouTube valide.' 
+    });
+    return;
+  }
 
-  const handleMovieSelect = useCallback((movie: Movie) => {
-    if (!movie.youtubeid && !movie.playlistid) {
-      toast.error('Vidéo non disponible', { description: 'Ce contenu ne peut pas être lu.' });
-      return;
-    }
-    setCurrentMovie(movie);
-  }, [setCurrentMovie]);
+  // Vérification des embeds bloqués
+  const movieStore = useMovieStore.getState();
+  if (movie.youtubeid && movieStore.isEmbedBlocked(movie.youtubeid)) {
+    toast.warning('Lecture limitée', {
+      description: 'Cette vidéo ne peut pas être intégrée. Ouverture sur YouTube...',
+      action: {
+        label: 'Ouvrir',
+        onClick: () => {
+          const directLink = `https://www.youtube.com/watch?v=${movie.youtubeid}`;
+          window.open(directLink, '_blank');
+        }
+      }
+    });
+    return;
+  }
+
+  // CORRECTION: Utiliser la nouvelle signature
+  setCurrentMovie(movie, true); // true = ajouter à l'historique
+}, [setCurrentMovie]);
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
