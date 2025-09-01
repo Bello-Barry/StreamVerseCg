@@ -21,7 +21,7 @@ interface MovieCardProps {
 }
 
 /**
- * Composant de carte film/série style Netflix avec animations et fonctionnalités avancées
+ * CORRECTION: Composant de carte film/série avec gestion du clic corrigée
  */
 export const MovieCard: React.FC<MovieCardProps> = ({ 
   movie, 
@@ -44,17 +44,29 @@ export const MovieCard: React.FC<MovieCardProps> = ({
     (movie.playlistid ? "/placeholder-playlist.jpg" : null) || 
     "/placeholder-movie.jpg";
 
-  // Gestion du clic principal
-  const handleClick = (e: React.MouseEvent) => {
+  // CORRECTION 1: Gestion du clic principal sur toute la zone d'image
+  const handleMainClick = (e: React.MouseEvent) => {
+    // Vérifier si le clic provient d'un bouton d'action
+    const target = e.target as HTMLElement;
+    const isButton = target.closest('button') !== null;
+    
+    if (isButton) {
+      // Si c'est un bouton, laisser l'événement du bouton se déclencher
+      return;
+    }
+    
+    // Sinon, déclencher la lecture
     e.preventDefault();
     e.stopPropagation();
+    console.log('Clic principal détecté sur:', movie.title);
     onClick();
   };
 
-  // Actions secondaires
+  // CORRECTION 2: Actions secondaires avec propagation contrôlée
   const handleActionClick = (e: React.MouseEvent, action: () => void) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('Action secondaire déclenchée');
     action();
   };
 
@@ -77,8 +89,11 @@ export const MovieCard: React.FC<MovieCardProps> = ({
     >
       <Card className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700 cursor-pointer">
         <CardContent className="p-0">
-          {/* Image principale */}
-          <div className="relative aspect-[2/3] overflow-hidden">
+          {/* CORRECTION 3: Zone d'image cliquable avec gestionnaire unifié */}
+          <div 
+            className="relative aspect-[2/3] overflow-hidden cursor-pointer"
+            onClick={handleMainClick}
+          >
             <Image
               src={thumbnailSrc}
               alt={movie.title}
@@ -91,14 +106,16 @@ export const MovieCard: React.FC<MovieCardProps> = ({
               onLoad={() => setImageLoaded(true)}
             />
             
-            {/* Gradient overlay */}
-            <div className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 ${
-              isHovered ? 'opacity-100' : 'opacity-60'
-            }`} />
+            {/* CORRECTION 4: Overlay cliquable pour la lecture */}
+            <div 
+              className={`absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 cursor-pointer ${
+                isHovered ? 'opacity-100' : 'opacity-60'
+              }`}
+            />
 
-            {/* Badge type */}
+            {/* Badge type - Position fixe pour éviter les conflits de clic */}
             <motion.div 
-              className="absolute top-2 left-2"
+              className="absolute top-2 left-2 pointer-events-none z-10"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
@@ -115,9 +132,9 @@ export const MovieCard: React.FC<MovieCardProps> = ({
               </Badge>
             </motion.div>
 
-            {/* Rating badge */}
+            {/* Rating badge - Position fixe */}
             <motion.div 
-              className="absolute top-2 right-2"
+              className="absolute top-2 right-2 pointer-events-none z-10"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
@@ -127,11 +144,11 @@ export const MovieCard: React.FC<MovieCardProps> = ({
               </Badge>
             </motion.div>
 
-            {/* Bouton play central */}
+            {/* CORRECTION 5: Bouton play central avec z-index élevé */}
             <AnimatePresence>
               {isHovered && (
                 <motion.div
-                  className="absolute inset-0 flex items-center justify-center"
+                  className="absolute inset-0 flex items-center justify-center z-20"
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
@@ -139,8 +156,8 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                 >
                   <Button
                     size="lg"
-                    className="rounded-full bg-white hover:bg-white/90 text-black w-16 h-16 shadow-2xl"
-                    onClick={handleClick}
+                    className="rounded-full bg-white hover:bg-white/90 text-black w-16 h-16 shadow-2xl pointer-events-auto"
+                    onClick={handleMainClick}
                   >
                     <Play className="h-6 w-6 ml-1" fill="currentColor" />
                   </Button>
@@ -148,11 +165,11 @@ export const MovieCard: React.FC<MovieCardProps> = ({
               )}
             </AnimatePresence>
 
-            {/* Actions en bas */}
+            {/* CORRECTION 6: Actions en bas avec z-index et gestion des événements améliorée */}
             <AnimatePresence>
               {isHovered && (
                 <motion.div
-                  className="absolute bottom-0 left-0 right-0 p-3"
+                  className="absolute bottom-0 left-0 right-0 p-3 z-20"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
@@ -163,8 +180,9 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                       <Button
                         size="icon"
                         variant="secondary"
-                        className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8"
+                        className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8 pointer-events-auto"
                         onClick={(e) => handleActionClick(e, () => onToggleFavorite?.(movie))}
+                        title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
                       >
                         <Heart className={`h-4 w-4 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
                       </Button>
@@ -172,17 +190,19 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                       <Button
                         size="icon"
                         variant="secondary"
-                        className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8"
+                        className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8 pointer-events-auto"
                         onClick={(e) => handleActionClick(e, () => onAddToWatchlist?.(movie))}
+                        title={isInWatchlist ? "Retirer de la liste" : "Ajouter à la liste"}
                       >
-                        <Plus className={`h-4 w-4 ${isInWatchlist ? 'rotate-45' : ''}`} />
+                        <Plus className={`h-4 w-4 transition-transform ${isInWatchlist ? 'rotate-45' : ''}`} />
                       </Button>
                       
                       <Button
                         size="icon"
                         variant="secondary"
-                        className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8"
+                        className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8 pointer-events-auto"
                         onClick={(e) => handleActionClick(e, () => onDownload?.(movie))}
+                        title="Télécharger"
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -191,8 +211,9 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                     <Button
                       size="icon"
                       variant="secondary"
-                      className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8"
+                      className="rounded-full bg-black/70 hover:bg-black/90 text-white w-8 h-8 pointer-events-auto"
                       onClick={(e) => handleActionClick(e, () => setShowDetails(!showDetails))}
+                      title="Plus d'infos"
                     >
                       <Info className="h-4 w-4" />
                     </Button>
@@ -202,11 +223,12 @@ export const MovieCard: React.FC<MovieCardProps> = ({
             </AnimatePresence>
           </div>
 
-          {/* Informations du film */}
+          {/* CORRECTION 7: Zone d'informations également cliquable */}
           <motion.div 
-            className="p-4 space-y-2"
+            className="p-4 space-y-2 cursor-pointer"
             animate={{ height: showDetails ? 'auto' : '80px' }}
             transition={{ duration: 0.3 }}
+            onClick={handleMainClick}
           >
             <h3 className="text-white font-bold text-sm line-clamp-2 leading-tight">
               {movie.title}
@@ -237,7 +259,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
