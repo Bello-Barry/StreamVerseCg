@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Movie } from '@/types/movie';
 import { getYoutubeThumbnail } from '@/lib/getYoutubeThumbnail';
 import { Play, List, Info, Heart, Plus, Download, Star, Clock } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from '@/components/MotionWrapper';
 
 interface MovieCardProps {
   movie: Movie;
