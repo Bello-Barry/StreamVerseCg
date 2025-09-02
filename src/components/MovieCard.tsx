@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Movie } from '@/types/movie';
 import { getYoutubeThumbnail } from '@/lib/getYoutubeThumbnail';
 import { Play, List, Info, Heart, Plus, Download, Star, Clock } from 'lucide-react';
-import { motion, AnimatePresence } from '@/components/MotionWrapper';
+// CORRECTION : Import direct depuis framer-motion
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface MovieCardProps {
   movie: Movie;
@@ -259,7 +260,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </motion.div>
         </CardContent>
       </Card>
     </motion.div>

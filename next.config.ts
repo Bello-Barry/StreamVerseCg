@@ -53,10 +53,13 @@ const nextConfig: NextConfig = {
   },
 
   // Retrait de 'experimental.esmExternals' qui est déprécié dans Next.js 15
-  experimental: {},
+  experimental: {
+    optimizePackageImports: ['framer-motion'],
+  },
+  transpilePackages: ['framer-motion'],
 
-  // Transpiler les modules nécessaires
-  transpilePackages: ['webtorrent'],
+
+
 
   // Optimisation des images
   images: {
